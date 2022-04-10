@@ -1,0 +1,25 @@
+random seed: 0
+paths:
+  slurm output dir: ~/code/diffcoord/results
+  temp dir: ~/code/diffcoord/temp
+data loading:
+  batch size: 1024
+augmentations:
+  ordering: affine (.9), flip (.1), intensity (.7), noise (.5), bias (.3), gamma (.3), histogram shift (.1)
+  affine:
+    rotation (degrees): 60,60,60
+    translation (voxels): 25,25,12
+    shearing: .1,.1,.1
+    scaling: .1,.1,.1
+  intensity scaling: -.25,.33
+  intensity shift: .03
+  noise stdev: .03
+  bias field:
+    coefficients: 0,.5
+    order: 3
+  gamma: .7,1.5
+optimizer:
+  epochs: 1000
+  type: Adam
+  learning rate: 1e-3
+  weight decay: 1e-5
