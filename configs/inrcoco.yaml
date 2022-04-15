@@ -1,5 +1,0 @@
-network:
-  type: INR
-data loading:
-  start_ix: 64
-  dataset: COCO

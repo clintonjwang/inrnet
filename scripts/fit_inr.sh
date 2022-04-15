@@ -5,7 +5,7 @@ then
 fi
 sbatch <<EOT
 #! /bin/bash
-#SBATCH --partition=${3:-gpu}
+#SBATCH --partition=gpu
 #SBATCH --time=0
 #SBATCH -J $1
 #SBATCH --gres=gpu:1
@@ -17,12 +17,6 @@ sbatch <<EOT
 
 cd /data/vision/polina/users/clintonw/code/diffcoord/inrnet
 source .bashrc
-python train.py -j=$1 -c=${2:-imgnet}
+python fit_inr.py -j=$1 -c=$2 -s=$3
 exit()
 EOT
-
-#
-#bergamot,perilla,caraway,cassia
-# --mem-per-gpu=48G
-# #SBATCH --exclusive
-# ,zaatar,peppermint

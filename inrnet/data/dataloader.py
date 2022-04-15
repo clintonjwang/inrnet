@@ -3,20 +3,21 @@ osp=os.path
 import torchvision
 from torchvision import transforms
 from PIL import Image
+import dill as pickle
 
-from util import glob2
+from inrnet.util import glob2
+from inrnet.data import kitti
 
 class cocoDS(torchvision.datasets.VisionDataset):
     def __init__(self, root, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
         self.paths = glob2(self.root,"*.jpg")
-
     def __getitem__(self, ix):
         return self.transform(Image.open(self.paths[ix]))
     def __len__(self):
         return len(self.paths)
 
-def get_dataloader(args):
+def get_img_dataloader(args):
     paths, dl_args = (args["paths"], args["data loading"])
     if dl_args["dataset"] == "ImageNet":
         trans = transforms.Compose([transforms.ToTensor(),
@@ -27,7 +28,7 @@ def get_dataloader(args):
         # imagenet_data = torchvision.datasets.ImageNet()
         data_loader = torch.utils.data.DataLoader(imagenet_data, batch_size=1, shuffle=False)
 
-    elif dl_args["dataset"] == "COCO":
+    elif dl_args["dataset"] == "coco":
         trans = transforms.Compose([
             transforms.ToTensor(),
         ])
@@ -52,14 +53,18 @@ def get_dataloader(args):
             transform=trans)
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
 
-    elif dl_args["dataset"] == "CIFAR-100":
-        trans = transforms.Compose([transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        ])
-        dataset = torchvision.datasets.CIFAR100(root="/data/vision/polina/scratch/clintonw/datasets/cifar",
-                 transform=trans)
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True)
+    elif dl_args["dataset"] == "kitti":
+        data_loader = kitti.get_kitti_img_dataloader()
 
     else:
         raise NotImplementedError
     return data_loader
+
+
+def get_inr_dataloader(dl_args):
+    if dl_args["dataset"] == "kitti":
+        data_loader = kitti.get_kitti_inr_dataloader()
+    else:
+        raise NotImplementedError
+    return data_loader
+

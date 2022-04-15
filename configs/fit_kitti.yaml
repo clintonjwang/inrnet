@@ -1,0 +1,11 @@
+parent: fit_siren
+data loading:
+  interval: 16
+  end_ix: 800
+  dataset: kitti
+  variables: img, depth, id
+  image shape:
+  - 352
+  - 1216
+optimizer:
+  max steps: 1200

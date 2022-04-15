@@ -3,11 +3,9 @@ osp = os.path
 import dill as pickle
 import numpy as np
 
-import util, losses
-import models.model as model_module
-from data.dataloader import get_dataloader
-from analysis import analyze
-from data import dataloader
+from inrnet import util, losses
+from inrnet.analysis import analyze
+from inrnet.data import dataloader
 
 ANALYSIS_DIR = osp.expanduser("~/code/diffcoord/temp")
 RESULTS_DIR = osp.expanduser("~/code/diffcoord/results")
@@ -29,6 +27,7 @@ def get_job_args(job):
 
 def get_job_model_and_args(job, metric="dice"):
     args = get_job_args(job)
+    raise NotImplementedError
     model = model_module.get_model(args["paths"], args["network"]).cuda().eval()
     if args["network"]["type"] == "TopNet":
         model_path = osp.join(RESULTS_DIR, job, "weights/best.pth")

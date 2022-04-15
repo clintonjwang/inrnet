@@ -7,6 +7,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_name')
     parser.add_argument('-j', '--job_id', default="manual")
+    parser.add_argument('-s', '--start_ix', default=0, type=int)
     cmd_args = parser.parse_args()
 
     config_name = cmd_args.job_id if cmd_args.config_name is None else cmd_args.config_name
@@ -55,12 +56,12 @@ def args_from_file(path, cmd_args=None):
         parents = []
         names = jobname.split("_")
 
-        if names[0] in ["aug", "bw", "sm", "scratch", "overfit", "synth", "volSA"]:
+        if names[0] in ["naive", "conv", "attn"]:
             parents.append(names[0])
         else:
             raise ValueError(f"bad jobname {jobname}")
 
-        if names[-1] in ["unetr", "tnet"]:
+        if names[-1] in ["seg", "depth", "diff", "i2i"]:
             parents.append(names[-1])
         else:
             raise ValueError(f"bad jobname {jobname}")
@@ -68,7 +69,7 @@ def args_from_file(path, cmd_args=None):
         args = {"parent":parents}
 
     if cmd_args is not None:
-        for param in ["job_id", "config_name"]:
+        for param in ["job_id", "config_name", "start_ix"]:
             args[param] = getattr(cmd_args, param)
 
     while "parent" in args:

@@ -1,4 +1,4 @@
-import os, torch, cv2, skimage.measure, pdb, torch, yaml, PIL
+import os, torch, cv2, math, pdb, torch, yaml, PIL
 import numpy as np
 import nibabel as nib
 osp = os.path
@@ -10,9 +10,36 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import monai.transforms as mtr
+from scipy.stats.qmc import Sobol
 
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
+
+
+def load_checkpoint(model, paths):
+    if paths["pretrained model name"] is not None:
+        init_weight_path = osp.join(TMP_DIR, paths["pretrained model name"])
+        if not osp.exists(init_weight_path):
+            raise ValueError(f"bad pretrained model path {init_weight_path}")
+
+        checkpoint_sd = torch.load(init_weight_path)
+        model_sd = model.state_dict()
+        for k in model_sd.keys():
+            if k in checkpoint_sd.keys() and checkpoint_sd[k].shape != model_sd[k].shape:
+                checkpoint_sd.pop(k)
+
+        model.load_state_dict(checkpoint_sd, strict=False)
+
+
+def generate_quasirandom_sequence(d=3, n=64):
+    sobol = Sobol(d=d)
+    sample = sobol.random_base2(m=int(math.ceil(np.log2(n))))
+    return sample
+
+def cycle(iterator):
+    while True:
+        for data in iterator:
+            yield data
 
 def parse_int_or_list(x):
     # converts string to an int or list of ints
@@ -159,10 +186,6 @@ def save_metric_histograms(trackers, epoch, root):
             path = osp.join(root, f"{epoch}_{tracker.name}_{phase}.png")
             tracker.histogram(path=path, phase=phase, epoch=epoch)
 
-
-def get_num_connected_components(img):
-    _, num = skimage.measure.label(img, return_num=True)
-    return num
 
 def save_examples(prefix, root, *imgs):
     imgs = list(imgs)

@@ -1,0 +1,7 @@
+parent: fit_siren
+data loading:
+  start_ix: 25000
+  dataset: coco
+  variables: null
+optimizer:
+  max steps: 800
