@@ -96,20 +96,3 @@ class Pyramid(nn.Module):
             p.append(self.pool(inr))
         return CatINR(p)
 
-
-class SEBlock(nn.Module):
-    # Squeeze_and_Excitation
-    def __init__(self, channels, reduction_ratio):
-        super().__init__()
-        r_ch = channels//reduction_ratio
-        self.SE = nn.Sequential(
-            inn.GlobalAveragePooling(),
-            nn.Linear(channels, r_ch),
-            nn.ReLU(inplace=True),
-            nn.Linear(r_ch, channels),
-            nn.Sigmoid(inplace=True),
-        )
-
-    def forward(self, inr):
-        weights = self.SE(inr)
-        return inr * weights

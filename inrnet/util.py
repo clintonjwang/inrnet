@@ -15,6 +15,10 @@ from scipy.stats.qmc import Sobol
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
+def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
+    tensors = [torch.linspace(*domain, steps=d) for d in dims]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:

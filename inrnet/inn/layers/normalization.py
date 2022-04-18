@@ -1,6 +1,9 @@
+from functools import partial
 import torch
 nn = torch.nn
 F = nn.functional
+
+from inrnet.inn import functional as inrF
 
 class InstanceNorm(nn.Module):
     def __init__(self, channels=None, affine=False):
@@ -14,8 +17,8 @@ class InstanceNorm(nn.Module):
             self.learned_std = nn.Parameter(torch.ones(channels).float())
 
     def forward(self, inr):
-        return inr.normalize(self)
-
+        inr.integrator = partial(inrF.normalize, layer=self)
+        return inr.create_derived_inr()
 
 class BatchNorm(nn.Module):
     def __init__(self, channels, momentum=0.1, device=None, dtype=None):
@@ -38,5 +41,5 @@ class BatchNorm(nn.Module):
         nn.init.zeros_(self.learned_mean)
 
     def forward(self, inr):
-        return inr.normalize(self)
-
+        inr.integrator = partial(inrF.normalize, layer=self)
+        return inr.create_derived_inr()

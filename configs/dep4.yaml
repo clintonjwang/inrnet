@@ -1,8 +1,10 @@
 network:
-  type: ConvCM
+  type: ResNet
   task: depth
   min channels: 16
   radius: .2
+  steerable: True
+  dropout: 0.
 data loading:
   dataset: kitti
   image shape:

@@ -47,19 +47,25 @@ def train_depth_model(args):
 
         if global_step % 10 == 0:
             print(loss.item(),flush=True)
+            del loss, z_pred
+            torch.cuda.empty_cache()
             with torch.no_grad():
-                tensors = [torch.linspace(-1, 1, steps=H//3), torch.linspace(-1, 1, steps=W//3)]
-                mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
-                xy_grid = mgrid.reshape(-1, 2).float().cuda()
-                InrNet.eval()
-                rgb = img_inr.evaluator(xy_grid)
-                rgb = rescale_float(rgb.reshape(H//3,W//3, 3).cpu().numpy())
-                torch.cuda.empty_cache()
-                z_pred = depth_inr(xy_grid)
-                z_pred = rescale_float(z_pred.reshape(H//3,W//3).cpu())
-                plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_rgb.png"), rgb)
-                plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_z.png"), z_pred, cmap="gray")
-                InrNet.train()
+                with torch.cuda.amp.autocast():
+                    h,w = H//4, W//4
+                    xy_grid = util.meshgrid_coords(h,w)
+                    InrNet.eval()
+                    z_pred = depth_inr(xy_grid)
+                    z_pred = rescale_float(z_pred.reshape(h,w).cpu().float().numpy())
+                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_z.png"), z_pred, cmap="gray")
+
+                    del z_pred, depth_inr
+                    torch.cuda.empty_cache()
+                    rgb = img_inr.evaluator(xy_grid)
+                    rgb = rescale_float(rgb.reshape(h,w, 3).cpu().float().numpy())
+                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_rgb.png"), rgb)
+
+                    torch.cuda.empty_cache()
+                    InrNet.train()
 
             torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
 
@@ -78,12 +84,15 @@ def train_depth_model(args):
 
 def getDepthNet(args):
     net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, radius=net_args["radius"],
-        mid_channels=net_args["min channels"])
+    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, dropout=net_args["dropout"])
     if net_args["type"] == "ConvCM":
-        model = inn.nets.ConvCM(**kwargs)
-    elif net_args["type"] == "ConvCmConv":
-        model = inn.nets.ConvCmConv(**kwargs)
+        model = inn.nets.ConvCM(mid_channels=net_args["min channels"], **kwargs)
+    elif net_args["type"] == "Conv4":
+        model = inn.nets.Conv4(mid_channels=net_args["min channels"], **kwargs)
+    elif net_args["type"] == "UNet":
+        model = inn.nets.UNet(min_channels=net_args["min channels"], **kwargs)
+    elif net_args["type"] == "FPN":
+        model = inn.nets.FPN(mid_channels=net_args["min channels"], **kwargs)
     elif net_args["type"] == "CmPlCm":
         model = inn.nets.CmPlCm(**kwargs)
     elif net_args["type"] == "ResNet":
