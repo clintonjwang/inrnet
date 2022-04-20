@@ -11,6 +11,7 @@ from inrnet.data import dataloader
 from inrnet import inn, util, losses
 from inrnet.models.inrs.siren import to_black_box
 
+rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=5, upper=95, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_float = mtr.ScaleIntensity()
 
 def train_depth_model(args):
@@ -20,59 +21,54 @@ def train_depth_model(args):
 
     global_step = 0
     scaler = torch.cuda.amp.GradScaler()
-    InrNet = getDepthNet(args).train()
+    InrNet = getDepthNet(args)
     optimizer = torch.optim.Adam(InrNet.parameters(), lr=args["optimizer"]["learning rate"])
     H,W = dl_args["image shape"]
     loss_tracker = util.MetricTracker("loss", function=losses.L1_dist)
     for img_inr, xyz in data_loader:
+        xyz.squeeze_()
         global_step += 1
-        print(".",end="",flush=True)
-        # xyz = subsample(xyz, dl_args["sample_fraction"])
-        xyz[0,:,0] /= W/2
-        xyz[0,:,1] /= H/2
-        xyz[0,:,2] /= dl_args["depth scale"]
-        xyz[0,:,:2] -= 1
+        xyz[:,0] /= W/2
+        xyz[:,1] /= H/2
+        xyz[:,2] /= dl_args["depth scale"]
+        xyz[:,:2] -= 1
+        if global_step < 1000:
+            xyz = inn.functional.subsample_points_by_grid(xyz, spacing=.08)
+        elif global_step < 5000:
+            xyz = inn.functional.subsample_points_by_grid(xyz, spacing=.04)
+        elif global_step < 9000:
+            xyz = inn.functional.subsample_points_by_grid(xyz, spacing=.02)
+        else:
+            xyz = inn.functional.subsample_points_by_grid(xyz, spacing=.01)
         xyz = xyz.half()
         img_inr = to_black_box(img_inr)
         with torch.cuda.amp.autocast():
             depth_inr = InrNet(img_inr)
-            z_pred = depth_inr(xyz[0,:,:2])
-            loss = loss_tracker(z_pred, xyz[0,:,-1])
+            if "DEBUG" in args:
+                pdb.set_trace()
+                loss = loss_tracker(inr=depth_inr, gt_values=img_inr(xyz[:,:2]).mean(-1), coords=xyz[:,:2])
+            else:
+                loss = loss_tracker(inr=depth_inr, gt_values=xyz[:,-1], coords=xyz[:,:2])
         optimizer.zero_grad()
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
-        # loss.backward()
-        # optimizer.step()
 
-        if global_step % 10 == 0:
+        if global_step % 20 == 0:
             print(loss.item(),flush=True)
-            del loss, z_pred
+        if global_step % 100 == 0:
             torch.cuda.empty_cache()
             with torch.no_grad():
                 with torch.cuda.amp.autocast():
                     h,w = H//4, W//4
-                    xy_grid = util.meshgrid_coords(h,w)
-                    InrNet.eval()
-                    z_pred = depth_inr(xy_grid)
-                    z_pred = rescale_float(z_pred.reshape(h,w).cpu().float().numpy())
-                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_z.png"), z_pred, cmap="gray")
-
-                    del z_pred, depth_inr
-                    torch.cuda.empty_cache()
-                    rgb = img_inr.evaluator(xy_grid)
-                    rgb = rescale_float(rgb.reshape(h,w, 3).cpu().float().numpy())
-                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_rgb.png"), rgb)
-
-                    torch.cuda.empty_cache()
-                    InrNet.train()
+                    z_pred = rescale_clip(depth_inr.eval().produce_image(h,w))
+                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_z.png"), z_pred, cmap="gray")
+                    rgb = rescale_float(img_inr.produce_image(h,w))
+                    plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_rgb.png"), rgb)
 
             torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
 
             # loss_tracker.plot_running_average(root=paths["job output dir"]+"/plots")
-            # util.save_examples(global_step, paths["job output dir"]+"/imgs",
-            #     example_outputs["orig_imgs"][:2], example_outputs["fake_img"][:2],
-            #     example_outputs["recon_img"][:2], transforms=transforms)
 
         # if attr_tracker.is_at_min("train"):
         #     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
@@ -82,23 +78,20 @@ def train_depth_model(args):
 
     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
+
 def getDepthNet(args):
     net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, dropout=net_args["dropout"])
-    if net_args["type"] == "ConvCM":
-        model = inn.nets.ConvCM(mid_channels=net_args["min channels"], **kwargs)
-    elif net_args["type"] == "Conv4":
-        model = inn.nets.Conv4(mid_channels=net_args["min channels"], **kwargs)
-    elif net_args["type"] == "UNet":
+    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2,
+        activation=net_args["activation type"], 
+        final_activation=net_args["final activation"], dropout=net_args["dropout"])
+    if net_args["type"] == "UNet":
         model = inn.nets.UNet(min_channels=net_args["min channels"], **kwargs)
+    elif net_args["type"] == "ConvCM":
+        model = inn.nets.ConvCM(min_channels=net_args["min channels"], **kwargs)
     elif net_args["type"] == "FPN":
-        model = inn.nets.FPN(mid_channels=net_args["min channels"], **kwargs)
-    elif net_args["type"] == "CmPlCm":
-        model = inn.nets.CmPlCm(**kwargs)
-    elif net_args["type"] == "ResNet":
-        model = inn.nets.ResNet(**kwargs)
+        model = inn.nets.FPN(min_channels=net_args["min channels"], **kwargs)
     else:
-        raise NotImplementedError
+        raise NotImplementedError("bad type: " + net_args["type"])
 
     #load_checkpoint(model, paths)
-    return model.cuda().eval()
+    return model.cuda()

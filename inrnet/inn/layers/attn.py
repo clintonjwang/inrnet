@@ -6,19 +6,20 @@ from inrnet.inn import polynomials, functional as inrF
 
 class TokenAttn(nn.Module):
     # 
-    def __init__(self, in_channels, out_channels, radius=.2, stride=.2):
+    def __init__(self, in_channels, out_channels, num_heads=1, spacing=.2):
         # in_ch is the output dimensions of the input INR (3 for RGB, 1 for occupancy net)
         # out_ch is the output dimensions of the output INR
         # spatial_dim is the coordinate dimensions (2 for SIREN, 6 for NeRF)
         super().__init__()
-        self.Q = polynomials.LegendreMixer(in_channels=in_channels, out_channels=d_k, input_dims=spatial_dim)
-        self.K = polynomials.LegendreMixer(in_channels=in_channels, out_channels=d_k, input_dims=spatial_dim)
+        self.Q = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
+        self.K = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
         self.d_k = d_k
         self.V = DerivedINR(n_outputs=d_k)
         self.V_weights = nn.Parameter(torch.randn(V_dim, d_k))
-
+        self.num_heads = num_heads
+        
     def forward(self, inr):
-        inr.integrator = partial(inrF.apply_gridconv, inr=inr, layer=self)
+        inr.integrator = partial(inrF.gridconv, inr=inr, layer=self)
         inr.channels = self.out_channels
         return inr.create_derived_inr()
 
@@ -36,8 +37,8 @@ class SelfAttn(nn.Module):
         # out_ch is the output dimensions of the output INR
         # spatial_dim is the coordinate dimensions (2 for SIREN, 6 for NeRF)
         super().__init__()
-        self.Q = polynomials.LegendreMixer(in_channels=in_channels, out_channels=d_k, input_dims=spatial_dim)
-        self.K = polynomials.LegendreMixer(in_channels=in_channels, out_channels=d_k, input_dims=spatial_dim)
+        self.Q = polynomials.LegendreFilter(in_channels, d_k, input_dims=spatial_dim)
+        self.K = polynomials.LegendreFilter(in_channels, d_k, input_dims=spatial_dim)
         self.d_k = d_k
         self.V = DerivedINR(n_outputs=d_k)
         self.V_weights = nn.Parameter(torch.randn(V_dim, d_k))

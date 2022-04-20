@@ -1,10 +1,10 @@
 network:
-  type: ConvCmConv
+  type: UNet
   task: depth
   min channels: 16
-  radius: .15
-  steerable: True
-  dropout: 0.
+  dropout: .1
+  activation: leakyrelu
+  parameterization: MLP
 data loading:
   dataset: kitti
   image shape:
@@ -13,4 +13,4 @@ data loading:
   depth scale: 75.
 optimizer:
   learning rate: 1e-4
-  max steps: 10000
+  max steps: 15000

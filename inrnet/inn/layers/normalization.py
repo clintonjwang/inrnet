@@ -5,41 +5,21 @@ F = nn.functional
 
 from inrnet.inn import functional as inrF
 
-class InstanceNorm(nn.Module):
-    def __init__(self, channels=None, affine=False):
-        # normalizes every channel
-        super().__init__()
-        if track_running_stats:
-            raise NotImplementedError("TODO: track_running_stats")
-        self.affine = affine
-        if affine:
-            self.learned_mean = nn.Parameter(torch.zeros(channels).float())
-            self.learned_std = nn.Parameter(torch.ones(channels).float())
-
-    def forward(self, inr):
-        inr.integrator = partial(inrF.normalize, layer=self)
-        return inr.create_derived_inr()
-
-class BatchNorm(nn.Module):
-    def __init__(self, channels, momentum=0.1, device=None, dtype=None):
+class ChannelNorm(nn.Module):
+    def __init__(self, channels=None, affine=True, momentum=0.1,
+            track_running_stats=True, device=None, dtype=torch.float):
         super().__init__()
         factory_kwargs = {'device': device, 'dtype': dtype}
-        self.learned_std = nn.Parameter(torch.empty(channels, **factory_kwargs))
-        self.learned_mean = nn.Parameter(torch.empty(channels, **factory_kwargs))
-        self.register_buffer('running_mean', torch.zeros(channels, **factory_kwargs))
-        self.register_buffer('running_var', torch.ones(channels, **factory_kwargs))
-        self.reset_parameters()
+        self.affine = affine
         self.momentum = momentum
-
-    def reset_running_stats(self):
-        self.running_mean.zero_()  # type: ignore[union-attr]
-        self.running_var.fill_(1)  # type: ignore[union-attr]
-
-    def reset_parameters(self):
-        self.reset_running_stats()
-        nn.init.ones_(self.learned_std)
-        nn.init.zeros_(self.learned_mean)
+        if affine:
+            self.learned_mean = nn.Parameter(torch.zeros(channels, **factory_kwargs))
+            self.learned_std = nn.Parameter(torch.ones(channels, **factory_kwargs))
+        if track_running_stats:
+            self.register_buffer('running_mean', torch.zeros(channels, **factory_kwargs))
+            self.register_buffer('running_var', torch.ones(channels, **factory_kwargs))
 
     def forward(self, inr):
-        inr.integrator = partial(inrF.normalize, layer=self)
-        return inr.create_derived_inr()
+        new_inr = inr.create_derived_inr()
+        new_inr.integrator = partial(inrF.normalize, layer=self)
+        return new_inr

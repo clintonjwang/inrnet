@@ -3,8 +3,6 @@ import torch, pdb, math
 nn = torch.nn
 F = nn.functional
 
-# Read: On Image Analysis by the Methods of Moments
-
 zern_radial_coeffs = [
     [(2., 0.)],
     (np.array((2, 0, -1)) * math.sqrt(3), (math.sqrt(6),0,0)),
@@ -63,12 +61,12 @@ class ZernikeFunction(nn.Module):
 
 
 class ZernikeKernel(nn.Module):
-    def __init__(self, in_channels, out_channels, radius=.2, order=4):
+    def __init__(self, in_channels, out_channels, radius, order=4):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.order = order
         self.radius = radius
+        self.order = order
         self.weights = nn.Parameter(torch.randn(sum(range(2,order+2)), in_channels*out_channels))
         self.register_buffer('basis_coeffs', get_zern_radial_coeffs(order)) #ocp
 
@@ -144,8 +142,8 @@ class LegendreFunction(nn.Module):
 
 
 class LegendreFilter(nn.Module):
-    # m LegendreFunctions [-1,1]^d->R^m
-    def __init__(self, in_channels, out_channels, input_dims=2, order=6):
+    # m LegendreFunctions [-r,r]^d->R^m
+    def __init__(self, in_channels, out_channels, radius=1., order=6, input_dims=2):
         super().__init__()
         self.bias = nn.Parameter(torch.zeros(in_channels*out_channels, dtype=torch.float))
         self.weights = nn.Parameter(torch.randn(in_channels*out_channels, input_dims, order))
@@ -158,9 +156,10 @@ class LegendreFilter(nn.Module):
             raise NotImplementedError
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.radius = radius
 
     def forward(self, x):
-        powers = torch.stack([x.pow(n) for n in range(self.order+1)], dim=-1) #bxp
+        powers = torch.stack([(x/self.radius).pow(n) for n in range(self.order+1)], dim=-1) #bxp
         weighted_coeffs = self.weights.matmul(self.basis_coeffs) #cxw,wp->cxp
         outputs = torch.einsum("bxp,cxp->bc", powers, weighted_coeffs) + self.bias
         return outputs.reshape(-1, self.in_channels, self.out_channels)/self.order

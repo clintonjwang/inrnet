@@ -11,40 +11,29 @@ def test_layers():
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
     model = nn.Sequential(
        inn.Conv(3,8, radius=.4, input_dims=2, dropout=.2),
-       inn.BatchNorm(8),
+       inn.ChannelNorm(8),
        inn.ReLU(),
        inn.AdaptiveChannelMixer(8,4, input_dims=2),
-       inn.AvgPool(radius=.4, stride=.2),
+       inn.AvgPool(radius=.4),
     ).cuda().train()
     new_inr = model(inr)
     with torch.no_grad():
         shape = new_inr(torch.randn(64,2).cuda()).shape
         assert shape == (64,4), f"shape is {shape}"
     new_inr(torch.randn(64,2).cuda()).sum().backward()
-    print("success")
 
 def test_network():
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
-    model = inn.nets.ConvCM(3,4).cuda().train()
+    model = inn.nets.Conv4(3,4).cuda().train()
     new_inr = model(inr)
     with torch.cuda.amp.autocast():
         with torch.no_grad():
             shape = new_inr(torch.randn(8,2).cuda()).shape
-            assert shape == (8,4), f"shape is {shape}"
+            assert shape == (1,4), f"shape is {shape}"
         new_inr(torch.randn(8,2).cuda()).sum().backward()
-    print("success")
 
-def test_poly():
-    siren = nn.Linear(2,3).cuda()
-    inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
-    model = inn.AdaptiveChannelMixer(in_channels=3, out_channels=4, input_dims=2).cuda()
-    new_inr = model(inr)
-    with torch.no_grad():
-        shape = new_inr(torch.randn(8,2).cuda()).shape
-        assert shape == (8,4), f"shape is {shape}"
-    print("success")
-
-test_layers()
+test_network()
+print("success")
 # args = job_mgmt.get_job_args("dep1")
 # train_depth_model(args)

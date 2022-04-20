@@ -1,13 +1,15 @@
 from scipy.stats.qmc import Sobol
 import math, torch, pdb
+import numpy as np
 nn=torch.nn
 
-def conv(coords, values, inr, layer, query_coords=None):
+### Convolutions
+
+def conv(values, inr, layer, query_coords=None):
+    coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride > 0:
-            query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            inr.sampled_coords = query_coords
-            raise NotImplementedError
+            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
         else:
             query_coords = coords
 
@@ -24,8 +26,7 @@ def conv(coords, values, inr, layer, query_coords=None):
     newVals = []
 
     if layer.N_bins == 0:
-        #W = layer.K(Diffs) # weights for each pair
-        #Wsplit = W.split(lens) # list of weights of neighborhood points
+        #Wsplit = layer.K(Diffs).split(lens)
         Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
         for ix,y in enumerate(Ysplit):
             if y.size(0) == 0:
@@ -48,21 +49,20 @@ def conv(coords, values, inr, layer, query_coords=None):
             else:
                 newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
         # newVals = [y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0) for ix,y in enumerate(Ysplit)]
-    return torch.stack(newVals, dim=0)
+    newVals = torch.stack(newVals, dim=0)
+    if layer.bias:
+        newVals = newVals + layer.b_j
+    return newVals
 
-def gridconv(coords, values, inr, layer):
-    n_points = round(2/layer.stride)
+def gridconv(values, inr, layer):
+    # applies conv once to each patch (token)
+    coords = inr.sampled_coords
+    n_points = round(2/layer.spacing)
     query_coords = util.meshgrid_coords(n_points, n_points, domain=inr.domain)
     return apply_conv(coords, values, inr, layer, query_coords=query_coords)
 
-def inner_product(coords, values, layer):
-    W_ij = layer.m_ij(coords) #(B,d) -> (B,cin,cout)
-    if layer.normalized:
-        return values.unsqueeze(1).matmul(torch.softmax(W_ij, dim=-1)).squeeze(1) + layer.b_j
-    else:
-        return values.unsqueeze(1).matmul(W_ij).squeeze(1) + layer.b_j
-
-def avg_pool(coords, values, layer, query_coords=None):
+def avg_pool(values, inr, layer, query_coords=None):
+    coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride > 0:
             query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
@@ -75,10 +75,29 @@ def avg_pool(coords, values, layer, query_coords=None):
     Y = values[torch.where(mask)[1]]
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
-def global_avg_pool(values):
-    return values.mean(0)
 
-def max_pool(coords, values, layer, query_coords=None):
+
+
+
+
+### Integrations over I
+
+def inner_product(values, inr, layer):
+    W_ij = layer.m_ij(inr.sampled_coords) #(B,d) -> (B,cin,cout)
+    if layer.normalized:
+        out = values.unsqueeze(1).matmul(torch.softmax(W_ij, dim=-1)).squeeze(1)
+    else:
+        out = values.unsqueeze(1).matmul(W_ij).squeeze(1)
+    if hasattr(layer, "b_j"):
+        return out + layer.b_j
+    else:
+        return out
+
+def global_avg_pool(values):
+    return values.mean(0, keepdim=True)
+
+def max_pool(values, inr, layer, query_coords=None):
+    coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride > 0:
             query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
@@ -92,7 +111,7 @@ def max_pool(coords, values, layer, query_coords=None):
     return torch.stack([y.max(0).values for y in Y.split(tuple(mask.sum(0)))])
 
 
-def normalize(coords, values, layer, eps=1e-6):
+def normalize(values, layer, eps=1e-6):
     mean = values.mean(0)
     var = values.pow(2).mean(0) - mean.pow(2)
     if hasattr(layer, "running_mean"):
@@ -109,10 +128,12 @@ def normalize(coords, values, layer, eps=1e-6):
 
 
 
-def generate_quasirandom_sequence(d=3, n=128):
+### Misc
+
+def generate_quasirandom_sequence(d=3, n=128, dtype=torch.float, device="cuda"):
     sobol = Sobol(d=d)
     sample = sobol.random_base2(m=int(math.ceil(math.log2(n))))
-    return sample
+    return torch.as_tensor(sample).to(dtype=dtype, device=device)
 
 def get_minNN_points_in_disk(N, radius=1., eps=0., dtype=torch.float, device="cuda"):
     # what we really want is a Voronoi partition that minimizes the
@@ -130,10 +151,31 @@ def get_ball_volume(r, dims):
     return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims
 
 def subsample_points_by_grid(coords, spacing, input_dims=2, domain=(-1,1)):
-    bin_ixs = torch.round(coords / spacing).int()
+    bin_ixs = torch.round(coords.squeeze(0)[:,:input_dims] / spacing).int()
     bin_ixs = bin_ixs[:,0]*int(1/spacing*3) + bin_ixs[:,1] # TODO: adapt for larger domains, d
     bins = torch.unique(bin_ixs)
     matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
     points_per_bin = tuple(matches.sum(1))
-    surviving_indices = [np.random.choice(x) for x in torch.where(matches)[1].split(points_per_bin)]
-    return coords[surviving_indices]
+    surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
+    return coords[...,surviving_indices,:]
+
+def subsample_points_by_grid(coords, spacing, input_dims=2, domain=(-1,1)):
+    bin_ixs = torch.round(coords.squeeze(0)[:,:input_dims] / spacing).int()
+    bin_ixs = bin_ixs[:,0]*int(1/spacing*3) + bin_ixs[:,1] # TODO: adapt for larger domains, d
+    bins = torch.unique(bin_ixs)
+    matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
+    points_per_bin = tuple(matches.sum(1))
+    surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
+    return coords[...,surviving_indices,:]
+
+
+def interpolate(query_coords, observed_coords, values):
+    if query_coords.size(0) == 0:
+        return values.new_zeros(0, values.size(1))
+
+    dists = (query_coords.unsqueeze(0) - observed_coords.unsqueeze(1)).norm(dim=-1)
+    r, indices = dists.topk(3, dim=0, largest=False)
+    q = (1/r).unsqueeze(-1)
+    Q = q.sum(0)
+    sv = (values[indices[0]] * q[0] + values[indices[1]] * q[1] + values[indices[2]] * q[2])/Q
+    return sv

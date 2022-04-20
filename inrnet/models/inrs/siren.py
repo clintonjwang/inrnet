@@ -5,8 +5,8 @@ F = nn.functional
 
 from inrnet import inn
 
-def to_black_box(siren):
-    return inn.BlackBoxINR(evaluator=siren, channels=siren.out_channels, input_dims=2, domain=(-1,1))
+def to_black_box(siren, **kwargs):
+    return inn.BlackBoxINR(evaluator=siren, channels=siren.out_channels, input_dims=2, domain=(-1,1), **kwargs)
 
 class Siren(nn.Module):
     def __init__(self, C=256, in_dims=2, out_channels=3, layers=3, outermost_linear=True, 

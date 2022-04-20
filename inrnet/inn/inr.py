@@ -4,16 +4,19 @@ from functools import partial
 nn=torch.nn
 F=nn.functional
 
-from inrnet.inn import vvf
+import util
+from inrnet.inn import functional as inrF
 
 class INR(nn.Module):
-    def __init__(self, channels, input_dims=2, domain=(-1,1)):
+    def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1)):
         super().__init__()
         self.input_dims = input_dims # input coord size
         self.channels = channels # output size
         self.domain = domain
         self.modifiers = []
         self.integrator = None
+        self.sample_size = sample_size
+        self.detached = False
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
@@ -68,17 +71,15 @@ class INR(nn.Module):
         # self.add_modification(lambda x: other/x)
         # return self
     
-    @staticmethod
-    def merge_domains(d1, d2):
-        return (max(d1[0], d2[0]), min(d1[1], d2[1]))
+    def generate_sample_points(self, sample_size=None):
+        if sample_size is None:
+            sample_size = self.sample_size
+        return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size) * \
+                (self.domain[1]-self.domain[0]) - self.domain[0]
+
 
     def add_modification(self, modification):
         self.modifiers.append(modification)
-        # if hasattr(self, "sampled_coords"):
-        #     new_vals = modification(self.sampled_coords[:,self.input_dims:])
-        #     self.channels = new_vals.size(1)
-        #     self.sampled_coords = torch.cat((self.sampled_coords[:,:self.input_dims], new_vals), dim=1)
-        # else:
         test_output = modification(torch.randn(1,self.channels).cuda())
         self.channels = test_output.size(1)
 
@@ -91,10 +92,10 @@ class INR(nn.Module):
 
     def sqrt(self, inplace=False):
         if inplace:
-            self.add_modification(lambda x: x.sqrt())
+            self.add_modification(torch.sqrt)
             return self
         else:
-            return self.create_modified_copy(lambda x: x.sqrt())
+            return self.create_modified_copy(torch.sqrt)
 
     def log(self, inplace=False):
         if inplace:
@@ -140,98 +141,113 @@ class INR(nn.Module):
         new_inr.evaluator = self
         return new_inr
 
-    def create_VVF(self, function):
-        VVF = vvf.VectorValuedFunction(evaluator=self, modifiers=[function],
-            output_dims=self.channels, input_dims=self.input_dims, domain=self.domain)
-        return VVF
+    # def create_VVF(self, integrator):
+    #     VVF = vvf.VectorValuedFunction(inr=self, integrator=integrator,
+    #         output_dims=self.channels, input_dims=self.input_dims, domain=self.domain)
+    #     return VVF
 
-    # def mean(self, values):
-    #     return self.sampled_coords[:, self.input_dims:].mean(0)
+    def detach(self):
+        self.detached = True
+        return self
+
+    def produce_image(self, h,w):
+        xy_grid = util.meshgrid_coords(h,w)
+        output = self.forward(xy_grid)
+        output = util.realign_values(output, coords_gt=xy_grid, inr=self)
+        return output.reshape(h,w,-1).squeeze(-1).cpu().float().numpy()
 
     def forward(self, coords):
+        if self.detached:
+            with torch.no_grad():
+                return self._forward(coords)
+        else:
+            return self._forward(coords)
+
+    def _forward(self, coords):
         out = self.evaluator(coords)
+        self.sampled_coords = self.evaluator.sampled_coords
+        if self.integrator is not None:
+            out = self.integrator(out)
         for m in self.modifiers:
             out = m(out)
-        if self.integrator is not None:
-            out = self.integrator(coords, out)
-        # if not self.training:
-        #     self.sampled_coords = torch.cat((coords, out), dim=1)
         return out
 
 
 class BlackBoxINR(INR):
     # wrapper for arbitrary INR architectures (SIREN, NeRF, etc.)
-    def __init__(self, evaluator, channels, input_dims=2, domain=(-1,1), device="cuda", dtype=torch.float):
-        super().__init__(channels=channels, input_dims=input_dims, domain=domain)
+    def __init__(self, evaluator, channels, device="cuda", dtype=torch.float, **kwargs):
+        super().__init__(channels=channels, **kwargs)
         self.evaluator = evaluator.to(device=device, dtype=dtype)
-        # init_coords = torch.tensor(inrF.generate_quasirandom_sequence(d=input_dims, n=128) * \
-        #                     (domain[1]-domain[0]) - domain[0]).to(device=device, dtype=dtype)
-        # vals = self.forward(init_coords)
-        # self.sampled_coords = torch.cat((init_coords, vals), dim=-1)
-
 
     def forward(self, coords):
+        if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.all(self.sampled_coords == coords):
+            return self.cached_outputs
+
+        self.sampled_coords = coords
         with torch.no_grad():
             out = self.evaluator(coords)
         for m in self.modifiers:
             out = m(out)
-        if self.integrator is not None:
-            out = self.integrator(coords, out)
-        # if not self.training:
-        #     self.sampled_coords = torch.cat((coords, out), dim=1)
+        self.cached_outputs = out
         return out
 
     def forward_with_grad(self, coords):
+        self.sampled_coords = coords
         out = self.evaluator(coords)
         for m in self.modifiers:
             out = m(out)
-        if self.integrator is not None:
-            out = self.integrator(coords, out)
         return out
 
 
 
+def merge_domains(d1, d2):
+    return (max(d1[0], d2[0]), min(d1[1], d2[1]))
+    
+def set_difference(x,y):
+    combined = torch.cat((x, y))
+    uniques, counts = combined.unique(return_counts=True)
+    return uniques[counts == 1]
+
 class MergeINR(INR):
     def __init__(self, inr1, inr2, channels, merge_function):
-        domain = INR.merge_domains(inr1.domain, inr2.domain)
+        domain = merge_domains(inr1.domain, inr2.domain)
         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
         self.inr1 = inr1
         self.inr2 = inr2
         self.merge_function = merge_function
-        # self.merge_coords()
+        self.interpolator = inrF.interpolate
 
-    def merge_coords(self):
-        if not hasattr(self.inr1, "sampled_coords"):
-            if not hasattr(self.inr2, "sampled_coords"):
-                return
-            else:
-                self.sampled_coords = self.inr2.sampled_coords
-        elif not hasattr(self.inr2, "sampled_coords"):
-            self.sampled_coords = self.inr1.sampled_coords
-        else:
-            x = self.inr1.sampled_coords
-            y = self.inr2.sampled_coords
-            # coord_diffs = torch.einsum('iv,jv->ijv', x[:,:self.input_dims], -y[:,:self.input_dims])
-            coord_diffs = x[:,:self.input_dims].unsqueeze(0) - y[:,:self.input_dims].unsqueeze(1)
-            matches = (coord_diffs.abs().sum(-1) == 0)
-            y_indices, x_indices = torch.where(matches)
-            X = x[x_indices,self.input_dims:]
-            Y = y[y_indices,self.input_dims:]
-            self.sampled_coords = torch.cat([x[x_indices,:self.input_dims], self.merge_function(X,Y)], dim=-1)
-            # for coord, val1 in self.inr1.sampled_coords.items():
-            #     if coord in self.inr2.sampled_coords:
-            #         val2 = inr2.sampled_coords
-            #         self.sampled_coords[coord] = self.merge_function(val1, val2)
+    def merge_coords(self, values1, values2):
+        x = self.inr1.sampled_coords
+        y = self.inr2.sampled_coords
+        if len(x) == len(y) and torch.all(x == y):
+            self.sampled_coords = x
+            return self.merge_function(values1, values2)
+
+        coord_diffs = x.unsqueeze(0) - y.unsqueeze(1)
+        matches = (coord_diffs.abs().sum(-1) == 0)
+        y_indices, x_indices = torch.where(matches)
+        X = values1[x_indices]
+        Y = values2[y_indices]
+        merged_outs = self.merge_function(X,Y)
+        extra_x = set_difference(torch.arange(len(x), device=x.device), x_indices)
+        extra_x_vals = self.merge_function(values1[extra_x],
+            self.interpolator(query_coords=x[extra_x], observed_coords=y, values=values2))
+        extra_y = set_difference(torch.arange(len(y), device=x.device), y_indices)
+        extra_y_vals = self.merge_function(values2[extra_y],
+            self.interpolator(query_coords=y[extra_y], observed_coords=x, values=values1))
+        self.sampled_coords = torch.cat((x[x_indices], x[extra_x], y[extra_y]), dim=0)
+        
+        return torch.cat((merged_outs, values1[extra_x], values2[extra_y]), dim=0)
 
     def forward(self, coords):
-        out = self.merge_function(self.inr1(coords), self.inr2(coords))
+        out = self.merge_coords(self.inr1(coords), self.inr2(coords))
+        if self.integrator is not None:
+            out = self.integrator(out)
         for m in self.modifiers:
             out = m(out)
-        if self.integrator is not None:
-            out = self.integrator(coords, out)
-        # if not self.training:
-        #     self.sampled_coords = torch.cat((coords, out), dim=1)
         return out
+
 
 class SumINR(MergeINR):
     def __init__(self, inr1, inr2):
@@ -251,7 +267,6 @@ class CatINR(MergeINR):
 class SplitINR(INR):
     # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
     def __init__(self, inr, split_channel, merge_function):
-        domain = INR.merge_domains(inr1.domain, inr2.domain)
         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
         self.inr1 = inr1
         self.channels1 = split_channel
@@ -261,3 +276,4 @@ class SplitINR(INR):
     def forward(self, coords):
         raise NotImplementedError
         return torch.split(self.inr1(coords))
+

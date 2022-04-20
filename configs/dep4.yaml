@@ -1,10 +1,9 @@
 network:
-  type: ResNet
+  type: FPN
   task: depth
-  min channels: 16
-  radius: .2
-  steerable: True
-  dropout: 0.
+  min channels: 8
+  dropout: .2
+  parameterization: zernike
 data loading:
   dataset: kitti
   image shape:
@@ -13,4 +12,4 @@ data loading:
   depth scale: 75.
 optimizer:
   learning rate: 1e-3
-  max steps: 10000
+  max steps: 15000

@@ -10,12 +10,13 @@ from inrnet.models.inrs import siren
 from inrnet import util
 
 kitti_root = "/data/vision/torralba/datasets/kitti_raw"
+DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 TMP_DIR = osp.expanduser("~/code/diffcoord/temp")
 
 def get_kitti_inr_dataloader():
     grayscale = siren.Siren(out_channels=1)
     rgb = siren.Siren(out_channels=3)
-    paths = sorted(util.glob2("/data/vision/polina/scratch/clintonw/datasets/inrnet/kitti/siren_*.pt"))
+    paths = sorted(util.glob2(f"{DS_DIR}/inrnet/kitti/siren_*.pt"))
     keys = ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
     for path in paths:
         data = torch.load(path)

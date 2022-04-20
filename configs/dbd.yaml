@@ -1,0 +1,18 @@
+DEBUG: null
+network:
+  type: ConvCM
+  task: depth
+  min channels: 8
+  dropout: 0.2
+  activation type: swish
+  parameterization: mlp
+  final activation: tanh
+data loading:
+  dataset: kitti
+  image shape:
+  - 352
+  - 1216
+  depth scale: 75.
+optimizer:
+  learning rate: 1e-2
+  max steps: 10000

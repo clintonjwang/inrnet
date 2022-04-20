@@ -15,6 +15,13 @@ from scipy.stats.qmc import Sobol
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
+def realign_values(out, coords_gt, inr):
+    xy_out = inr.sampled_coords
+    diffs = xy_out.unsqueeze(0) - coords_gt.squeeze(0).unsqueeze(1)
+    matches = diffs.abs().sum(-1) == 0
+    return out[torch.where(matches)[1]]
+
+
 def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
@@ -126,6 +133,9 @@ class MetricTracker:
     def min(self, phase="val"):
         try: return np.nanmin(self.epoch_history[phase])
         except: return np.nan
+
+    def current_moving_average(self, window, phase="val"):
+        return np.mean(self.minibatch_values[phase][-window:])
 
     def get_moving_average(self, window, interval=None, phase="val"):
         if interval is None:

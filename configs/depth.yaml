@@ -1,9 +1,10 @@
 network:
   type: UNet
   task: depth
-  min channels: 16
-  dropout: .1
-  parameterization: zernike
+  min channels: 8
+  dropout: 0.2
+  activation type: swish
+  parameterization: mlp
 data loading:
   dataset: kitti
   image shape:
@@ -11,5 +12,5 @@ data loading:
   - 1216
   depth scale: 75.
 optimizer:
-  learning rate: 1e-3
-  max steps: 15000
+  learning rate: 1e-4
+  max steps: 10000

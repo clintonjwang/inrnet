@@ -1,0 +1,11 @@
+parent: fit_siren
+data loading:
+  interval: 16
+  end_ix: 128
+  dataset: zebra
+  variables: null
+  image shape:
+  - 256
+  - 256
+optimizer:
+  max steps: 1200
