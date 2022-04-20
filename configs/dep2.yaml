@@ -1,15 +1,11 @@
+parent: depth
 network:
   type: UNet
-  task: depth
   min channels: 16
   dropout: .1
+  activation: swish
+  final activation: tanh
   parameterization: zernike
-data loading:
-  dataset: kitti
-  image shape:
-  - 352
-  - 1216
-  depth scale: 75.
 optimizer:
   learning rate: 1e-3
   max steps: 15000

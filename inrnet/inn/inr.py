@@ -127,8 +127,8 @@ class INR(nn.Module):
         else:
             return self.create_modified_copy(lambda x: torch.matmul(x,other))
 
-    def cat(self, other):
-        return CatINR(self, other)
+    # def cat(self, other):
+    #     return CatINR(self, other)
 
     def create_modified_copy(self, modification):
         new_inr = copy.copy(self)
@@ -150,11 +150,25 @@ class INR(nn.Module):
         self.detached = True
         return self
 
-    def produce_image(self, h,w):
-        xy_grid = util.meshgrid_coords(h,w)
-        output = self.forward(xy_grid)
-        output = util.realign_values(output, coords_gt=xy_grid, inr=self)
-        return output.reshape(h,w,-1).squeeze(-1).cpu().float().numpy()
+    def produce_image(self, H,W, split=None):
+        with torch.no_grad():
+            if split == None:
+                xy_grid = util.meshgrid_coords(H,W)
+                output = self.forward(xy_grid)
+                output = util.realign_values(output, coords_gt=xy_grid, inr=self)
+                return output.reshape(H,W,-1).squeeze(-1).float().cpu().numpy()
+            else:
+                outs = []
+                xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
+                for xy_grid in xy_grids:
+                    xy_grid = xy_grid.cuda()
+                    output = self.forward(xy_grid)
+                    outs.append(util.realign_values(output, coords_gt=xy_grid, inr=self).cpu())
+                    torch.cuda.empty_cache()
+                xy_grid = util.meshgrid_coords(H,W)
+                output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
+                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=16)
+                return output.reshape(H,W,-1).squeeze(-1).float().numpy()
 
     def forward(self, coords):
         if self.detached:

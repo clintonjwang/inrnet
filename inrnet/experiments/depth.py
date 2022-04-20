@@ -45,7 +45,6 @@ def train_depth_model(args):
         with torch.cuda.amp.autocast():
             depth_inr = InrNet(img_inr)
             if "DEBUG" in args:
-                pdb.set_trace()
                 loss = loss_tracker(inr=depth_inr, gt_values=img_inr(xyz[:,:2]).mean(-1), coords=xyz[:,:2])
             else:
                 loss = loss_tracker(inr=depth_inr, gt_values=xyz[:,-1], coords=xyz[:,:2])
@@ -54,14 +53,14 @@ def train_depth_model(args):
         scaler.step(optimizer)
         scaler.update()
 
-        if global_step % 20 == 0:
+        if global_step % 1 == 0:
             print(loss.item(),flush=True)
-        if global_step % 100 == 0:
+        if global_step % 1 == 0:
             torch.cuda.empty_cache()
             with torch.no_grad():
                 with torch.cuda.amp.autocast():
-                    h,w = H//4, W//4
-                    z_pred = rescale_clip(depth_inr.eval().produce_image(h,w))
+                    h,w = H//2, W//2
+                    z_pred = rescale_clip(depth_inr.eval().produce_image(h,w, split=2))
                     plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_z.png"), z_pred, cmap="gray")
                     rgb = rescale_float(img_inr.produce_image(h,w))
                     plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_rgb.png"), rgb)
@@ -81,8 +80,7 @@ def train_depth_model(args):
 
 def getDepthNet(args):
     net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2,
-        activation=net_args["activation type"], 
+    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, activation=net_args["activation"], 
         final_activation=net_args["final activation"], dropout=net_args["dropout"])
     if net_args["type"] == "UNet":
         model = inn.nets.UNet(min_channels=net_args["min channels"], **kwargs)

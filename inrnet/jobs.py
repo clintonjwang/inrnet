@@ -4,7 +4,6 @@ import dill as pickle
 import numpy as np
 
 from inrnet import util, losses
-from inrnet.analysis import analyze
 from inrnet.data import dataloader
 
 ANALYSIS_DIR = osp.expanduser("~/code/diffcoord/temp")

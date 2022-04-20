@@ -34,9 +34,12 @@ class Conv(nn.Module):
                     out_channels=out_channels, radius=radius, order=order).cuda()
                 raise NotImplementedError("TODO: conv groups")
             else:
-                self.K = Kernel(in_channels=in_channels,
-                    out_channels=out_channels, radius=radius, order=order).cuda()
+                self.K = Kernel(in_channels=in_channels, out_channels=out_channels,
+                    radius=radius, order=order).cuda()
         else:
+            if parameterization == "polynomial":
+                raise NotImplementedError("TODO: 3D polynomial basis")
+
             self.K = nn.Sequential(nn.Linear(input_dims,6), nn.ReLU(inplace=True),
                 nn.Linear(6,in_channels*out_channels), Reshape(in_channels,out_channels))
             if groups != 1:

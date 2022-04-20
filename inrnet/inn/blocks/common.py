@@ -4,8 +4,8 @@ F = nn.functional
 
 from inrnet import inn
 
-def conv_norm_act(in_, out_, radius=.2, activation_type="swish", **kwargs):
-    act_layer = inn.get_activation_layer(activation_type)
+def conv_norm_act(in_, out_, radius=.2, **kwargs):
+    act_layer = inn.get_activation_layer(kwargs.pop("activation", "swish"))
     return nn.Sequential(inn.Conv(in_, out_, radius=radius, **kwargs),
         inn.ChannelNorm(out_),
         act_layer,

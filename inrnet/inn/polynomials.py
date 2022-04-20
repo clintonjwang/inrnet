@@ -146,21 +146,22 @@ class LegendreFilter(nn.Module):
     def __init__(self, in_channels, out_channels, radius=1., order=6, input_dims=2):
         super().__init__()
         self.bias = nn.Parameter(torch.zeros(in_channels*out_channels, dtype=torch.float))
-        self.weights = nn.Parameter(torch.randn(in_channels*out_channels, input_dims, order))
+        self.weights = nn.Parameter(torch.randn(in_channels*out_channels,
+            input_dims, order) / input_dims / math.sqrt(in_channels+out_channels))
+        self.order = order
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.radius = radius
         basis_coeffs = []
         for o in range(order):
             basis_coeffs.append([0]*(order-o-1) + list(leg_basis_coeffs[o]))
         self.register_buffer('basis_coeffs', torch.tensor(basis_coeffs, dtype=torch.float))
-        self.order = order
         if order > 6:
             raise NotImplementedError
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.radius = radius
 
     def forward(self, x):
         powers = torch.stack([(x/self.radius).pow(n) for n in range(self.order+1)], dim=-1) #bxp
         weighted_coeffs = self.weights.matmul(self.basis_coeffs) #cxw,wp->cxp
-        outputs = torch.einsum("bxp,cxp->bc", powers, weighted_coeffs) + self.bias
-        return outputs.reshape(-1, self.in_channels, self.out_channels)/self.order
+        outputs = torch.einsum("bxp,cxp->bc", powers, weighted_coeffs)/self.order + self.bias
+        return outputs.reshape(-1, self.in_channels, self.out_channels)
 

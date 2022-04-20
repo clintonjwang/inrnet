@@ -1,6 +1,0 @@
-network:
-  type: MLP
-  INR size: 198915
-optimizer:
-  learning rate: 2e-5
-  max steps: 50000

@@ -15,12 +15,67 @@ from scipy.stats.qmc import Sobol
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
-def realign_values(out, coords_gt, inr):
-    xy_out = inr.sampled_coords
-    diffs = xy_out.unsqueeze(0) - coords_gt.squeeze(0).unsqueeze(1)
-    matches = diffs.abs().sum(-1) == 0
-    return out[torch.where(matches)[1]]
+def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
+    if coords_out is None:
+        coords_out = inr.sampled_coords
+    coords_gt = coords_gt[:,0]*4 + coords_gt[:,1]
+    coords_out = coords_out[:,0]*4 + coords_out[:,1]
+    if split is None:
+        matches = coords_gt.unsqueeze(1) == coords_out.unsqueeze(0)
+        indices = torch.where(matches)[1]
+    else:
+        N = coords_out.size(0)
+        dx = N//split
+        indices = []
+        for ix in range(0,N,dx):
+            matches = coords_gt[ix:ix+dx].unsqueeze(1) == coords_out.unsqueeze(0)
+            indices.append(torch.where(matches)[1])
+        indices = torch.cat(indices,dim=0)
+    if indices.size(0) != out.size(0):
+        raise ValueError("realignment failed")
+    return out[indices]
+    # O = coords_out.cpu().numpy().tolist()
+    # indices = [O.index(G) for G in coords_gt.cpu().numpy()]
+    # return out[indices]
 
+
+def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.half, device="cuda"):
+    if len(dims) != 2 or split != 2:
+        raise NotImplementedError
+
+    h,w = dims
+    spacing = 2/(h-1), 2/(w-1)
+    splitdims = h//split, w//split
+
+    mgs = []
+    domains = []
+
+    # domain (h1,h2),(w1,w2)
+    dom0 = (domain[0], domain[1]-spacing[0]), (domain[0]+spacing[1], domain[1])
+    tensors = [torch.linspace(*dom0[0], steps=splitdims[0]), torch.linspace(*dom0[1], steps=splitdims[1])]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgs.append(mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device))
+    # domains.append(dom0)
+
+    dom1 = (domain[0], domain[1]-spacing[0]), (domain[0], domain[1]-spacing[1])
+    tensors = [torch.linspace(*dom1[0], steps=splitdims[0]), torch.linspace(*dom1[1], steps=splitdims[1])]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgs.append(mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device))
+    # domains.append(dom1)
+
+    dom2 = (domain[0]+spacing[0], domain[1]), (domain[0]+spacing[1], domain[1])
+    tensors = [torch.linspace(*dom2[0], steps=splitdims[0]), torch.linspace(*dom2[1], steps=splitdims[1])]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgs.append(mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device))
+    # domains.append(dom2)
+
+    dom3 = (domain[0]+spacing[0], domain[1]), (domain[0], domain[1]-spacing[1])
+    tensors = [torch.linspace(*dom3[0], steps=splitdims[0]), torch.linspace(*dom3[1], steps=splitdims[1])]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgs.append(mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device))
+    # domains.append(dom3)
+
+    return mgs
 
 def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]

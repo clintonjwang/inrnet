@@ -16,7 +16,7 @@ def conv(values, inr, layer, query_coords=None):
     Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
     mask = layer.norm(Diffs) < layer.radius
 
-    if layer.dropout > 0 and layer.training:
+    if layer.dropout > 0 and inr.training:
         mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
     Y = values[torch.where(mask)[1]] # flattened list of values of neighborhood points

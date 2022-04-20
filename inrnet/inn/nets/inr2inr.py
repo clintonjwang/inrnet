@@ -6,7 +6,7 @@ from inrnet import inn
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels, out_channels, min_channels=16, spatial_dim=2, **kwargs):
+    def __init__(self, in_channels, out_channels, min_channels=16, spatial_dim=2, final_activation=None, **kwargs):
         super().__init__()
         C = min_channels
         conv_kwargs = {"input_dims":spatial_dim, **kwargs}
@@ -20,10 +20,13 @@ class UNet(nn.Module):
         self.up3 = inn.blocks.conv_norm_act(C*8, C*4, radius=1., **conv_kwargs)
         self.up2 = inn.blocks.conv_norm_act(C*4, C*2, radius=.6, **conv_kwargs)
         self.up1 = inn.blocks.conv_norm_act(C*2, C, radius=.3, **conv_kwargs)
-        self.last = nn.Sequential(
+        self.last = [
             inn.blocks.conv_norm_act(C, C, radius=.1, **conv_kwargs),
             inn.ChannelMixer(C, out_channels)
-        )
+        ]
+        if final_activation is not None:
+            self.last.append(inn.get_activation_layer(final_activation))
+        self.last = nn.Sequential(*self.last)
 
     def forward(self, inr):
         z1 = self.first(inr)
@@ -37,7 +40,7 @@ class UNet(nn.Module):
 
 
 class FPN(nn.Module):
-    def __init__(self, in_channels, out_channels, min_channels=16, spatial_dim=2, **kwargs):
+    def __init__(self, in_channels, out_channels, min_channels=16, spatial_dim=2, final_activation=None, **kwargs):
         super().__init__()
         C = min_channels
         conv_kwargs = {"input_dims":spatial_dim, **kwargs}
@@ -77,6 +80,8 @@ class FPN(nn.Module):
         # self.to_out2 = inn.ChannelMixer(C*2, out_channels)
         # self.to_out3 = inn.ChannelMixer(C*4, out_channels)
         # self.to_out4 = inn.ChannelMixer(C*8, out_channels)
+        if final_activation is not None:
+            self.final = inn.get_activation_layer(final_activation)
 
     def forward(self, inr):
         d1 = self.first(inr)
@@ -86,18 +91,20 @@ class FPN(nn.Module):
         u3 = self.up3(d4) + d3
         u2 = self.up2(u3) + d2
         u1 = self.up1(u2) + d1
-        return self.to_out1(u1) + self.to_out2(u2) + self.to_out3(u3) + self.to_out4(d4)
-
+        out = self.to_out1(u1) + self.to_out2(u2) + self.to_out3(u3) + self.to_out4(d4)
+        if hasattr(self, "final"):
+            out = self.final(out)
+        return out
 
 
 class ConvCM(nn.Module):
     def __init__(self, in_channels, out_channels, min_channels=16,
-            final_activation=None, spatial_dim=2, dropout=0.):
+            final_activation=None, spatial_dim=2, **kwargs):
         super().__init__()
         C = min_channels
         self.layers = [
             inn.blocks.conv_norm_act(in_channels, out_channels, radius=.01, input_dims=spatial_dim,
-                dropout=dropout),
+                **kwargs),
             # inn.AdaptiveChannelMixer(in_channels, out_channels, input_dims=spatial_dim, bias=True),
         ]
         if final_activation is not None:
