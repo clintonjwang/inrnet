@@ -32,12 +32,12 @@ def conv(values, inr, layer, query_coords=None):
             if y.size(0) == 0:
                 newVals.append(y.new_zeros(layer.out_channels))
             else:
-                W = layer.K(Dsplit[ix])
+                W = layer.weight(Dsplit[ix])
                 newVals.append(y.unsqueeze(1).matmul(W).squeeze(1).mean(0))
 
     else:
         bin_centers = get_minNN_points_in_disk(radius=layer.radius, N=layer.N_bins)
-        Kh = layer.K(bin_centers)
+        Kh = layer.weight(bin_centers)
         with torch.no_grad():
             bin_ixs = (Diffs.unsqueeze(0) - bin_centers.unsqueeze(1)).norm(dim=-1).min(0).indices # (N_points, d)
         Wsplit = Kh.index_select(dim=0, index=bin_ixs).split(lens)
@@ -48,10 +48,17 @@ def conv(values, inr, layer, query_coords=None):
                 newVals.append(y.new_zeros(layer.out_channels))
             else:
                 newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
+        # if not inr.training:
+        #     for ix,l in enumerate(lens):
+        #         if l>1:
+        #             print(ix, end=",")
+        #         if l==0:
+        #             print(ix, end="!")
+        #     pdb.set_trace()
         # newVals = [y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0) for ix,y in enumerate(Ysplit)]
     newVals = torch.stack(newVals, dim=0)
     if layer.bias:
-        newVals = newVals + layer.b_j
+        newVals = newVals + layer.bias
     return newVals
 
 def gridconv(values, inr, layer):
@@ -75,6 +82,12 @@ def avg_pool(values, inr, layer, query_coords=None):
     Y = values[torch.where(mask)[1]]
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
+def adaptive_avg_pool(values, inr, layer):
+    coords = inr.sampled_coords
+    Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
+    mask = layer.norm(Diffs) < layer.radius 
+    Y = values[torch.where(mask)[1]]
+    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
 
 

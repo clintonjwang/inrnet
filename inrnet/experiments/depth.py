@@ -53,16 +53,16 @@ def train_depth_model(args):
         scaler.step(optimizer)
         scaler.update()
 
-        if global_step % 1 == 0:
+        if global_step % 20 == 0:
             print(loss.item(),flush=True)
-        if global_step % 1 == 0:
+        if global_step % 100 == 0:
             torch.cuda.empty_cache()
             with torch.no_grad():
                 with torch.cuda.amp.autocast():
                     h,w = H//2, W//2
                     z_pred = rescale_clip(depth_inr.eval().produce_image(h,w, split=2))
                     plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_z.png"), z_pred, cmap="gray")
-                    rgb = rescale_float(img_inr.produce_image(h,w))
+                    rgb = rescale_float(img_inr.produce_image(h,w, split=2))
                     plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_rgb.png"), rgb)
 
             torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
@@ -84,10 +84,10 @@ def getDepthNet(args):
         final_activation=net_args["final activation"], dropout=net_args["dropout"])
     if net_args["type"] == "UNet":
         model = inn.nets.UNet(min_channels=net_args["min channels"], **kwargs)
-    elif net_args["type"] == "ConvCM":
-        model = inn.nets.ConvCM(min_channels=net_args["min channels"], **kwargs)
     elif net_args["type"] == "FPN":
         model = inn.nets.FPN(min_channels=net_args["min channels"], **kwargs)
+    elif net_args["type"] == "SimpleI2I":
+        model = inn.nets.SimpleI2I(min_channels=net_args["min channels"], **kwargs)
     else:
         raise NotImplementedError("bad type: " + net_args["type"])
 

@@ -2,12 +2,22 @@ import torch
 nn = torch.nn
 F = nn.functional
 
+def translate_activation(layer):
+    if isinstance(layer, nn.ReLU):
+        return ReLU()
+    elif isinstance(layer, nn.LeakyReLU):
+        return LeakyReLU()
+    else:
+        raise NotImplementedError
+
 def get_activation_layer(type):
+    if type is None:
+        return nn.Identity()
     type = type.lower()
     if type == "relu":
         return ReLU()
     elif type == "leakyrelu":
-        return ReLU()
+        return LeakyReLU()
     elif type == "gelu":
         return GELU()
     elif type == "swish":

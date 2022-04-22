@@ -4,7 +4,7 @@ from functools import partial
 nn=torch.nn
 F=nn.functional
 
-import util
+from inrnet import util
 from inrnet.inn import functional as inrF
 
 class INR(nn.Module):
@@ -71,12 +71,16 @@ class INR(nn.Module):
         # self.add_modification(lambda x: other/x)
         # return self
     
-    def generate_sample_points(self, sample_size=None):
+    def generate_sample_points(self, method="qmc", sample_size=None, dims=None):
         if sample_size is None:
             sample_size = self.sample_size
-        return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size) * \
-                (self.domain[1]-self.domain[0]) - self.domain[0]
-
+        if method == "qmc":
+            return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size) * \
+                    (self.domain[1]-self.domain[0]) - self.domain[0]
+        elif method == "grid":
+            return util.meshgrid_coords(*dims)
+        else:
+            raise NotImplementedError("invalid method: "+method)
 
     def add_modification(self, modification):
         self.modifiers.append(modification)
@@ -161,14 +165,13 @@ class INR(nn.Module):
                 outs = []
                 xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
                 for xy_grid in xy_grids:
-                    xy_grid = xy_grid.cuda()
-                    output = self.forward(xy_grid)
-                    outs.append(util.realign_values(output, coords_gt=xy_grid, inr=self).cpu())
+                    output = self.forward(xy_grid.cuda())
+                    outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
                     torch.cuda.empty_cache()
                 xy_grid = util.meshgrid_coords(H,W)
                 output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
-                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=16)
-                return output.reshape(H,W,-1).squeeze(-1).float().numpy()
+                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
+                return output.reshape(H,W,-1).squeeze(-1).cpu().float().numpy()
 
     def forward(self, coords):
         if self.detached:
@@ -193,8 +196,17 @@ class BlackBoxINR(INR):
         super().__init__(channels=channels, **kwargs)
         self.evaluator = evaluator.to(device=device, dtype=dtype)
 
+    def add_modification(self, modification):
+        super().add_modification(modification)
+        self.sampled_coords = torch.empty(0)
+
+    def create_modified_copy(self, modification):
+        self.sampled_coords = torch.empty(0)
+        new_inr = super().create_modified_copy(modification)
+        return new_inr
+
     def forward(self, coords):
-        if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.all(self.sampled_coords == coords):
+        if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
 
         self.sampled_coords = coords

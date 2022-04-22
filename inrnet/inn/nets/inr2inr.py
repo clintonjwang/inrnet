@@ -10,12 +10,15 @@ class UNet(nn.Module):
         super().__init__()
         C = min_channels
         conv_kwargs = {"input_dims":spatial_dim, **kwargs}
-        self.first = inn.blocks.conv_norm_act(in_channels, C, radius=.1, **conv_kwargs)
-        self.down1 = inn.blocks.conv_norm_act(C, C*2, radius=.2, stride=.1, **conv_kwargs)
-        self.down2 = inn.blocks.conv_norm_act(C*2, C*4, radius=.4, stride=.2, **conv_kwargs)
+        self.first = inn.blocks.conv_norm_act(in_channels, C, radius=.01, **conv_kwargs)
+        self.down1 = nn.Sequential(
+            inn.blocks.conv_norm_act(C, C, radius=.02, stride=.01, **conv_kwargs),
+            inn.blocks.conv_norm_act(C, C*2, radius=.04, stride=.02, **conv_kwargs),
+        )
+        self.down2 = inn.blocks.conv_norm_act(C*2, C*4, radius=.04, stride=.02, **conv_kwargs)
         self.down3 = nn.Sequential(
-            inn.blocks.conv_norm_act(C*4, C*8, radius=.7, stride=.4, **conv_kwargs),
-            inn.blocks.ResBlock(C*8, radius=.8, **conv_kwargs),
+            inn.blocks.conv_norm_act(C*4, C*8, radius=.1, stride=.05, **conv_kwargs),
+            inn.blocks.ResBlock(C*8, radius=.2, **conv_kwargs),
         )
         self.up3 = inn.blocks.conv_norm_act(C*8, C*4, radius=1., **conv_kwargs)
         self.up2 = inn.blocks.conv_norm_act(C*4, C*2, radius=.6, **conv_kwargs)
@@ -44,7 +47,7 @@ class FPN(nn.Module):
         super().__init__()
         C = min_channels
         conv_kwargs = {"input_dims":spatial_dim, **kwargs}
-        self.first = inn.blocks.conv_norm_act(in_channels, C, radius=.1, **conv_kwargs)
+        self.first = inn.blocks.conv_norm_act(in_channels, C, radius=.01, stride=.001, **conv_kwargs)
         self.down1 = nn.Sequential(
             # inn.blocks.ResBlock(C, radius=.2, stride=.1, **conv_kwargs),
             inn.blocks.conv_norm_act(C, C*2, radius=.3, stride=.1, **conv_kwargs),
@@ -97,15 +100,15 @@ class FPN(nn.Module):
         return out
 
 
-class ConvCM(nn.Module):
+class SimpleI2I(nn.Module):
     def __init__(self, in_channels, out_channels, min_channels=16,
             final_activation=None, spatial_dim=2, **kwargs):
         super().__init__()
         C = min_channels
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, out_channels, radius=.01, input_dims=spatial_dim,
+            inn.blocks.conv_norm_act(in_channels, C, radius=.02, input_dims=spatial_dim,
                 **kwargs),
-            # inn.AdaptiveChannelMixer(in_channels, out_channels, input_dims=spatial_dim, bias=True),
+            inn.ChannelMixer(C, out_channels, input_dims=spatial_dim, bias=True),
         ]
         if final_activation is not None:
             self.layers.append(inn.get_activation_layer(final_activation))

@@ -5,6 +5,15 @@ F = nn.functional
 
 from inrnet.inn import functional as inrF
 
+def translate_bn2d(bn):
+    layer = inn.ChannelNorm(channels=bn.num_features, affine=True,
+                momentum=0.1, track_running_stats=True)
+    layer.weight.data = bn.weight.data
+    layer.bias.data = bn.bias.data
+    layer.running_mean.data = bn.running_mean.data
+    layer.running_std.data = bn.running_var.data
+    return layer
+
 class ChannelNorm(nn.Module):
     def __init__(self, channels=None, affine=True, momentum=0.1,
             track_running_stats=True, device=None, dtype=torch.float):

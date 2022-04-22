@@ -3,7 +3,7 @@ import torch
 nn = torch.nn
 F = nn.functional
 
-import util
+from inrnet import util
 from inrnet.inn import functional as inrF
 
 def L1_dist_inr(N=128):
