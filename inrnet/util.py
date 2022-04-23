@@ -47,6 +47,11 @@ def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
     # indices = [O.index(G) for G in coords_gt.cpu().numpy()]
     # return out[indices]
 
+def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
+    tensors = [torch.linspace(*domain, steps=d) for d in dims]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
+
 
 def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.half, device="cuda"):
     if len(dims) != 2 or split != 2:
@@ -56,11 +61,6 @@ def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.half, devic
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
     splitgrids = (mgrid[::2,::2], mgrid[1::2,::2], mgrid[::2,1::2], mgrid[1::2,1::2])
     return [mg.reshape(-1, len(dims)).to(dtype=dtype, device=device) for mg in splitgrids]
-
-def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
-    tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
-    return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:

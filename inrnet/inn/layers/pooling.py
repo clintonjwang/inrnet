@@ -8,10 +8,16 @@ from inrnet.inn import functional as inrF
 def translate_pool(layer, img_shape):
     if isinstance(layer, nn.MaxPool2d):
         h,w = img_shape
-        k = layer.kernel_size
-        s = layer.stride
-        K = k / h, k / w
-        return MaxPool(kernel_size=K)
+        domain_width = 2
+        spacing = domain_width / (h-1), domain_width / (w-1)
+        k = layer.kernel_size * spacing, layer.kernel_size * spacing
+        # k = layer.kernel_size / h, layer.kernel_size / w
+        s = layer.stride / h * 2.01, layer.stride / w * 2.01 # add a little extra to prevent boundary effects
+        if layer.kernel_size % 2 == 0:
+            shift = k[0]/4, k[1]/4
+        else:
+            shift = 0,0
+        return MaxPool(kernel_size=k, stride=s, shift=shift)
     else:
         raise NotImplementedError
 
@@ -28,6 +34,17 @@ class AvgPool(nn.Module):
         new_inr.integrator = partial(inrF.avg_pool, inr=new_inr, layer=self)
         return new_inr
 
+class MaxPool(nn.Module):
+    def __init__(self, kernel_size, stride=0., shift=0.):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.shift = shift
+    def forward(self, inr):
+        new_inr = inr.create_derived_inr()
+        new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)
+        return new_inr
+
 class MaxPoolBall(nn.Module):
     def __init__(self, radius, stride=0., p_norm="inf"):
         super().__init__()
@@ -36,16 +53,6 @@ class MaxPoolBall(nn.Module):
         if p_norm == "inf":
             p_norm = torch.inf
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
-    def forward(self, inr):
-        new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)
-        return new_inr
-
-class MaxPool(nn.Module):
-    def __init__(self, kernel_size, stride=0.):
-        super().__init__()
-        self.kernel_size = kernel_size
-        self.stride = stride
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)

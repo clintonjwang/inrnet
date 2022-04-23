@@ -8,56 +8,66 @@ nn=torch.nn
 def conv(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
-        if layer.stride > 0:
+        if layer.stride != 0:
             inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
         else:
             query_coords = coords
 
-    Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
-    mask = layer.norm(Diffs) < layer.radius
+    if hasattr(layer, "norm"):
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = layer.norm(Diffs) < layer.radius
+    else:
+        if hasattr(layer, "shift"):
+            query_coords = query_coords + torch.tensor(layer.shift, dtype=query_coords.dtype, device=query_coords.device)
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
+
+    # Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
+    # mask = layer.norm(Diffs) < layer.radius
 
     if layer.dropout > 0 and inr.training:
         mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
     Y = values[torch.where(mask)[1]] # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
-    lens = tuple(mask.sum(0)) # number of kernel points assigned to each point
+    lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
     Ysplit = Y.split(lens) # list of values at neighborhood points
     newVals = []
 
-    if layer.N_bins == 0:
-        #Wsplit = layer.K(Diffs).split(lens)
+    if hasattr(layer, "interpolate_weights"):
         Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
         for ix,y in enumerate(Ysplit):
-            if y.size(0) == 0:
-                newVals.append(y.new_zeros(layer.out_channels))
-            else:
-                W = layer.weight(Dsplit[ix])
-                newVals.append(y.unsqueeze(1).matmul(W).squeeze(1).mean(0))
+            w_io = layer.interpolate_weights(-Dsplit[ix])
+            newVals.append(torch.einsum('ni,ion->o',y,w_io))
 
     else:
-        bin_centers = get_minNN_points_in_disk(radius=layer.radius, N=layer.N_bins)
-        Kh = layer.weight(bin_centers)
-        with torch.no_grad():
-            bin_ixs = (Diffs.unsqueeze(0) - bin_centers.unsqueeze(1)).norm(dim=-1).min(0).indices # (N_points, d)
-        Wsplit = Kh.index_select(dim=0, index=bin_ixs).split(lens)
-        
-        newVals = []
-        for ix,y in enumerate(Ysplit):
-            if y.size(0) == 0:
-                newVals.append(y.new_zeros(layer.out_channels))
-            else:
-                newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
-        # if not inr.training:
-        #     for ix,l in enumerate(lens):
-        #         if l>1:
-        #             print(ix, end=",")
-        #         if l==0:
-        #             print(ix, end="!")
-        #     pdb.set_trace()
-        # newVals = [y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0) for ix,y in enumerate(Ysplit)]
+        if layer.N_bins == 0:
+            #Wsplit = layer.K(Diffs).split(lens)
+            Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
+            for ix,y in enumerate(Ysplit):
+                if y.size(0) == 0:
+                    newVals.append(y.new_zeros(layer.out_channels))
+                else:
+                    W = layer.weight(-Dsplit[ix])
+                    newVals.append(y.unsqueeze(1).matmul(W).squeeze(1).mean(0))
+
+        else:
+            bin_centers = get_minNN_points_in_disk(radius=layer.radius, N=layer.N_bins)
+            Kh = layer.weight(bin_centers)
+            with torch.no_grad():
+                bin_ixs = (Diffs.unsqueeze(0) - bin_centers.unsqueeze(1)).norm(dim=-1).min(0).indices # (N_points, d)
+            Wsplit = Kh.index_select(dim=0, index=bin_ixs).split(lens)
+            
+            newVals = []
+            for ix,y in enumerate(Ysplit):
+                if y.size(0) == 0:
+                    newVals.append(y.new_zeros(layer.out_channels))
+                else:
+                    newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
+                    
     newVals = torch.stack(newVals, dim=0)
-    if layer.bias:
+
+    if layer.bias is not None:
         newVals = newVals + layer.bias
     return newVals
 
@@ -71,25 +81,39 @@ def gridconv(values, inr, layer):
 def avg_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
-        if layer.stride > 0:
-            query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            inr.sampled_coords = query_coords
+        if layer.stride != 0:
+            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
         else:
             query_coords = coords
 
-    Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
+    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = layer.norm(Diffs) < layer.radius 
     Y = values[torch.where(mask)[1]]
-    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
+    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(1)))])
 
-def adaptive_avg_pool(values, inr, layer):
+
+
+def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
-    Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
-    mask = layer.norm(Diffs) < layer.radius 
+    if query_coords is None:
+        if layer.stride != 0:
+            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+        else:
+            query_coords = coords
+
+    if hasattr(layer, "norm"):
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = layer.norm(Diffs) < layer.radius
+    else:
+        query_coords = query_coords + torch.tensor(layer.shift, dtype=query_coords.dtype, device=query_coords.device)
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
+    lens = tuple(mask.sum(1))
     Y = values[torch.where(mask)[1]]
-    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
+    Ysplit = Y.split(lens)
+    return torch.stack([y.max(0).values for y in Ysplit], dim=0)
 
-
+#((Diffs[:,-1,0].abs() <= layer.kernel_size[0]) * (Diffs[:,-1,1].abs() <= layer.kernel_size[1])).sum()
 
 
 
@@ -109,19 +133,12 @@ def inner_product(values, inr, layer):
 def global_avg_pool(values):
     return values.mean(0, keepdim=True)
 
-def max_pool(values, inr, layer, query_coords=None):
+def adaptive_avg_pool(values, inr, layer):
     coords = inr.sampled_coords
-    if query_coords is None:
-        if layer.stride > 0:
-            query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            inr.sampled_coords = query_coords
-        else:
-            query_coords = coords
-
-    Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
-    mask = layer.norm(Diffs) < layer.radius
-    Y = values[torch.where(mask)[1]]#, inr.input_dims:]
-    return torch.stack([y.max(0).values for y in Y.split(tuple(mask.sum(0)))])
+    Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
+    mask = layer.norm(Diffs) < layer.radius 
+    Y = values[torch.where(mask)[1]]
+    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
 
 def normalize(values, layer, eps=1e-6):
@@ -163,23 +180,26 @@ def get_minNN_points_in_disk(N, radius=1., eps=0., dtype=torch.float, device="cu
 def get_ball_volume(r, dims):
     return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims
 
-def subsample_points_by_grid(coords, spacing, input_dims=2, domain=(-1,1)):
-    bin_ixs = torch.round(coords.squeeze(0)[:,:input_dims] / spacing).int()
-    bin_ixs = bin_ixs[:,0]*int(1/spacing*3) + bin_ixs[:,1] # TODO: adapt for larger domains, d
+def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
+    if hasattr(spacing, "__iter__"):
+        x = coords[...,0] / spacing[0]
+        y = coords[...,1] / spacing[1]
+        bin_ixs = torch.round(torch.stack((x,y), dim=-1)).int()
+        bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
+    else:
+        bin_ixs = torch.round(coords[...,:input_dims] / spacing).int()
+        bin_ixs = bin_ixs[:,0]*int(3/spacing) + bin_ixs[:,1] # TODO: adapt for larger domains, d
     bins = torch.unique(bin_ixs)
     matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
     points_per_bin = tuple(matches.sum(1))
-    surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
-    return coords[...,surviving_indices,:]
+    if random:
+        surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
+    else:
+        def select_topleft(indices):
+            return indices[torch.min(coords[indices,0] + coords[indices,1]*.1, dim=0).indices.item()]
+        surviving_indices = [select_topleft(x) for x in torch.where(matches)[1].split(points_per_bin)]
 
-def subsample_points_by_grid(coords, spacing, input_dims=2, domain=(-1,1)):
-    bin_ixs = torch.round(coords.squeeze(0)[:,:input_dims] / spacing).int()
-    bin_ixs = bin_ixs[:,0]*int(1/spacing*3) + bin_ixs[:,1] # TODO: adapt for larger domains, d
-    bins = torch.unique(bin_ixs)
-    matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
-    points_per_bin = tuple(matches.sum(1))
-    surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
-    return coords[...,surviving_indices,:]
+    return coords[surviving_indices,:]
 
 
 def interpolate(query_coords, observed_coords, values):
