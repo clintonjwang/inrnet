@@ -84,23 +84,17 @@ class SplineConv(Conv):
         else:
             raise NotImplementedError("bbox")
         self.order = order
-        Tx,Ty,C = [],[],[]
+        C = []
         for i in range(in_channels):
-            Tx.append([])
-            Ty.append([])
             C.append([])
             for o in range(out_channels):
                 bs = Spline2D(x,y, init_weights[o,i], bbox=bbox, kx=order,ky=order, s=smoothing)
                 tx,ty,c = [torch.tensor(z).float() for z in bs.tck]
-                Tx[-1].append(tx)
-                Ty[-1].append(ty)
                 C[-1].append(c.reshape(h,w))
-            Tx[-1] = torch.stack(Tx[-1],dim=0)
-            Ty[-1] = torch.stack(Ty[-1],dim=0)
             C[-1] = torch.stack(C[-1],dim=0)
 
-        self.Tx = nn.Parameter(torch.stack(Tx, dim=1))
-        self.Ty = nn.Parameter(torch.stack(Ty, dim=1))
+        self.Tx = nn.Parameter(tx)
+        self.Ty = nn.Parameter(ty)
         self.C = nn.Parameter(torch.stack(C, dim=1))
 
     def forward(self, inr):
@@ -115,60 +109,32 @@ class SplineConv(Conv):
         Y = xy[:,1].unsqueeze(1)
         px = py = self.order
 
-        values, kx = (self.Tx<=X.reshape(-1,1,1,1)).min(dim=-1)
+        values, kx = (self.Tx<=X).min(dim=-1)
         kx -= 1
         kx[values] = self.Tx.size(-1)-px-2
-
-        values, ky = (self.Ty<=Y.reshape(-1,1,1,1)).min(dim=-1)
+        values, ky = (self.Ty<=Y).min(dim=-1)
         ky -= 1
         ky[values] = self.Ty.size(-1)-py-2
 
         in_, out_ = self.in_channels, self.out_channels
         Dim = in_*out_
         Ctrl = self.C.view(Dim, *self.C.shape[-2:])
-        kx = kx.view(-1, Dim)
-        ky = ky.view(-1, Dim)
-        Tx = self.Tx.view(Dim, -1)
-        Ty = self.Ty.view(Dim, -1)
         for z in range(X.size(0)):
-            for i in range(Dim):
-                D = Ctrl[i, kx[z,i]-px : kx[z,i]+1, ky[z,i]-py : ky[z,i]+1].clone()
+            D = Ctrl[:, kx[z]-px : kx[z]+1, ky[z]-py : ky[z]+1].clone()
 
-                for r in range(1, px + 1):
-                    alphax = (X[z,0] - Tx[i,kx[z,i]-px+1:kx[z,i]+1]) / (
-                        Tx[i,2+kx[z,i]-r:2+kx[z,i]-r+px] - Tx[i,kx[z,i]-px+1:kx[z,i]+1])
-                    for j in range(px, r - 1, -1):
-                        D[j] = (1-alphax[j-1]) * D[j-1] + alphax[j-1] * D[j]
+            for r in range(1, px + 1):
+                alphax = (X[z,0] - self.Tx[kx[z]-px+1:kx[z]+1]) / (
+                    self.Tx[2+kx[z]-r:2+kx[z]-r+px] - self.Tx[kx[z]-px+1:kx[z]+1])
+                for j in range(px, r - 1, -1):
+                    D[:,j] = (1-alphax[j-1]) * D[:,j-1] + alphax[j-1] * D[:,j]
 
-                for r in range(1, py + 1):
-                    alphay = (Y[z,0] - Ty[i,ky[z,i]-py+1:ky[z,i]+1]) / (
-                        Ty[i,2+ky[z,i]-r:2+ky[z,i]-r+py] - Ty[i,ky[z,i]-py+1:ky[z,i]+1])
-                    for j in range(py, r-1, -1):
-                        D[px][j] = (1-alphay[j-1]) * D[px][j-1] + alphay[j-1] * D[px][j]
-                
-                w_oi.append(D[px][py])
-
-        # for i in range(self.in_channels):
-        #     for o in range(self.out_channels):
-        #         D = []
-        #         for z in range(X.size(0)):
-        #             d = self.C[o,i,kx[z,o,i]-px:kx[z,o,i]+1,ky[z,o,i]-py:ky[z,o,i]+1].clone()
-
-        #             for r in range(1, px + 1):
-        #                 alphax = (X[z,0] - self.Tx[o,i,kx[z,o,i]-px+1:kx[z,o,i]+1]) / (
-        #                     self.Tx[o,i,2+kx[z,o,i]-r:2+kx[z,o,i]-r+px] - self.Tx[o,i,kx[z,o,i]-px+1:kx[z,o,i]+1])
-        #                 for j in range(px, r - 1, -1):
-        #                     d[j] = (1-alphax[j-1]) * d[j-1] + alphax[j-1] * d[j]
-
-        #             for r in range(1, py + 1):
-        #                 alphay = (Y[z,0] - self.Ty[o,i,ky[z,o,i]-py+1:ky[z,o,i]+1]) / (
-        #                     self.Ty[o,i,2+ky[z,o,i]-r:2+ky[z,o,i]-r+py] - self.Ty[o,i,ky[z,o,i]-py+1:ky[z,o,i]+1])
-        #                 for j in range(py, r-1, -1):
-        #                     d[px][j] = (1-alphay[j-1]) * d[px][j-1] + alphay[j-1] * d[px][j]
-                    
-        #             D.append(d[px][py])
-
-        #         w_io.append(torch.stack(D))
+            for r in range(1, py + 1):
+                alphay = (Y[z,0] - self.Ty[ky[z]-py+1:ky[z]+1]) / (
+                    self.Ty[2+ky[z]-r:2+ky[z]-r+py] - self.Ty[ky[z]-py+1:ky[z]+1])
+                for j in range(py, r-1, -1):
+                    D[:,px,j] = (1-alphay[j-1]) * D[:,px,j-1] + alphay[j-1] * D[:,px,j]
+            
+            w_oi.append(D[:,px,py])
 
         return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_channels)
 
