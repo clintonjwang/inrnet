@@ -42,26 +42,33 @@ def test_equivalence():
     for inr, _ in data_loader:
         inr = to_black_box(inr).cuda()
         break
-    img_shape = h,w = 352//88, 1216//304
+    img_shape = h,w = 16,16 #352, 1216
     with torch.cuda.amp.autocast():
         img = inr.produce_image(h,w)
     x = torch.tensor(img).permute(2,0,1).unsqueeze(0).cuda()
 
-    discrete_model = model.features[:2].cuda().eval()
-    InrNet = nn.Sequential(
-        *[inn.conversion.translate_discrete_layer(layer, img_shape).cuda() for layer in discrete_model]
-    )
-    y = discrete_model(x)
-
-    coords = util.meshgrid_coords(h,w)
-    out_inr = InrNet(inr)
     with torch.no_grad():
         with torch.cuda.amp.autocast():
+            discrete_model = model.features[:6].cuda().eval()
+            cont_layers = []
+            current_shape = h,w
+            extrema = ((-1,1),(-1,1))
+            for layer in discrete_model:
+                if isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
+                    cont_layer, current_shape, extrema = inn.conversion.translate_discrete_layer(
+                        layer, current_shape, extrema=extrema)
+                else:
+                    cont_layer = inn.conversion.translate_discrete_layer(layer)
+                cont_layers.append(cont_layer)
+            InrNet = nn.Sequential(*cont_layers).cuda()
+            y = discrete_model(x)
+
+            coords = util.meshgrid_coords(h,w)
+            out_inr = InrNet(inr)
             out = out_inr.eval()(coords)
-            #coords = util.meshgrid_split_coords(h,w)[0]
+            coords = util.meshgrid_split_coords(h,w)[0]
             out = util.realign_values(out, coords_gt=coords, inr=out_inr)
-            out = out.reshape(h,w,64).permute(2,0,1).unsqueeze(0)
-            #out = out.reshape(h//2,w//2,3).permute(2,0,1).unsqueeze(0)
+            out = out.reshape(*current_shape,-1).permute(2,0,1).unsqueeze(0)
 
     if y.shape != out.shape:
         print('shape mismatch')

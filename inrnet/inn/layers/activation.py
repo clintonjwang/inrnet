@@ -4,11 +4,12 @@ F = nn.functional
 
 def translate_activation(layer):
     if isinstance(layer, nn.ReLU):
-        return ReLU()
+        layer = ReLU()
     elif isinstance(layer, nn.LeakyReLU):
-        return LeakyReLU()
+        layer = LeakyReLU()
     else:
         raise NotImplementedError
+    return layer
 
 def get_activation_layer(type):
     if type is None:

@@ -7,12 +7,12 @@ F = nn.functional
 from inrnet.inn import functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
-def translate_conv2d(conv2d, img_shape, order=2, smoothing=.01, **kwargs): #h,w
+def translate_conv2d(conv2d, input_shape, extrema, order=2, smoothing=.01, **kwargs): #h,w
     # offset/grow so that the conv kernel goes a half pixel past the boundary
-    h,w = img_shape
+    h,w = input_shape # shape of input features/image
     out_, in_, k1, k2 = conv2d.weight.shape
-    domain_width = 2
-    spacing = domain_width / (h-1), domain_width / (w-1)
+    extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
+    spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     K = k1 * spacing[0], k2 * spacing[1]
 
     if k1 == k2 == 1:
@@ -48,7 +48,7 @@ def translate_conv2d(conv2d, img_shape, order=2, smoothing=.01, **kwargs): #h,w
     if bias:
         layer.bias.data = conv2d.bias
 
-    return layer
+    return layer, input_shape, extrema
 
 
 

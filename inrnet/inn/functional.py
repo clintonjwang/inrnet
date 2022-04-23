@@ -21,7 +21,7 @@ def conv(values, inr, layer, query_coords=None):
             query_coords = query_coords + torch.tensor(layer.shift, dtype=query_coords.dtype, device=query_coords.device)
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-
+        
     # Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
     # mask = layer.norm(Diffs) < layer.radius
 
@@ -90,7 +90,6 @@ def avg_pool(values, inr, layer, query_coords=None):
     mask = layer.norm(Diffs) < layer.radius 
     Y = values[torch.where(mask)[1]]
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(1)))])
-
 
 
 def max_pool(values, inr, layer, query_coords=None):
@@ -184,7 +183,9 @@ def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
     if hasattr(spacing, "__iter__"):
         x = coords[...,0] / spacing[0]
         y = coords[...,1] / spacing[1]
-        bin_ixs = torch.round(torch.stack((x,y), dim=-1)).int()
+        x -= x.min()
+        y -= y.min()
+        bin_ixs = torch.floor(torch.stack((x,y), dim=-1)).int()
         bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
     else:
         bin_ixs = torch.round(coords[...,:input_dims] / spacing).int()
