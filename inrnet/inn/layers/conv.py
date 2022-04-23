@@ -110,44 +110,67 @@ class SplineConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        w_io = []
-        for i in range(self.in_channels):
-            for o in range(self.out_channels):
-                w_io.append(deBoor2d(xy[:,0], xy[:,1], args=(
-                    self.Tx[o,i],self.Ty[o,i],self.C[o,i], self.order, self.order)))
-        return torch.stack(w_io).reshape(self.in_channels, self.out_channels, xy.size(0))
+        w_oi = []
+        X = xy[:,0].unsqueeze(1)
+        Y = xy[:,1].unsqueeze(1)
+        px = py = self.order
 
-def deBoor2d(X,Y, args):
-    # interpolates (x,y) on a Rectangular Bivariate B-spline surface
-    # TODO: vector operations
-    tx,ty, C, px,py = args
-    X = X.unsqueeze(1)
-    Y = Y.unsqueeze(1)
+        values, kx = (self.Tx<=X.reshape(-1,1,1,1)).min(dim=-1)
+        kx -= 1
+        kx[values] = self.Tx.size(-1)-px-2
 
-    values, kx = (tx<=X).min(dim=1)
-    kx -= 1
-    kx[values] = tx.size(0)-px-2
+        values, ky = (self.Ty<=Y.reshape(-1,1,1,1)).min(dim=-1)
+        ky -= 1
+        ky[values] = self.Ty.size(-1)-py-2
 
-    values, ky = (ty<=Y).min(dim=1)
-    ky -= 1
-    ky[values] = ty.size(0)-py-2
+        in_, out_ = self.in_channels, self.out_channels
+        Dim = in_*out_
+        Ctrl = self.C.view(Dim, *self.C.shape[-2:])
+        kx = kx.view(-1, Dim)
+        ky = ky.view(-1, Dim)
+        Tx = self.Tx.view(Dim, -1)
+        Ty = self.Ty.view(Dim, -1)
+        for z in range(X.size(0)):
+            for i in range(Dim):
+                D = Ctrl[i, kx[z,i]-px : kx[z,i]+1, ky[z,i]-py : ky[z,i]+1].clone()
 
-    D = []
-    for i in range(X.size(0)):
-        d = C[kx[i]-px:kx[i]+1,ky[i]-py:ky[i]+1].clone()
+                for r in range(1, px + 1):
+                    alphax = (X[z,0] - Tx[i,kx[z,i]-px+1:kx[z,i]+1]) / (
+                        Tx[i,2+kx[z,i]-r:2+kx[z,i]-r+px] - Tx[i,kx[z,i]-px+1:kx[z,i]+1])
+                    for j in range(px, r - 1, -1):
+                        D[j] = (1-alphax[j-1]) * D[j-1] + alphax[j-1] * D[j]
 
-        for r in range(1, px + 1):
-            alphax = (X[i,0] - tx[kx[i]-px:kx[i]+1]) / (tx[1+kx[i]-r:2+kx[i]-r+px] - tx[kx[i]-px:kx[i]+1])
-            for j in range(px, r - 1, -1):
-                d[j] = (1-alphax[j]) * d[j-1] + alphax[j] * d[j]
+                for r in range(1, py + 1):
+                    alphay = (Y[z,0] - Ty[i,ky[z,i]-py+1:ky[z,i]+1]) / (
+                        Ty[i,2+ky[z,i]-r:2+ky[z,i]-r+py] - Ty[i,ky[z,i]-py+1:ky[z,i]+1])
+                    for j in range(py, r-1, -1):
+                        D[px][j] = (1-alphay[j-1]) * D[px][j-1] + alphay[j-1] * D[px][j]
+                
+                w_oi.append(D[px][py])
 
-        for r in range(1, py + 1):
-            alphay = (Y[i,0] - ty[ky[i]-py:ky[i]+1]) / (ty[1+ky[i]-r:2+ky[i]-r+py] - ty[ky[i]-py:ky[i]+1])
-            for j in range(py, r - 1, -1):
-                d[px][j] = (1-alphay[j]) * d[px][j-1] + alphay[j] * d[px][j]
-        D.append(d[px][py])
+        # for i in range(self.in_channels):
+        #     for o in range(self.out_channels):
+        #         D = []
+        #         for z in range(X.size(0)):
+        #             d = self.C[o,i,kx[z,o,i]-px:kx[z,o,i]+1,ky[z,o,i]-py:ky[z,o,i]+1].clone()
 
-    return torch.stack(D)
+        #             for r in range(1, px + 1):
+        #                 alphax = (X[z,0] - self.Tx[o,i,kx[z,o,i]-px+1:kx[z,o,i]+1]) / (
+        #                     self.Tx[o,i,2+kx[z,o,i]-r:2+kx[z,o,i]-r+px] - self.Tx[o,i,kx[z,o,i]-px+1:kx[z,o,i]+1])
+        #                 for j in range(px, r - 1, -1):
+        #                     d[j] = (1-alphax[j-1]) * d[j-1] + alphax[j-1] * d[j]
+
+        #             for r in range(1, py + 1):
+        #                 alphay = (Y[z,0] - self.Ty[o,i,ky[z,o,i]-py+1:ky[z,o,i]+1]) / (
+        #                     self.Ty[o,i,2+ky[z,o,i]-r:2+ky[z,o,i]-r+py] - self.Ty[o,i,ky[z,o,i]-py+1:ky[z,o,i]+1])
+        #                 for j in range(py, r-1, -1):
+        #                     d[px][j] = (1-alphay[j-1]) * d[px][j-1] + alphay[j-1] * d[px][j]
+                    
+        #             D.append(d[px][py])
+
+        #         w_io.append(torch.stack(D))
+
+        return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_channels)
 
 class BallConv(Conv):
     def __init__(self, in_channels, out_channels, radius, stride=0., p_norm="inf",

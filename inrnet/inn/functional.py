@@ -37,8 +37,8 @@ def conv(values, inr, layer, query_coords=None):
     if hasattr(layer, "interpolate_weights"):
         Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
         for ix,y in enumerate(Ysplit):
-            w_io = layer.interpolate_weights(-Dsplit[ix])
-            newVals.append(torch.einsum('ni,ion->o',y,w_io))
+            w_oi = layer.interpolate_weights(-Dsplit[ix])
+            newVals.append(torch.einsum('ni,noi->o',y,w_oi))
 
     else:
         if layer.N_bins == 0:
