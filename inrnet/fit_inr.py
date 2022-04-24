@@ -12,31 +12,28 @@ from models.inrs import siren
 DATA_DIR = osp.expanduser("/data/vision/polina/scratch/clintonw/datasets/inrnet")
 
 def train_siren(args):
-    data_loader = dataloader.get_img_dataloader(args)
+    dataset = dataloader.get_img_dataset(args)
     keys = ('net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias')
     param_dicts = {k:[] for k in keys}
     start_ix=int(args["start_ix"])
     end_ix = start_ix+args["data loading"]["end_ix"]
-    dataset = args["data loading"]["dataset"]
+    ds_name = args["data loading"]["dataset"]
     interval = args["data loading"]["interval"]
     total_steps = args["optimizer"]["max steps"]
 
-    while osp.exists(DATA_DIR+f"/{dataset}/siren_{start_ix+interval-1}.pt"):
+    while osp.exists(DATA_DIR+f"/{ds_name}/siren_{start_ix+interval-1}.pt"):
         start_ix += interval
     other_data = []
     print("Starting", flush=True)
-    for ix,data in enumerate(data_loader):
-        if ix < start_ix:
-            continue
-        elif ix > end_ix:
-            break
+    for ix in range(start_ix,end_ix):
+        data = dataset[ix]
 
         if args["data loading"]["variables"] is None:
             img = data
         else:
             img = data.pop("img")
             other_data.append(data)
-        imgFit = siren.ImageFitting(img)
+        imgFit = siren.ImageFitting(img.unsqueeze_(0))
         H,W = imgFit.H, imgFit.W
         dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
         INR = siren.Siren(out_channels=img.size(1)).cuda()
@@ -63,7 +60,15 @@ def train_siren(args):
             param_dicts = {k:[] for k in keys}
     print("finished")
 
-
+        # import monai.transforms as mtr
+        # rescale_float = mtr.ScaleIntensity()
+        # fname = osp.expanduser("~/downloads/orig.png")
+        # arr = rescale_float(img.squeeze().permute(1,2,0).cpu().numpy())
+        # plt.imsave(fname, arr)
+        # INR.H,INR.W=H,W
+        # arr = rescale_float(INR.produce_image().cpu().numpy())
+        # fname = osp.expanduser("~/downloads/siren.png")
+        # plt.imsave(fname, arr)
 
 def main(args):
     if not torch.cuda.is_available():

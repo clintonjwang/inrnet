@@ -160,7 +160,7 @@ class SplineConv(Conv):
         return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_groups)
 
     # cl, c = KMeans(x)
-    def kmeans(self, x, Niter=10, tol=1e-3):
+    def kmeans(self, x, Niter=5, tol=1e-3):
         """Implements Lloyd's algorithm for the Euclidean metric.
         Source: https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
         K = self.N_bins

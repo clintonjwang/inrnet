@@ -19,37 +19,46 @@ class jpgDS(torchvision.datasets.VisionDataset):
     def __len__(self):
         return len(self.paths)
 
-def get_img_dataloader(args):
-    paths, dl_args = (args["paths"], args["data loading"])
-    if dl_args["dataset"] == "ImageNet":
-        trans = transforms.Compose([transforms.ToTensor(),
+class INetDS(torchvision.datasets.VisionDataset):
+    def __init__(self, root, *args, **kwargs):
+        super().__init__(root, *args, **kwargs)
+        self.subpaths = open(self.root+"/val.txt", "r").read().split('\n')
+        classes = open(self.root+"/labels.txt", 'r').read().split('\n')
+        self.classes = [c[:c.find(',')] for c in classes]
+    def __getitem__(self, ix):
+        return {"cls":self.classes.index(osp.basename(osp.dirname(self.subpaths[ix]))),
+        "img":self.transform(Image.open(osp.join(self.root, self.subpaths[ix])))}
+    def __len__(self):
+        return len(self.subpaths)
+
+def get_img_dataset(args):
+    dl_args = args["data loading"]
+    if dl_args["dataset"] == "imagenet1k":
+        trans = transforms.Compose([
+            transforms.Resize((224,224)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
-        dataset = torchvision.datasets.ImageFolder(
-            DS_DIR+"/imagenet_pytorch/train",
-            transform=trans)
-        # imagenet_data = torchvision.datasets.ImageNet()
-        data_loader = torch.utils.data.DataLoader(imagenet_data, batch_size=1, shuffle=False)
+        dataset = INetDS(DS_DIR+"/imagenet_pytorch", transform=trans)
 
     elif dl_args["dataset"] == "coco":
         trans = transforms.Compose([transforms.ToTensor()])
         dataset = jpgDS(DS_DIR+"/coco/train2017", transform=trans)
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
     elif dl_args["dataset"] == "horse":
         trans = transforms.Compose([transforms.ToTensor()])
         dataset = jpgDS(DS_DIR+"/inrnet/horse2zebra/trainA", transform=trans)
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
     elif dl_args["dataset"] == "zebra":
         trans = transforms.Compose([transforms.ToTensor()])
         dataset = jpgDS(DS_DIR+"/inrnet/horse2zebra/trainB", transform=trans)
-        data_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
     elif dl_args["dataset"] == "kitti":
+        raise NotImplementedError("kitti dataset")
         data_loader = kitti.get_kitti_img_dataloader()
 
     else:
         raise NotImplementedError
-    return data_loader
+    return dataset
 
 
 def get_inr_dataloader(dl_args):

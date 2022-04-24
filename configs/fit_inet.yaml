@@ -1,8 +1,8 @@
 parent: fit_siren
 data loading:
   interval: 32
-  end_ix: 1600
-  dataset: imagenet
-  variables: null
+  end_ix: 800
+  dataset: imagenet1k
+  variables: img, cls
 optimizer:
-  max steps: 1200
+  max steps: 2000
