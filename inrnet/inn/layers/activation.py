@@ -7,6 +7,10 @@ def translate_activation(layer):
         layer = ReLU()
     elif isinstance(layer, nn.LeakyReLU):
         layer = LeakyReLU()
+    elif isinstance(layer, nn.SiLU):
+        layer = SiLU()
+    elif isinstance(layer, nn.GELU):
+        layer = GELU()
     else:
         raise NotImplementedError
     return layer

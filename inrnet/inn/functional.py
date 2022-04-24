@@ -24,8 +24,7 @@ def conv(values, inr, layer, query_coords=None):
         
     # Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
     # mask = layer.norm(Diffs) < layer.radius
-
-    if layer.dropout > 0 and inr.training:
+    if layer.dropout > 0 and (inr.training and layer.training):
         mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
     Y = values[torch.where(mask)[1]] # flattened list of values of neighborhood points
@@ -35,10 +34,29 @@ def conv(values, inr, layer, query_coords=None):
     newVals = []
 
     if hasattr(layer, "interpolate_weights"):
-        Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
-        for ix,y in enumerate(Ysplit):
-            w_oi = layer.interpolate_weights(-Dsplit[ix])
-            newVals.append(torch.einsum('ni,noi->o',y,w_oi))
+        if layer.N_bins == 0:
+            Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
+            if layer.groups != 1:
+                for ix,y in enumerate(Ysplit):
+                    w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
+                    newVals.append(torch.einsum('ni,ni->i',y,w_o))
+            else:
+                for ix,y in enumerate(Ysplit):
+                    w_oi = layer.interpolate_weights(-Dsplit[ix])
+                    newVals.append(torch.einsum('ni,noi->o',y,w_oi))
+
+        else:
+            bin_ixs, bin_centers = layer.kmeans(Diffs)
+            if layer.groups != 1:
+                w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
+                Wsplit = w_o.index_select(dim=0, index=bin_ixs).split(lens)
+                for ix,y in enumerate(Ysplit):
+                    newVals.append(torch.einsum('bi,bi->i',y,Wsplit[ix]))
+            else:
+                w_oi = layer.interpolate_weights(-bin_centers)
+                Wsplit = w_oi.index_select(dim=0, index=bin_ixs).split(lens)
+                for ix,y in enumerate(Ysplit):
+                    newVals.append(torch.einsum('bi,boi->o',y,Wsplit[ix]))
 
     else:
         if layer.N_bins == 0:
@@ -140,19 +158,21 @@ def adaptive_avg_pool(values, inr, layer):
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
 
-def normalize(values, layer, eps=1e-6):
+def normalize(values, inr, layer):
     mean = values.mean(0)
     var = values.pow(2).mean(0) - mean.pow(2)
     if hasattr(layer, "running_mean"):
-        if layer.training:
+        if inr.training and layer.training:
             with torch.no_grad():
                 layer.running_mean = layer.momentum * layer.running_mean + (1-layer.momentum) * mean
                 layer.running_var = layer.momentum * layer.running_var + (1-layer.momentum) * var
-        return (values - layer.running_mean)/(layer.running_var.sqrt() + eps) * layer.learned_std + layer.learned_mean
-    elif layer.affine:
-        return (values - mean)/(var.sqrt() + eps) * layer.learned_std + layer.learned_mean
+        mean = layer.running_mean
+        var = layer.running_var
+
+    if hasattr(layer, "weight"):
+        return (values - mean)/(var.sqrt() + layer.eps) * layer.weight + layer.bias
     else:
-        return (values - mean)/(var.sqrt() + eps)
+        return (values - mean)/(var.sqrt() + layer.eps)
 
 
 
@@ -180,16 +200,12 @@ def get_ball_volume(r, dims):
     return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims
 
 def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
-    if hasattr(spacing, "__iter__"):
-        x = coords[...,0] / spacing[0]
-        y = coords[...,1] / spacing[1]
-        x -= x.min()
-        y -= y.min()
-        bin_ixs = torch.floor(torch.stack((x,y), dim=-1)).int()
-        bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
-    else:
-        bin_ixs = torch.round(coords[...,:input_dims] / spacing).int()
-        bin_ixs = bin_ixs[:,0]*int(3/spacing) + bin_ixs[:,1] # TODO: adapt for larger domains, d
+    x = coords[...,0] / spacing[0]
+    y = coords[...,1] / spacing[1]
+    x -= x.min()
+    y -= y.min()
+    bin_ixs = torch.floor(torch.stack((x,y), dim=-1)+1e-4).int()
+    bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
     bins = torch.unique(bin_ixs)
     matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
     points_per_bin = tuple(matches.sum(1))

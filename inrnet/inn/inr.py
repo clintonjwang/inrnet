@@ -134,6 +134,11 @@ class INR(nn.Module):
     # def cat(self, other):
     #     return CatINR(self, other)
 
+    def __repr__(self):
+        ret = repr(self.evaluator)
+        ret += f"""\n-> channels={self.channels}, integrator={self.integrator}, modifiers={self.modifiers}"""
+        return ret
+
     def create_modified_copy(self, modification):
         new_inr = copy.copy(self)
         new_inr.modifiers = self.modifiers.copy()
@@ -195,6 +200,9 @@ class BlackBoxINR(INR):
     def __init__(self, evaluator, channels, device="cuda", dtype=torch.float, **kwargs):
         super().__init__(channels=channels, **kwargs)
         self.evaluator = evaluator.to(device=device, dtype=dtype)
+
+    def __repr__(self):
+        return f"""BlackBoxINR(channels={self.channels}, modifiers={self.modifiers})"""
 
     def add_modification(self, modification):
         super().add_modification(modification)

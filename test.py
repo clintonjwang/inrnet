@@ -36,64 +36,64 @@ def test_network():
 
 def test_equivalence():
     from inrnet.models.inrs.siren import to_black_box
-    model = torchvision.models.vgg11(pretrained=True)
+    model = torchvision.models.efficientnet_b0(pretrained=True)
     args = job_mgmt.get_job_args("dep1")
-    data_loader = dataloader.get_inr_dataloader(args["data loading"])
-    for inr, _ in data_loader:
-        inr = to_black_box(inr).cuda()
-        break
-    img_shape = h,w = 16,16 #352, 1216
-    with torch.cuda.amp.autocast():
-        img = inr.produce_image(h,w)
-    x = torch.tensor(img).permute(2,0,1).unsqueeze(0).cuda()
-
     with torch.no_grad():
-        with torch.cuda.amp.autocast():
-            discrete_model = model.features[:6].cuda().eval()
-            cont_layers = []
-            current_shape = h,w
-            extrema = ((-1,1),(-1,1))
-            for layer in discrete_model:
-                if isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
-                    cont_layer, current_shape, extrema = inn.conversion.translate_discrete_layer(
-                        layer, current_shape, extrema=extrema)
-                else:
-                    cont_layer = inn.conversion.translate_discrete_layer(layer)
-                cont_layers.append(cont_layer)
-            InrNet = nn.Sequential(*cont_layers).cuda()
-            y = discrete_model(x)
+        data_loader = dataloader.get_inr_dataloader(args["data loading"])
+        for inr, _ in data_loader:
+            inr = to_black_box(inr).cuda()
+            break
 
-            coords = util.meshgrid_coords(h,w)
-            out_inr = InrNet(inr)
-            out = out_inr.eval()(coords)
-            coords = util.meshgrid_split_coords(h,w)[0]
+        img_shape = h,w = 128,128 #352, 1216
+
+        # discrete_model = model.features[:7].cuda().eval()
+        discrete_model = nn.Sequential(model.features[:2],
+            model.avgpool, model.classifier).cuda().eval()
+
+        InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
+
+        coords = util.meshgrid_coords(h,w)
+        out_inr = InrNet(inr)
+        out = out_inr.eval()(coords)
+
+        if output_shape is not None:
+            split = w // output_shape[-1]
+            coords = util.first_split_meshgrid(h,w, split=split)
             out = util.realign_values(out, coords_gt=coords, inr=out_inr)
-            out = out.reshape(*current_shape,-1).permute(2,0,1).unsqueeze(0)
+            out = out.reshape(*output_shape,-1).permute(2,0,1).unsqueeze(0)
+        print("done with INR")
+        
+        torch.cuda.empty_cache()
+        img = inr.produce_image(h,w, split=2)
+        x = torch.tensor(img).permute(2,0,1).unsqueeze(0).cuda()
+        y = discrete_model(x)
 
     if y.shape != out.shape:
         print('shape mismatch')
         pdb.set_trace()
-    if not torch.allclose(y.half(), out.half(), rtol=.06, atol=.02):
-        print('value mismatch:', ((y-out)/out).abs().max(), (y-out).abs().max())
+    if not torch.allclose(y, out, rtol=.2, atol=.2):
+        print('value mismatch:', (2*(y-out)/(out+y)).abs().max(), (y-out).abs().max())
+        print((y-out).abs().mean(), y.abs().mean(), out.abs().mean())
         pdb.set_trace()
+
 
 def test_equivalence_dummy():
     from inrnet.models.inrs.siren import to_black_box
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return (coords[:,0] > 0.1).to(dtype=coords.dtype).unsqueeze(-1)
-    inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=3, input_dims=2, domain=(-1,1))
+    inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=1, input_dims=2, domain=(-1,1))
     img_shape = h,w = 4,4
     with torch.cuda.amp.autocast():
         img = inr.produce_image(h,w)
     x = torch.tensor(img).unsqueeze(0).unsqueeze(0).cuda()
-    conv = nn.Conv2d(1,1,(3,3),(1,1), padding=(1,1))
+    conv = nn.Conv2d(1,5,(1,1))#,(1,1), padding=(1,1))
     # conv.weight.data.fill_(1.)
     # conv.weight.data[0,0,1,1].fill_(1.)
     # conv.bias.data.fill_(1.)
 
     discrete_layer = conv.cuda()
-    InrNet = inn.conversion.translate_discrete_layer(discrete_layer, img_shape, smoothing=0.).cuda()
+    InrNet = inn.conversion.translate_discrete_layer(discrete_layer).cuda()
     y = discrete_layer(x)
 
     coords = util.meshgrid_coords(h,w)
@@ -102,13 +102,13 @@ def test_equivalence_dummy():
         with torch.cuda.amp.autocast():
             out = out_inr.eval()(coords)
             out = util.realign_values(out, coords_gt=coords, inr=out_inr)
-            out = out.reshape(h,w).unsqueeze(0).unsqueeze(0)
+            out = out.reshape(h,w,-1).permute(2,0,1).unsqueeze(0)
 
     if y.shape != out.shape:
         print('shape mismatch')
         pdb.set_trace()
-    if not torch.allclose(y.half(), out.half(), rtol=1e-5, atol=1e-3):
-        print('value mismatch')
+    if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
+        print('value mismatch:', (2*(y-out)/(out+y)).abs().max(), (y-out).abs().max())
         pdb.set_trace()
 
 test_equivalence()

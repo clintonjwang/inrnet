@@ -1,4 +1,4 @@
 from .layers import *
 from .inr import *
 from .vvf import *
-from . import functional, blocks, nets, polynomials
+from . import functional, blocks, nets, polynomials, conversion

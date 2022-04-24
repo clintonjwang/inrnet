@@ -11,9 +11,9 @@ def translate_pool(layer, input_shape, extrema):
         extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
         spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
         k = layer.kernel_size * spacing[0], layer.kernel_size * spacing[1]
-        s = layer.stride * spacing[0], layer.stride * spacing[1] # add a little extra to prevent boundary effects
+        s = layer.stride * spacing[0], layer.stride * spacing[1]
         if layer.kernel_size % 2 == 0:
-            shift = k[0]/4, k[1]/4
+            shift = spacing[0]/2, spacing[1]/2
         else:
             shift = 0,0
         out_shape = h//2, w//2
@@ -61,9 +61,33 @@ class MaxPoolBall(nn.Module):
         return new_inr
 
 class GlobalAvgPool(nn.Module):
+    def __init__(self, input_channels, squeeze_channels,
+            activation=nn.ReLU, scale_activation=nn.Sigmoid):
+        super().__init__()
+        self.layers = layers
+        
+    def integrator(self, values):
+        output = self.layers(values.mean(0, keepdim=True))
+        return output
+
     def forward(self, inr):
-        coords = inr.generate_sample_points()
-        return inrF.global_avg_pool(inr(coords))
+        # scale = self._scale(inr)
+        # return inr * scale
+        new_inr = inr.create_derived_inr()
+        new_inr.integrator = self.integrator
+        return new_inr
+
+# class GlobalAvgPool(nn.Module):
+#     def __init__(self, sampling="input"):
+#         super().__init__()
+#         self.sampling = sampling
+#     def forward(self, inr, coords=None):
+#         if coords is None:
+#             if self.sampling == "qmc":
+#                 coords = inr.generate_sample_points()
+#                 return inrF.global_avg_pool(inr(coords))
+#             elif self.sampling == "input":
+#                 return inrF.global_avg_pool(inr(coords))
 
 class AdaptiveAvgPool(nn.Module):
     def __init__(self, output_size, p_norm="inf"):

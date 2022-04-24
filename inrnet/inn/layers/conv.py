@@ -7,34 +7,39 @@ F = nn.functional
 from inrnet.inn import functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
-def translate_conv2d(conv2d, input_shape, extrema, order=2, smoothing=.01, **kwargs): #h,w
+def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,w
     # offset/grow so that the conv kernel goes a half pixel past the boundary
     h,w = input_shape # shape of input features/image
     out_, in_, k1, k2 = conv2d.weight.shape
     extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     K = k1 * spacing[0], k2 * spacing[1]
+    order = k1//2+1
 
+    if k1 > 3:
+        smoothing = 0.
+        # cannot handle different knot positions per channel
     if k1 == k2 == 1:
         raise NotImplementedError("ChannelMixer")
 
     if k1 % 2 == k2 % 2 == 0:
-        shift = k1/4, k2/4
+        shift = spacing[0]/2, spacing[1]/2
         raise NotImplementedError("shift bbox")
     else:
         shift = 0,0
 
-    if conv2d.groups != 1:
-        raise NotImplementedError("groups")
-
     if conv2d.padding != (k1//2,k2//2):
         raise NotImplementedError("padding")
 
-    if conv2d.stride == (1,1):
+    if conv2d.stride in [1,(1,1)]:
         stride = 0.
+        out_shape = input_shape
+    elif conv2d.stride in [2,(2,2)]:
+        stride = conv2d.stride[0] * spacing[0], conv2d.stride[1] * spacing[1]
+        out_shape = (input_shape[0]//2, input_shape[1]//2)
+        extrema = ((extrema[0][0], extrema[0][1]-spacing[0]),
+                (extrema[1][0], extrema[1][1]-spacing[1]))
     else:
-        stride = conv2d.stride[0] / h * 2.01, conv2d.stride[1] / w * 2.01
-        # stride = (K[0]*.75, K[1]*.75)
         raise NotImplementedError("stride")
 
     if conv2d.bias is None:
@@ -42,13 +47,14 @@ def translate_conv2d(conv2d, input_shape, extrema, order=2, smoothing=.01, **kwa
     else:
         bias = True
         
-    layer = SplineConv(in_, out_, order=order, smoothing=smoothing,
-        init_weights=conv2d.weight.detach().cpu().numpy(),
+    layer = SplineConv(in_*conv2d.groups, out_, order=order, smoothing=smoothing,
+        init_weights=conv2d.weight.detach().cpu().numpy(), groups=conv2d.groups,
+        N_bins=k1*k2,
         control_grid_dims=(k1,k2), kernel_size=K, stride=stride, bias=bias, **kwargs)
     if bias:
         layer.bias.data = conv2d.bias
 
-    return layer, input_shape, extrema
+    return layer, out_shape, extrema
 
 
 
@@ -67,7 +73,7 @@ class Conv(nn.Module):
         
 class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, control_grid_dims, init_weights, order=2, stride=0.,
-            input_dims=2, N_bins=16, groups=1, bias=False, smoothing=0., shift=0, padding_mode="cutoff"):
+            input_dims=2, N_bins=9, groups=1, bias=False, smoothing=0., shift=0, padding_mode="cutoff"):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             stride=stride, bias=bias, groups=groups)
         self.N_bins = N_bins
@@ -75,27 +81,42 @@ class SplineConv(Conv):
         self.parameterization="B-spline"
         self.dropout = 0
         self.padding_mode = padding_mode
+        self.in_groups = self.in_channels // self.groups
+        if groups == 1 or (groups == in_channels and groups == out_channels):
+            pass
+        else:
+            raise NotImplementedError("groups")
 
         # fit pretrained kernel with b-spline
         h,w = control_grid_dims
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
-        if (h == w == 3):
-            x,y = np.linspace(bbox[0]/1.5, bbox[1]/1.5, h), np.linspace(bbox[2]/1.5, bbox[3]/1.5, w)
-        else:
-            raise NotImplementedError("bbox")
+        x,y = (np.linspace(bbox[0]/h*(h-1), bbox[1]/h*(h-1), h),
+               np.linspace(bbox[2]/w*(w-1), bbox[3]/w*(w-1), w))
+
         self.order = order
         C = []
-        for i in range(in_channels):
+        for i in range(self.in_groups):
             C.append([])
             for o in range(out_channels):
                 bs = Spline2D(x,y, init_weights[o,i], bbox=bbox, kx=order,ky=order, s=smoothing)
                 tx,ty,c = [torch.tensor(z).float() for z in bs.tck]
-                C[-1].append(c.reshape(h,w))
+                try:
+                    C[-1].append(c.reshape(h,w))
+                except RuntimeError:
+                    h=tx.size(0)-order-1
+                    w=ty.size(0)-order-1
+                    C[-1].append(c.reshape(h,w))
             C[-1] = torch.stack(C[-1],dim=0)
 
+        self.register_buffer("grid_points", torch.as_tensor(
+            np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=torch.float))
         self.Tx = nn.Parameter(tx)
         self.Ty = nn.Parameter(ty)
         self.C = nn.Parameter(torch.stack(C, dim=1))
+
+    def __repr__(self):
+        return f"""SplineConv(in_channels={self.in_channels},
+            out_channels={self.out_channels}, bias={self.bias})"""
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
@@ -116,7 +137,7 @@ class SplineConv(Conv):
         ky -= 1
         ky[values] = self.Ty.size(-1)-py-2
 
-        in_, out_ = self.in_channels, self.out_channels
+        in_, out_ = self.in_groups, self.out_channels
         Dim = in_*out_
         Ctrl = self.C.view(Dim, *self.C.shape[-2:])
         for z in range(X.size(0)):
@@ -136,7 +157,43 @@ class SplineConv(Conv):
             
             w_oi.append(D[:,px,py])
 
-        return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_channels)
+        return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_groups)
+
+    # cl, c = KMeans(x)
+    def kmeans(self, x, Niter=10, tol=1e-3):
+        """Implements Lloyd's algorithm for the Euclidean metric.
+        Source: https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
+        K = self.N_bins
+        N, D = x.shape  # Number of samples, dimension of the ambient space
+        c = self.grid_points.clone()  # Initialize centroids to grid
+        x_i = x.view(N, 1, D)  # (N, 1, D) samples
+        c_j = c.view(1, K, D)  # (1, K, D) centroids
+
+        # K-means loop:
+        # - x  is the (N, D) point cloud,
+        # - cl is the (N,) vector of class labels
+        # - c  is the (K, D) cloud of cluster centroids
+        for i in range(Niter):
+            # E step: assign points to the closest cluster -------------------------
+            D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) symbolic squared distances
+            cl = D_ij.argmin(dim=1).long().view(-1)  # Points -> Nearest cluster
+            if D_ij.mean() < tol:
+                break
+
+            # M step: update the centroids to the normalized cluster average: ------
+            # Compute the sum of points per cluster:
+            c.zero_()
+            c.scatter_add_(0, cl[:, None].repeat(1, D), x)
+
+            # Divide by the number of points per cluster:
+            Ncl = torch.bincount(cl, minlength=K).type_as(c).view(K, 1)
+            c /= Ncl  # in-place division to compute the average
+
+        return cl, c
+
+
+
+
 
 class BallConv(Conv):
     def __init__(self, in_channels, out_channels, radius, stride=0., p_norm="inf",

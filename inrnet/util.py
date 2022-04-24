@@ -39,21 +39,21 @@ def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
             torch.cuda.empty_cache()
         indices = torch.cat(indices,dim=0)
     if indices.size(0) != out.size(0):
-        # print("realignment failed")
-        # pdb.set_trace()
-        raise ValueError("realignment failed")
+        print("realignment failed")
+        pdb.set_trace()
+        # raise ValueError("realignment failed")
     return out[indices]
     # O = coords_out.cpu().numpy().tolist()
     # indices = [O.index(G) for G in coords_gt.cpu().numpy()]
     # return out[indices]
 
-def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.half, device="cuda"):
+def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.float, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
     return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 
-def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.half, device="cuda"):
+def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.float, device="cuda"):
     if len(dims) != 2 or split != 2:
         raise NotImplementedError
 
@@ -61,6 +61,12 @@ def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.half, devic
     mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
     splitgrids = (mgrid[::2,::2], mgrid[1::2,::2], mgrid[::2,1::2], mgrid[1::2,1::2])
     return [mg.reshape(-1, len(dims)).to(dtype=dtype, device=device) for mg in splitgrids]
+
+def first_split_meshgrid(*dims, split=2, domain=(-1,1), dtype=torch.float, device="cuda"):
+    tensors = [torch.linspace(*domain, steps=d) for d in dims]
+    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    splitgrid = mgrid[::split,::split]
+    return splitgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:
