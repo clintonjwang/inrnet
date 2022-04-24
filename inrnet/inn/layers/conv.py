@@ -116,7 +116,7 @@ class SplineConv(Conv):
 
     def __repr__(self):
         return f"""SplineConv(in_channels={self.in_channels},
-            out_channels={self.out_channels}, bias={self.bias})"""
+            out_channels={self.out_channels}, bias={self.bias is not None})"""
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()

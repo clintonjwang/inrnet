@@ -1,5 +1,5 @@
 from functools import partial
-import torch
+import torch, pdb
 nn = torch.nn
 F = nn.functional
 
@@ -60,21 +60,16 @@ class MaxPoolBall(nn.Module):
         new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)
         return new_inr
 
-class GlobalAvgPool(nn.Module):
-    def __init__(self, input_channels, squeeze_channels,
-            activation=nn.ReLU, scale_activation=nn.Sigmoid):
+class GlobalAvgPoolSequence(nn.Module):
+    def __init__(self, layers):
         super().__init__()
         self.layers = layers
-        
-    def integrator(self, values):
-        output = self.layers(values.mean(0, keepdim=True))
-        return output
-
+    # def integrator(self, values):
+    #     pdb.set_trace()
+    #     return self.layers(values.mean(0, keepdim=True))
     def forward(self, inr):
-        # scale = self._scale(inr)
-        # return inr * scale
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = self.integrator
+        new_inr.integrator = lambda values: self.layers(values.mean(0, keepdim=True))
         return new_inr
 
 # class GlobalAvgPool(nn.Module):

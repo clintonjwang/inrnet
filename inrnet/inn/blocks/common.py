@@ -16,7 +16,8 @@ class ResBlock(nn.Module):
         super().__init__()
         self.sequential = sequential
     def forward(self, inr):
-        return self.sequential(inr) + inr
+        # return inr + self.sequential(inr)
+        return inn.ResINR(inr, self.sequential)
 
 class ResConv(nn.Module):
     def __init__(self, C, **kwargs):

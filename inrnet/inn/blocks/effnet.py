@@ -20,20 +20,12 @@ class SqueezeExcitation(nn.Module):
     def __init__(self, input_channels, squeeze_channels,
             activation=nn.ReLU, scale_activation=nn.Sigmoid):
         super().__init__()
-        self.avgpool = inn.GlobalAvgPool()
         self.fc1 = nn.Linear(input_channels, squeeze_channels, 1)
         self.fc2 = nn.Linear(squeeze_channels, input_channels, 1)
         self.activation = activation()
         self.scale_activation = scale_activation()
 
-    def _scale(self, inr):
-        scale = self.avgpool(inr)
-        scale = self.fc1(scale)
-        scale = self.activation(scale)
-        scale = self.fc2(scale)
-        return self.scale_activation(scale)
-
-    def integrator(self, values):
+    def integrator(self, values, inr=None):
         scale = values.mean(0, keepdim=True)
         scale = self.fc1(scale)
         scale = self.activation(scale)
@@ -41,8 +33,6 @@ class SqueezeExcitation(nn.Module):
         return values * self.scale_activation(scale)
 
     def forward(self, inr):
-        # scale = self._scale(inr)
-        # return inr * scale
         new_inr = inr.create_derived_inr()
         new_inr.integrator = self.integrator
         return new_inr

@@ -89,12 +89,12 @@ def conv(values, inr, layer, query_coords=None):
         newVals = newVals + layer.bias
     return newVals
 
-def gridconv(values, inr, layer):
-    # applies conv once to each patch (token)
-    coords = inr.sampled_coords
-    n_points = round(2/layer.spacing)
-    query_coords = util.meshgrid_coords(n_points, n_points, domain=inr.domain)
-    return apply_conv(coords, values, inr, layer, query_coords=query_coords)
+# def gridconv(values, inr, layer):
+#     # applies conv once to each patch (token)
+#     coords = inr.sampled_coords
+#     n_points = round(2/layer.spacing)
+#     query_coords = util.meshgrid_coords(n_points, n_points, domain=inr.domain)
+#     return apply_conv(coords, values, inr, layer, query_coords=query_coords)
 
 def avg_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
@@ -212,9 +212,10 @@ def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
     if random:
         surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
     else:
-        def select_topleft(indices):
-            return indices[torch.min(coords[indices,0] + coords[indices,1]*.1, dim=0).indices.item()]
-        surviving_indices = [select_topleft(x) for x in torch.where(matches)[1].split(points_per_bin)]
+        surviving_indices = [x[0] for x in torch.where(matches)[1].split(points_per_bin)]
+        # def select_topleft(indices):
+        #     return indices[torch.min(coords[indices,0] + coords[indices,1]*.1, dim=0).indices.item()]
+        # surviving_indices = [select_topleft(x) for x in torch.where(matches)[1].split(points_per_bin)]
 
     return coords[surviving_indices,:]
 

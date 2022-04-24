@@ -32,12 +32,12 @@ class ChannelMixer(nn.Module):
 
     def forward(self, inr):
         if self.normalized:
-            inr.matmul(torch.softmax(self.weight, dim=-1), inplace=True)
+            out = inr.matmul(torch.softmax(self.weight, dim=-1))
         else:
-            inr.matmul(self.weight, inplace=True)
+            out = inr.matmul(self.weight)
         if hasattr(self, "bias"):
-            inr += self.bias
-        return inr
+            out += self.bias
+        return out
 
 class AdaptiveChannelMixer(nn.Module):
     def __init__(self, in_channels, out_channels, input_dims=2, normalized=False, bias=True):

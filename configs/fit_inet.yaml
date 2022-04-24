@@ -2,7 +2,7 @@ parent: fit_siren
 data loading:
   interval: 32
   end_ix: 1600
-  dataset: coco
+  dataset: imagenet
   variables: null
 optimizer:
   max steps: 1200

@@ -4,11 +4,13 @@ nn = torch.nn
 from inrnet import inn
 from inrnet.inn.blocks.effnet import translate_SE
 from torchvision.ops.misc import SqueezeExcitation
-from torchvision.models.efficientnet import MBConv
+from torchvision.models.efficientnet import EfficientNet, MBConv
 
 def translate_discrete_model(discrete_model, input_shape):
     extrema = ((-1,1),(-1,1))
-    #if isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
+    if isinstance(discrete_model, EfficientNet):
+        discrete_model = nn.Sequential(discrete_model.features,
+            discrete_model.avgpool, discrete_model.classifier)
     InrNet, output_shape, extrema = translate_sequential_layer(discrete_model, input_shape, extrema)
     return InrNet.cuda(), output_shape
 
@@ -17,7 +19,7 @@ def translate_sequential_layer(layers, current_shape, extrema):
     cont_layers = []
     for layer in layers:
         if isinstance(layer, nn.modules.pooling._AdaptiveAvgPoolNd):
-            cont_layer, current_shape, extrema = inn.GlobalAvgPool(), None, None
+            # cont_layer, current_shape, extrema = inn.GlobalAvgPool(), None, None
             break
 
         elif isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
@@ -38,11 +40,15 @@ def translate_sequential_layer(layers, current_shape, extrema):
         else:
             cont_layer = inn.conversion.translate_simple_layer(layer)
         cont_layers.append(cont_layer)
-    remaining_layers = []
-    for ix in range(len(cont_layers), len(layers)):
-        remaining_layers.append(layers[ix])
 
-    cont_sequence = nn.Sequential(*cont_layers, *remaining_layers)
+    remaining_layers = []
+    for ix in range(len(cont_layers)+1, len(layers)):
+        remaining_layers.append(layers[ix])
+    if len(remaining_layers) > 0:
+        cont_layers.append(inn.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
+        current_shape, extrema = None, None
+
+    cont_sequence = nn.Sequential(*cont_layers)
     return cont_sequence, current_shape, extrema
 
 def translate_simple_layer(layer):
