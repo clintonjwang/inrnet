@@ -1,6 +1,0 @@
-paths:
-  slurm output dir: ~/code/diffcoord/results
-  temp dir: ~/code/diffcoord/temp
-  data dir: /data/vision/polina/scratch/clintonw/datasets/imagenet_pytorch/ImageNet
-data loading:
-  dataset: ImageNet

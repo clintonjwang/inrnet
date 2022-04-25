@@ -6,6 +6,13 @@ F = nn.functional
 from inrnet import util
 from inrnet.inn import functional as inrF
 
+def CrossEntropy(N=128):
+    ce = nn.CrossEntropyLoss()
+    def ce_loss(pred, class_ix):
+        coords = pred.generate_sample_points(sample_size=N)
+        return ce(pred(coords), class_ix)
+    return ce_loss
+
 def L1_dist_inr(N=128):
     def l1_qmc(pred,target):
         coords = target.generate_sample_points(sample_size=N)

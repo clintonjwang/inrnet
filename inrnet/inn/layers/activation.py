@@ -6,7 +6,7 @@ def translate_activation(layer):
     if isinstance(layer, nn.ReLU):
         layer = ReLU()
     elif isinstance(layer, nn.LeakyReLU):
-        layer = LeakyReLU()
+        layer = LeakyReLU(layer.negative_slope)
     elif isinstance(layer, nn.SiLU):
         layer = SiLU()
     elif isinstance(layer, nn.GELU):
@@ -39,8 +39,11 @@ class ReLU(nn.Module):
         inr.add_modification(nn.ReLU(inplace=True))
         return inr
 class LeakyReLU(nn.Module):
+    def __init__(self, negative_slope):
+        super().__init__()
+        self.negative_slope = negative_slope
     def forward(self, inr):
-        inr.add_modification(nn.LeakyReLU(inplace=True))
+        inr.add_modification(nn.LeakyReLU(self.negative_slope, inplace=True))
         return inr
 class GELU(nn.Module):
     def forward(self, inr):

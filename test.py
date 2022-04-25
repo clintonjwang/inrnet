@@ -6,50 +6,26 @@ import numpy as np
 
 from inrnet.data import dataloader
 from inrnet import jobs as job_mgmt
-from inrnet import inn, util
-from inrnet.experiments.depth import train_depth_model
-
-def test_layers():
-    siren = nn.Linear(2,3).cuda()
-    inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
-    model = nn.Sequential(
-       inn.Conv(3,8, radius=.4, input_dims=2, dropout=.2),
-       inn.ChannelNorm(8),
-       inn.ReLU(),
-       inn.AdaptiveChannelMixer(8,4, input_dims=2),
-       inn.AvgPool(radius=.4),
-    ).cuda().train()
-    new_inr = model(inr)
-    with torch.no_grad():
-        shape = new_inr(torch.randn(64,2).cuda()).shape
-        assert shape == (64,4), f"shape is {shape}"
-    new_inr(torch.randn(64,2).cuda()).sum().backward()
-
-def test_network():
-    siren = nn.Linear(2,3).cuda()
-    inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
-    model = inn.nets.Conv4(3,4).cuda().train()
-    new_inr = model(inr)
-    with torch.cuda.amp.autocast():
-        with torch.no_grad():
-            shape = new_inr(torch.randn(8,2).cuda()).shape
-            assert shape == (1,4), f"shape is {shape}"
-        new_inr(torch.randn(8,2).cuda()).sum().backward()
+from inrnet import inn, util, experiments, models
+from inrnet.models.inrs.siren import to_black_box
 
 def test_equivalence():
-    from inrnet.models.inrs.siren import to_black_box
-    model = torchvision.models.efficientnet_b0(pretrained=True)
+    # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
     args = job_mgmt.get_job_args("dep1")
     with torch.no_grad():
+        model = torchvision.models.efficientnet_b0(pretrained=True)
         data_loader = dataloader.get_inr_dataloader(args["data loading"])
         for inr, _ in data_loader:
             inr = to_black_box(inr).cuda()
             break
 
-        img_shape = h,w = 128,128 #352, 1216
-        discrete_model = model.cuda().eval()
-
+        img_shape = h,w = 256,256
+        discrete_model = model.eval().cuda()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
+        # discrete_model = nn.Sequential(
+        #     D.main[:8], nn.Conv2d(256, 512, 3, padding=1),
+        #     D.main[9:], nn.AdaptiveAvgPool2d(1), nn.Flatten()).cuda().eval()
+        # InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
 
         coords = util.meshgrid_coords(h,w)
         t = time()
@@ -76,9 +52,11 @@ def test_equivalence():
         print((y-out).abs().mean(), y.abs().mean(), out.abs().mean())
         pdb.set_trace()
 
+test_equivalence()
+print("success")
+
 
 def test_equivalence_dummy():
-    from inrnet.models.inrs.siren import to_black_box
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return (coords[:,0] > 0.1).to(dtype=coords.dtype).unsqueeze(-1)
@@ -112,7 +90,6 @@ def test_equivalence_dummy():
         pdb.set_trace()
 
 def test_time_dummy():
-    from inrnet.models.inrs.siren import to_black_box
     model = torchvision.models.efficientnet_b0(pretrained=True)
     with torch.no_grad():
         C = 3
@@ -134,7 +111,32 @@ def test_time_dummy():
         pdb.set_trace()
 
 
-test_equivalence()
-print("success")
 # args = job_mgmt.get_job_args("dep1")
 # train_depth_model(args)
+
+def test_layers():
+    siren = nn.Linear(2,3).cuda()
+    inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
+    model = nn.Sequential(
+       inn.Conv(3,8, radius=.4, input_dims=2, dropout=.2),
+       inn.ChannelNorm(8),
+       inn.ReLU(),
+       inn.AdaptiveChannelMixer(8,4, input_dims=2),
+       inn.AvgPool(radius=.4),
+    ).cuda().train()
+    new_inr = model(inr)
+    with torch.no_grad():
+        shape = new_inr(torch.randn(64,2).cuda()).shape
+        assert shape == (64,4), f"shape is {shape}"
+    new_inr(torch.randn(64,2).cuda()).sum().backward()
+
+def test_network():
+    siren = nn.Linear(2,3).cuda()
+    inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
+    model = inn.nets.Conv4(3,4).cuda().train()
+    new_inr = model(inr)
+    with torch.cuda.amp.autocast():
+        with torch.no_grad():
+            shape = new_inr(torch.randn(8,2).cuda()).shape
+            assert shape == (1,4), f"shape is {shape}"
+        new_inr(torch.randn(8,2).cuda()).sum().backward()

@@ -1,0 +1,5 @@
+network:
+  task: classify
+  type: effnet-b0
+data loading: null
+optimizer: null

@@ -1,0 +1,8 @@
+parent: fit_siren
+data loading:
+  interval: 32
+  end_ix: 800
+  dataset: places_std
+  variables: null
+optimizer:
+  max steps: 2000

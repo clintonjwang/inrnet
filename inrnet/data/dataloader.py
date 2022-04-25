@@ -1,12 +1,14 @@
-import os, torch
+import os, torch, pdb
 osp=os.path
 import torchvision
 from torchvision import transforms
 from PIL import Image
 import dill as pickle
+import numpy as np
 
+from inrnet.models.inrs import siren
 from inrnet.util import glob2
-from inrnet.data import kitti, inr_loaders
+from inrnet.data import kitti
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
@@ -26,8 +28,11 @@ class INetDS(torchvision.datasets.VisionDataset):
         classes = open(self.root+"/labels.txt", 'r').read().split('\n')
         self.classes = [c[:c.find(',')] for c in classes]
     def __getitem__(self, ix):
-        return {"cls":self.classes.index(osp.basename(osp.dirname(self.subpaths[ix]))),
-        "img":self.transform(Image.open(osp.join(self.root, self.subpaths[ix])))}
+        try:
+            return {"cls":self.classes.index(osp.basename(osp.dirname(self.subpaths[ix]))),
+                "img":self.transform(Image.open(osp.join(self.root, self.subpaths[ix])))}
+        except RuntimeError:
+            return None
     def __len__(self):
         return len(self.subpaths)
 
@@ -35,7 +40,6 @@ def get_img_dataset(args):
     dl_args = args["data loading"]
     if dl_args["dataset"] == "imagenet1k":
         trans = transforms.Compose([
-            transforms.Resize((224,224)),
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
@@ -52,6 +56,14 @@ def get_img_dataset(args):
         trans = transforms.Compose([transforms.ToTensor()])
         dataset = jpgDS(DS_DIR+"/inrnet/horse2zebra/trainB", transform=trans)
 
+    elif dl_args["dataset"] == "places_std":
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        dataset = torchvision.datasets.ImageFolder(
+            DS_DIR+"/places365_standard/val", transform=trans)
+
     elif dl_args["dataset"] == "kitti":
         raise NotImplementedError("kitti dataset")
         data_loader = kitti.get_kitti_img_dataloader()
@@ -65,7 +77,38 @@ def get_inr_dataloader(dl_args):
     if dl_args["dataset"] == "kitti":
         return kitti.get_kitti_inr_dataloader()
     elif dl_args["dataset"] == "horse2zebra":
-        return inr_loaders.get_h2z_inr_dataloader("horse"), inr_loaders.get_h2z_inr_dataloader("zebra")
+        return get_inr_loader_for_imgds("horse"), get_inr_loader_for_imgds("zebra")
+    elif dl_args["dataset"] == "imagenet1k":
+        return get_inr_loader_for_cls_ds("imagenet1k")
     else:
         raise NotImplementedError
+
+def get_inr_loader_for_cls_ds(dataset):
+    inr = siren.Siren(out_channels=3)
+    paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))
+    keys = ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
+    for path in paths:
+        data, classes = torch.load(path)
+        for ix in range(len(data)):
+            param_dict = {k:data[k][ix] for k in keys}
+            try:
+                inr.load_state_dict(param_dict)
+            except RuntimeError:
+                continue
+            yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
+
+
+def get_inr_loader_for_imgds(dataset):
+    inr = siren.Siren(out_channels=3)
+    paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))
+    keys = ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
+    for path in paths:
+        data = torch.load(path)
+        for ix in range(len(data)):
+            param_dict = {k:data[k][ix] for k in keys}
+            try:
+                inr.load_state_dict(param_dict)
+            except RuntimeError:
+                continue
+            yield inr.cuda()
 

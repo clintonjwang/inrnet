@@ -17,10 +17,13 @@ def translate_discrete_model(discrete_model, input_shape):
 
 def translate_sequential_layer(layers, current_shape, extrema):
     cont_layers = []
-    for layer in layers:
+    for layer_num,layer in enumerate(layers):
         if isinstance(layer, nn.modules.pooling._AdaptiveAvgPoolNd):
             # cont_layer, current_shape, extrema = inn.GlobalAvgPool(), None, None
             break
+
+        elif isinstance(layer, nn.modules.padding._ReflectionPadNd) or isinstance(layer, nn.Upsample):
+            continue
 
         elif isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
             cont_layer, current_shape, extrema = inn.conversion.translate_strided_layer(
@@ -39,10 +42,11 @@ def translate_sequential_layer(layers, current_shape, extrema):
 
         else:
             cont_layer = inn.conversion.translate_simple_layer(layer)
+
         cont_layers.append(cont_layer)
 
     remaining_layers = []
-    for ix in range(len(cont_layers)+1, len(layers)):
+    for ix in range(layer_num+1, len(layers)):
         remaining_layers.append(layers[ix])
     if len(remaining_layers) > 0:
         cont_layers.append(inn.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
@@ -55,8 +59,8 @@ def translate_simple_layer(layer):
     if layer.__class__ in (nn.ReLU, nn.LeakyReLU, nn.SiLU, nn.GELU):
         return inn.translate_activation(layer)
 
-    elif isinstance(layer, nn.modules.batchnorm._BatchNorm):
-        return inn.translate_bn(layer)
+    elif isinstance(layer, nn.modules.batchnorm._BatchNorm) or isinstance(layer, nn.modules.instancenorm._InstanceNorm):
+        return inn.translate_norm(layer)
 
     elif isinstance(layer, SqueezeExcitation):
         return translate_SE(layer)

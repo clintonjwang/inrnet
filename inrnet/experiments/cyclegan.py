@@ -1,4 +1,4 @@
-import os, pdb, torch
+import os, pdb
 osp = os.path
 import torch
 nn = torch.nn
@@ -13,6 +13,9 @@ from inrnet.models.inrs.siren import to_black_box
 
 rescale_float = mtr.ScaleIntensity()
 
+def test_cyclegan(args):
+    return
+    
 def train_cyclegan(args):
     paths = args["paths"]
     dl_args = args["data loading"]
@@ -20,15 +23,15 @@ def train_cyclegan(args):
 
     global_step = 0
     scaler = torch.cuda.amp.GradScaler()
-    G_to_horse = getGenerator(args)
-    G_to_zebra = getGenerator(args)
-    D_horse = getDiscriminator(args)
-    D_zebra = getDiscriminator(args)
-    G_optim = torch.optim.Adam(list(G_to_horse.parameters()) + list(G_to_zebra.parameters()),
+    G_A2B = getGenerator(args)
+    G_B2A = getGenerator(args)
+    D_B = getDiscriminator(args)
+    D_A = getDiscriminator(args)
+    G_optim = torch.optim.Adam(list(G_A2B.parameters()) + list(G_B2A.parameters()),
         lr=args["optimizer"]["G learning rate"], betas=(0.5, 0.999))
-    D_horse_optim = torch.optim.Adam(D_horse.parameters(),
+    D_B_optim = torch.optim.Adam(D_B.parameters(),
         lr=args["optimizer"]["D learning rate"], betas=(0.5, 0.999))
-    D_zebra_optim = torch.optim.Adam(D_zebra.parameters(),
+    D_A_optim = torch.optim.Adam(D_A.parameters(),
         lr=args["optimizer"]["D learning rate"], betas=(0.5, 0.999))
     G_fxn, D_fxn = losses.adv_loss_fxns(args["loss settings"])
 
@@ -53,39 +56,37 @@ def train_cyclegan(args):
         true_zebra = to_black_box(next(zebra_loader), sample_size=N).cuda()
         true_horse = to_black_box(horse_inr, sample_size=N).cuda()
         with torch.cuda.amp.autocast():
-            fake_horse = G_to_horse(true_zebra)
-            cycle_zebra = G_to_zebra(fake_horse)
+            fake_horse = G_A2B(true_zebra)
+            cycle_zebra = G_B2A(fake_horse)
             G_loss = cycle_tracker(cycle_zebra, true_zebra) * 10.
-            G_loss += ID_tracker(G_to_zebra(true_zebra), true_zebra) * 5.
+            G_loss += ID_tracker(G_B2A(true_zebra), true_zebra) * 5.
 
-            fake_logit = D_horse(fake_horse)
+            fake_logit = D_B(fake_horse)
             G_loss += Gadv_tracker(fake_logit)
             backward(G_loss, G_optim)
             del G_loss, fake_logit
 
-            if "DEBUG" not in args:
-                true_logit = D_horse(true_horse)
-                fake_logit = D_horse(G_to_horse(true_zebra).detach())
-                D_loss = Dadv_tracker(fake_logit, true_logit)
-                backward(D_loss, D_horse_optim)
-                del D_loss, fake_logit, true_logit
+            true_logit = D_B(true_horse)
+            fake_logit = D_B(G_A2B(true_zebra).detach())
+            D_loss = Dadv_tracker(fake_logit, true_logit)
+            backward(D_loss, D_B_optim)
+            del D_loss, fake_logit, true_logit
 
-            fake_zebra = G_to_zebra(true_horse)
-            cycle_horse = G_to_horse(fake_zebra)
+            fake_zebra = G_B2A(true_horse)
+            cycle_horse = G_A2B(fake_zebra)
             G_loss = cycle_tracker(cycle_horse, true_horse) * 10.
-            G_loss += ID_tracker(G_to_horse(true_horse), true_horse) * 5.
+            G_loss += ID_tracker(G_A2B(true_horse), true_horse) * 5.
 
-            fake_logit = D_zebra(fake_zebra)
+            fake_logit = D_A(fake_zebra)
             G_loss += Gadv_tracker(fake_logit)
             backward(G_loss, G_optim)
             del G_loss, fake_logit
 
-            if "DEBUG" not in args:
-                true_logit = D_zebra(true_zebra)
-                fake_logit = D_zebra(G_to_zebra(true_horse).detach())
-                D_loss = Dadv_tracker(fake_logit, true_logit)
-                backward(D_loss, D_zebra_optim)
-                del D_loss, fake_logit, true_logit
+            true_logit = D_A(true_zebra)
+            fake_logit = D_A(G_B2A(true_horse).detach())
+            D_loss = Dadv_tracker(fake_logit, true_logit)
+            backward(D_loss, D_A_optim)
+            del D_loss, fake_logit, true_logit
 
 
         if global_step % 10 == 0:
@@ -110,8 +111,8 @@ def train_cyclegan(args):
                     rgb = rescale_float(rgb.reshape(h,w,3).cpu().float().numpy())
                     plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step//10}_zebra.png"), rgb)
 
-            # torch.save(G_to_horse.state_dict(), osp.join(paths["weights dir"], "G_to_horse.pth"))
-            # torch.save(G_to_zebra.state_dict(), osp.join(paths["weights dir"], "G_to_zebra.pth"))
+            # torch.save(G_A2B.state_dict(), osp.join(paths["weights dir"], "netG_A2B.pth"))
+            # torch.save(G_B2A.state_dict(), osp.join(paths["weights dir"], "netG_B2A.pth"))
 
         if global_step > args["optimizer"]["max steps"]:
             break

@@ -1,4 +1,4 @@
-from scipy.stats.qmc import Sobol
+from scipy.stats import qmc
 import math, torch, pdb
 import numpy as np
 nn=torch.nn
@@ -17,8 +17,8 @@ def conv(values, inr, layer, query_coords=None):
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = layer.norm(Diffs) < layer.radius
     else:
-        if hasattr(layer, "shift"):
-            query_coords = query_coords + torch.tensor(layer.shift, dtype=query_coords.dtype, device=query_coords.device)
+        if torch.amax(layer.shift)>0:
+            query_coords = query_coords + layer.shift
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
         
@@ -180,8 +180,12 @@ def normalize(values, inr, layer):
 ### Misc
 
 def generate_quasirandom_sequence(d=3, n=128, dtype=torch.float, device="cuda"):
-    sobol = Sobol(d=d)
-    sample = sobol.random_base2(m=int(math.ceil(math.log2(n))))
+    if math.log2(n) % 1 == 0:
+        sampler = qmc.Sobol(d=d)
+        sample = sampler.random_base2(m=int(math.log2(n)))
+    else:
+        sampler = qmc.Halton(d=d)
+        sample = sampler.random(n=n)
     return torch.as_tensor(sample).to(dtype=dtype, device=device)
 
 def get_minNN_points_in_disk(N, radius=1., eps=0., dtype=torch.float, device="cuda"):

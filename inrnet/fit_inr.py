@@ -27,6 +27,8 @@ def train_siren(args):
     print("Starting", flush=True)
     for ix in range(start_ix,end_ix):
         data = dataset[ix]
+        if data is None:
+            continue
 
         if args["data loading"]["variables"] is None:
             img = data
@@ -53,9 +55,9 @@ def train_siren(args):
         
         if ix % interval == interval-1:
             if args["data loading"]["variables"] is None:
-                torch.save(param_dicts, DATA_DIR+f"/{dataset}/siren_{ix}.pt")
+                torch.save(param_dicts, DATA_DIR+f"/{ds_name}/siren_{ix}.pt")
             else:
-                torch.save((param_dicts, other_data), DATA_DIR+f"/{dataset}/siren_{ix}.pt")
+                torch.save((param_dicts, other_data), DATA_DIR+f"/{ds_name}/siren_{ix}.pt")
                 other_data = []
             param_dicts = {k:[] for k in keys}
     print("finished")

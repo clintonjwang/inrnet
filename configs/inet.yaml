@@ -1,0 +1,10 @@
+parent: classify
+data loading:
+  dataset: imagenet1k
+  initial sample points: 512
+  image shape:
+  - 256
+  - 256
+optimizer:
+  learning rate: 1e-5
+  max steps: 10000
