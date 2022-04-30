@@ -20,6 +20,7 @@ class INR(nn.Module):
         self.sample_size = sample_size
         self.detached = False
         self.grid_mode = False
+        self.caching_enabled = True
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
@@ -173,7 +174,11 @@ class INR(nn.Module):
 
     def __repr__(self):
         ret = repr(self.evaluator)
-        ret += f"""\n-> channels={self.channels}, integrator={repr(self.integrator)}, modifiers={self.modifiers}"""
+        ret += f"\n-> C={self.channels}"
+        if self.integrator is not None:
+            ret += f", integrator={repr(self.integrator)}"
+        if len(self.modifiers) > 0:
+            ret += f", modifiers={self.modifiers}"""
         return ret
 
     def detach(self):
@@ -207,7 +212,7 @@ class INR(nn.Module):
             return self._forward(coords)
 
     def _forward(self, coords):
-        if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
+        if hasattr(self, "cached_outputs"):
             return self.cached_outputs
 
         out = self.evaluator(coords)
@@ -224,7 +229,8 @@ class INR(nn.Module):
         for m in self.modifiers:
             out = m(out)
         # self.mod_time = time()-t
-        self.cached_outputs = out
+        if self.caching_enabled:
+            self.cached_outputs = out
         return out
 
     # def integrator_time(self):
@@ -270,35 +276,34 @@ class BlackBoxINR(INR):
         return out
 
 
-class ResINR(INR):
-    def __init__(self, base_inr, layers1, layers2=None):
-        super().__init__(channels=base_inr.channels)
-        self.evaluator = base_inr
-        new_inr = INR(channels=base_inr.channels,
-            input_dims=base_inr.input_dims, domain=base_inr.domain)
-        new_inr.evaluator = nn.Identity()
-        new_inr.origin = base_inr
-        self.res_inr = layers1(new_inr)
-        # self.layers2 = layers2
-    def _forward(self, coords):
-        # if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
-        #     return self.cached_outputs
-        intermediate = self.evaluator(coords)
-        residual = self.res_inr(intermediate)
-        # if self.layers2 is None:
-        out = intermediate + residual
-        pdb.set_trace()
-        # else:
-        #     out = self.layers2(out) + residual
-        self.sampled_coords = self.evaluator.sampled_coords
-        if self.integrator is not None:
-            out = self.integrator(out)
-        for m in self.modifiers:
-            out = m(out)
-        #aa = self.res_inr.parent(3)(intermediate)
-        # self.cached_outputs = out
-        return out
-        #torch.allclose(self.res_inr.sampled_coords, self.evaluator.sampled_coords)
+# class ResINR(INR):
+#     def __init__(self, base_inr, layers1, layers2=None):
+#         super().__init__(channels=base_inr.channels)
+#         self.evaluator = base_inr
+#         new_inr = INR(channels=base_inr.channels,
+#             input_dims=base_inr.input_dims, domain=base_inr.domain)
+#         new_inr.evaluator = nn.Identity()
+#         new_inr.origin = base_inr
+#         self.res_inr = layers1(new_inr)
+#         # self.layers2 = layers2
+#     def _forward(self, coords):
+#         # if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
+#         #     return self.cached_outputs
+#         intermediate = self.evaluator(coords)
+#         residual = self.res_inr(intermediate)
+#         # if self.layers2 is None:
+#         out = intermediate + residual
+#         # else:
+#         #     out = self.layers2(out) + residual
+#         self.sampled_coords = self.evaluator.sampled_coords
+#         if self.integrator is not None:
+#             out = self.integrator(out)
+#         for m in self.modifiers:
+#             out = m(out)
+#         #aa = self.res_inr.parent(3)(intermediate)
+#         # self.cached_outputs = out
+#         return out
+#         #torch.allclose(self.res_inr.sampled_coords, self.evaluator.sampled_coords)
 
 
 
@@ -348,11 +353,8 @@ class MergeINR(INR):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
         out1 = self.inr1(coords)
-        pdb.set_trace()
         out2 = self.inr2(coords)
-        t = time()
         out = self.merge_coords(out1, out2)
-        self.merge_time = time()-t
         if self.integrator is not None:
             out = self.integrator(out)
         for m in self.modifiers:

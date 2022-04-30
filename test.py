@@ -29,7 +29,7 @@ def test_equivalence():
 
     with torch.no_grad():
         model = torchvision.models.efficientnet_b0(pretrained=True)
-        discrete_model = model.features[:5].eval().cuda()
+        discrete_model = model.eval().cuda()
         # cv = nn.Conv2d(C,C,3,1,1,bias=False)
         # cv.weight.data.zero_()
         # cv.weight.data[:,:,1,1].fill_(1.)
