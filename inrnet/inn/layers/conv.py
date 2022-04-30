@@ -19,7 +19,6 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
     if k1 > 3:
         smoothing = 0.
         # cannot handle different knot positions per channel
-
     if k1 % 2 == k2 % 2 == 0:
         shift = spacing[0]/2, spacing[1]/2
     else:
@@ -27,7 +26,8 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
 
     # if conv2d.padding != ((k1+1)//2-1, (k2+1)//2-1):
     #     raise NotImplementedError("padding")
-
+    padded_extrema=((extrema[0][0]-spacing[0]/2, extrema[0][1]+spacing[0]/2),
+            (extrema[1][0]-spacing[1]/2, extrema[1][1]+spacing[1]/2))
     if conv2d.stride in [1,(1,1)]:
         stride = 0.
         out_shape = input_shape
@@ -39,17 +39,16 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
     else:
         raise NotImplementedError("stride")
 
-    if conv2d.bias is None:
-        bias = False
-    else:
-        bias = True
-        
+    bias = conv2d.bias is not None
     layer = SplineConv(in_*conv2d.groups, out_, order=order, smoothing=smoothing,
-        init_weights=conv2d.weight.detach().cpu().numpy(), groups=conv2d.groups,
+        init_weights=conv2d.weight.detach().cpu().numpy()*k1*k2,
+        # scale up weights since we divide by the number of grid points
+        groups=conv2d.groups, padding=conv2d.padding,
+        padded_extrema=padded_extrema,
         N_bins=2**math.ceil(math.log2(k1*k2)), shift=shift, control_grid_dims=(k1,k2),
         kernel_size=K, stride=stride, bias=bias, **kwargs)
     if bias:
-        layer.bias.data = conv2d.bias
+        layer.bias.data = conv2d.bias.data
 
     return layer, out_shape, extrema
 
@@ -67,18 +66,19 @@ class Conv(nn.Module):
             self.bias = nn.Parameter(torch.zeros(out_channels))
         else:
             self.bias = None
-        
+
 class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, control_grid_dims, init_weights, order=2, stride=0.,
-            input_dims=2, N_bins=9, groups=1, bias=False, smoothing=0., shift=(0,0), padding_mode="cutoff"):
+            input_dims=2, N_bins=0, groups=1, padding=0, padded_extrema=None, bias=False, smoothing=0., shift=(0,0)):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             stride=stride, bias=bias, groups=groups)
         self.N_bins = N_bins
         self.kernel_size = K = kernel_size
         self.parameterization="B-spline"
         self.dropout = 0
-        self.padding_mode = padding_mode
+        self.padding = padding
         self.in_groups = self.in_channels // self.groups
+        self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema))
         self.register_buffer('shift', torch.tensor(shift, dtype=torch.float))
         if groups == 1 or (groups == in_channels and groups == out_channels):
             pass
@@ -108,19 +108,29 @@ class SplineConv(Conv):
 
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=torch.float))
-        self.register_buffer("sample_points", inrF.generate_quasirandom_sequence(n=))
-        self.Tx = nn.Parameter(tx)
-        self.Ty = nn.Parameter(ty)
+        self.register_buffer("sample_points", inrF.generate_quasirandom_sequence(n=N_bins, d=input_dims, bbox=bbox))
+        self.register_buffer("Tx", tx)
+        self.register_buffer("Ty", ty)
+        # self.Tx = nn.Parameter(tx)
+        # self.Ty = nn.Parameter(ty)
         self.C = nn.Parameter(torch.stack(C, dim=1))
 
     def __repr__(self):
-        return f"""SplineConv(in_channels={self.in_channels}, out_channels={self.out_channels}, bias={self.bias is not None})"""
+        return f"""SplineConv(in_channels={self.in_channels}, out_channels={
+        self.out_channels}, kernel_size={np.round(self.kernel_size, decimals=3)}, bias={self.bias is not None})"""
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.integrator = partial(inrF.conv, inr=new_inr, layer=self)
         new_inr.channels = self.out_channels
         return new_inr
+
+    def kernel_intersection_ratio(self, query_coords):
+        dist_to_boundary = (query_coords.unsqueeze(1) - self.padded_extrema.T.unsqueeze(0)).abs().amin(dim=1)
+        k = self.kernel_size[0]/2, self.kernel_size[1]/2
+        padding_ratio = (self.kernel_size[0] - F.relu(k[0] - dist_to_boundary[:,0])) * (
+            self.kernel_size[1] - F.relu(k[1] - dist_to_boundary[:,1])) / self.kernel_size[0] / self.kernel_size[1]
+        return padding_ratio
 
     def interpolate_weights(self, xy):
         w_oi = []
@@ -129,10 +139,10 @@ class SplineConv(Conv):
         px = py = self.order
 
         values, kx = (self.Tx<=X).min(dim=-1)
-        kx -= 1
-        kx[values] = self.Tx.size(-1)-px-2
         values, ky = (self.Ty<=Y).min(dim=-1)
+        kx -= 1
         ky -= 1
+        kx[values] = self.Tx.size(-1)-px-2
         ky[values] = self.Ty.size(-1)-py-2
 
         in_, out_ = self.in_groups, self.out_channels
@@ -146,50 +156,36 @@ class SplineConv(Conv):
                     alphax = (X[z,0] - self.Tx[kx[z]-px+1:kx[z]+1]) / (
                         self.Tx[2+kx[z]-r:2+kx[z]-r+px] - self.Tx[kx[z]-px+1:kx[z]+1])
                 except RuntimeError:
+                    print("input off the grid")
                     pdb.set_trace()
                 for j in range(px, r - 1, -1):
-                    D[:,j] = (1-alphax[j-1]) * D[:,j-1] + alphax[j-1] * D[:,j]
+                    D[:,j] = (1-alphax[j-1]) * D[:,j-1] + alphax[j-1] * D[:,j].clone()
 
             for r in range(1, py + 1):
                 alphay = (Y[z,0] - self.Ty[ky[z]-py+1:ky[z]+1]) / (
                     self.Ty[2+ky[z]-r:2+ky[z]-r+py] - self.Ty[ky[z]-py+1:ky[z]+1])
                 for j in range(py, r-1, -1):
-                    D[:,px,j] = (1-alphay[j-1]) * D[:,px,j-1] + alphay[j-1] * D[:,px,j]
+                    D[:,px,j] = (1-alphay[j-1]) * D[:,px,j-1].clone() + alphay[j-1] * D[:,px,j].clone()
             
             w_oi.append(D[:,px,py])
 
-        return torch.stack(w_oi).reshape(xy.size(0), self.out_channels, self.in_groups)
+        return torch.stack(w_oi).view(xy.size(0), self.out_channels, self.in_groups)
 
-    # cl, c = KMeans(x)
-    def kmeans(self, x, Niter=5, tol=1e-5):
-        """Implements Lloyd's algorithm for the Euclidean metric.
-        Source: https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
-        K = self.N_bins
-        N, D = x.shape  # Number of samples, dimension of the ambient space
-        c = self.grid_points.clone()  # Initialize centroids to grid
-        x_i = x.view(N, 1, D)  # (N, 1, D) samples
-        c_j = c.view(1, K, D)  # (1, K, D) centroids
+    def cluster_diffs(self, x, tol=1e-5, grid_mode=False):
+        """Based on kmeans in https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
+        if grid_mode:
+            c = self.grid_points  # Initialize centroids to grid
+        else:
+            c = self.sample_points # Initialize centroids with low-disc seq
+        x_i = x.unsqueeze(1)  # (N, 1, D) samples
+        c_j = c.unsqueeze(0)  # (1, K, D) centroids
 
-        # K-means loop:
-        # - x  is the (N, D) point cloud,
-        # - cl is the (N,) vector of class labels
-        # - c  is the (K, D) cloud of cluster centroids
-        for i in range(Niter):
-            # E step: assign points to the closest cluster -------------------------
-            D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) symbolic squared distances
-            minD, indices = D_ij.min(dim=1)
-            cl = indices.view(-1)  # Points -> Nearest cluster
-            if minD.mean() < tol:
-                break
-
-            # M step: update the centroids to the normalized cluster average: ------
-            # Compute the sum of points per cluster:
-            c.zero_()
-            c.scatter_add_(0, cl[:, None].repeat(1, D), x)
-
-            # Divide by the number of points per cluster:
-            Ncl = torch.bincount(cl, minlength=K).type_as(c).view(K, 1)
-            c /= Ncl  # in-place division to compute the average
+        D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) symbolic squared distances
+        minD, indices = D_ij.min(dim=1)
+        cl = indices.view(-1)  # Points -> Nearest cluster
+        if grid_mode and minD.mean() > tol:
+            print("bad grid alignment")
+            pdb.set_trace()
 
         return cl, c
 
@@ -232,7 +228,7 @@ class BallConv(Conv):
                 nn.Linear(6,in_channels*out_channels), Reshape(in_channels,out_channels))
             if groups != 1:
                 raise NotImplementedError("TODO: conv groups")
-                
+        
         if p_norm not in [2, torch.inf]:
             raise NotImplementedError(f"unsupported norm {p_norm}")
         if parameterization not in ["polynomial", "mlp"]:

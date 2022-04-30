@@ -34,32 +34,43 @@ def test_classifier(args):
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
     InrNet = load_pretrained_classifier(args)
-    top_5, top_1 = [], []
-    N = args["data loading"]["number of samples"]
+    top_5, top_1 = 0,0
+    n_imgs = 0
+    n_points = args["data loading"]["validation sample points"]
     for img_inr, class_ix in data_loader:
-        img_inr = to_black_box(img_inr)
-        with torch.cuda.amp.autocast():
-            pred_cls = InrNet(img_inr)
-            coords = target.generate_sample_points(sample_size=N)
-            return ce(pred(coords), class_ix.cuda())
+        n_imgs += 1
+        with torch.no_grad():
+            with torch.cuda.amp.autocast():
+                img_inr = to_black_box(img_inr)
+                output = InrNet(img_inr)
+                coords = output.generate_sample_points(sample_size=n_points)
+                pred_cls = output(coords).topk(k=5).indices.cpu()
+                top_5 += class_ix in pred_cls
+                top_1 += (class_ix == pred_cls[0,0]).item()
 
-def train_classifier(args):
+        if n_imgs % 10 == 9:
+            print("top_5:", top_5/n_imgs, "; top_1:", top_1/n_imgs)
+    torch.save({"top 5": top_5, "top_1": top_1, "N":n_imgs}, paths["job output dir"]+"/results.txt")
+
+
+def finetune_classifier(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
+    # torch.autograd.set_detect_anomaly(True)
 
     global_step = 0
     scaler = torch.cuda.amp.GradScaler()
     InrNet = load_pretrained_classifier(args)
     optimizer = torch.optim.Adam(InrNet.parameters(), lr=args["optimizer"]["learning rate"])
     loss_tracker = util.MetricTracker("loss", function=losses.CrossEntropy())
+    top_5, top_1 = 0,0
     for img_inr, class_ix in data_loader:
         global_step += 1
         img_inr = to_black_box(img_inr)
         with torch.cuda.amp.autocast():
             pred_cls = InrNet(img_inr)
             loss = loss_tracker(pred_cls, class_ix.cuda())
-            pdb.set_trace()
         optimizer.zero_grad()
         scaler.scale(loss).backward()
         scaler.step(optimizer)

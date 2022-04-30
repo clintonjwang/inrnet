@@ -87,17 +87,23 @@ def get_inr_loader_for_cls_ds(dataset):
     inr = siren.Siren(out_channels=3)
     paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))
     keys = ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
-    for path in paths:
-        data, classes = torch.load(path)
-        for ix in range(len(data)):
-            param_dict = {k:data[k][ix] for k in keys}
-            try:
-                inr.load_state_dict(param_dict)
-            except RuntimeError:
-                continue
-            yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
+    def ordered_loader():
+        for path in paths:
+            data, classes = torch.load(path)
+            for ix in range(len(data)):
+                param_dict = {k:data[k][ix] for k in keys}
+                try:
+                    inr.load_state_dict(param_dict)
+                except RuntimeError:
+                    continue
+                yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
+    # dataset = 
+    raise NotImplementedError("inr loader is not randomized")
+    return torch.utils.data.DataLoader(dataset)
 
-
+class ClsDS(torch.utils.data.IterableDataset):
+    pass
+    
 def get_inr_loader_for_imgds(dataset):
     inr = siren.Siren(out_channels=3)
     paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))

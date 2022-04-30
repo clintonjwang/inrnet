@@ -14,6 +14,7 @@ def translate_conv1x1(conv):
         layer.bias.data = conv.bias.data
     return layer
 
+
 class ChannelMixer(nn.Module):
     def __init__(self, in_channels, out_channels, normalized=False, bias=True):
         super().__init__()
@@ -38,6 +39,7 @@ class ChannelMixer(nn.Module):
         if hasattr(self, "bias"):
             out += self.bias
         return out
+
 
 class AdaptiveChannelMixer(nn.Module):
     def __init__(self, in_channels, out_channels, input_dims=2, normalized=False, bias=True):

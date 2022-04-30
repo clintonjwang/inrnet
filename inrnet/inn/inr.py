@@ -19,6 +19,7 @@ class INR(nn.Module):
         self.integrator = None
         self.sample_size = sample_size
         self.detached = False
+        self.grid_mode = False
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
@@ -28,6 +29,13 @@ class INR(nn.Module):
             return (self.domain[1] - self.domain[0])**self.input_dims
         else:
             return np.prod([d[1]-d[0] for d in self.domain])
+
+    def toggle_grid_mode(self, mode=None):
+        if mode is None:
+            mode = not self.grid_mode
+        self.grid_mode = mode
+        if hasattr(self.evaluator, 'toggle_grid_mode'):
+            self.evaluator.toggle_grid_mode(mode=mode)
 
     def __neg__(self):
         self.add_modification(lambda x: -x)
@@ -91,11 +99,8 @@ class INR(nn.Module):
         self.channels = test_output.size(1)
 
     def create_modified_copy(self, modification):
-        if hasattr(self, 'partial_forward'):
-            new_inr = self.create_derived_inr()
-        else:
-            self.sampled_coords = torch.empty(0)
-            new_inr = copy.copy(self)
+        self.sampled_coords = torch.empty(0)
+        new_inr = copy.copy(self)
         new_inr.modifiers = self.modifiers.copy()
         new_inr.add_modification(modification)
         if new_inr.integrator is not None:
@@ -104,16 +109,8 @@ class INR(nn.Module):
 
     def create_derived_inr(self):
         new_inr = INR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
-        if hasattr(self, 'partial_forward'):
-            new_inr.evaluator = nn.Identity()
-            new_inr.origin = self
-            delattr(self, 'partial_forward')
-        else:
-            new_inr.evaluator = self
+        new_inr.evaluator = self
         return new_inr
-
-    def set_partial_forward(self):
-        self.partial_forward = True
 
     def pow(self, n, inplace=False):
         if inplace:
@@ -211,6 +208,7 @@ class INR(nn.Module):
             self.sampled_coords = self.evaluator.sampled_coords
         except AttributeError:
             self.sampled_coords = self.origin.sampled_coords
+            pdb.set_trace()
         if self.integrator is not None:
             # t = time()
             out = self.integrator(out)
@@ -232,18 +230,6 @@ class INR(nn.Module):
     #     elif not isinstance(self.evaluator, BlackBoxINR):
     #         return self.evaluator.integrator_time() + it
     #     else:   
-    #         return it
-
-    # def modif_time(self):
-    #     if hasattr(self, 'mod_time'):
-    #         it = [self.mod_time]
-    #     else:
-    #         it = []
-    #     if isinstance(self, MergeINR):
-    #         return self.inr1.modif_time() + self.inr2.modif_time() + it
-    #     elif not isinstance(self.evaluator, BlackBoxINR):
-    #         return self.evaluator.modif_time() + it
-    #     else:
     #         return it
 
 
@@ -302,18 +288,20 @@ class ResINR(INR):
     def __init__(self, base_inr, layers1, layers2=None):
         super().__init__(channels=base_inr.channels)
         self.evaluator = base_inr
-        base_inr.set_partial_forward()
-        self.res_inr = layers1(base_inr)
-        self.layers2 = layers2
+        new_inr = INR(channels=base_inr.channels, input_dims=base_inr.input_dims, domain=base_inr.domain)
+        new_inr.evaluator = nn.Identity()
+        new_inr.origin = base_inr
+        self.res_inr = layers1(new_inr)
+        # self.layers2 = layers2
     def _forward(self, coords):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
         out = self.evaluator(coords)
         residual = self.res_inr(out)
-        if self.layers2 is None:
-            out = out + residual
-        else:
-            out = self.layers2(out) + residual
+        # if self.layers2 is None:
+        out = out + residual
+        # else:
+        #     out = self.layers2(out) + residual
         self.sampled_coords = self.evaluator.sampled_coords
         if self.integrator is not None:
             out = self.integrator(out)

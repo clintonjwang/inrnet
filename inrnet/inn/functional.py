@@ -17,11 +17,13 @@ def conv(values, inr, layer, query_coords=None):
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = layer.norm(Diffs) < layer.radius
     else:
-        if torch.amax(layer.shift)>0:
+        if torch.amax(layer.shift) > 0:
             query_coords = query_coords + layer.shift
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-        
+        padding_ratio = layer.kernel_intersection_ratio(query_coords)
+        # scaling factor
+
     # Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
     # mask = layer.norm(Diffs) < layer.radius
     if layer.dropout > 0 and (inr.training and layer.training):
@@ -34,30 +36,31 @@ def conv(values, inr, layer, query_coords=None):
     newVals = []
 
     if hasattr(layer, "interpolate_weights"):
-        if layer.N_bins == 0:
-            Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
-            if layer.groups != 1:
-                for ix,y in enumerate(Ysplit):
-                    w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
-                    newVals.append(torch.einsum('ni,ni->i',y,w_o))
-            else:
-                for ix,y in enumerate(Ysplit):
-                    w_oi = layer.interpolate_weights(-Dsplit[ix])
-                    newVals.append(torch.einsum('ni,noi->o',y,w_oi))
+        if inr.grid_mode or layer.N_bins != 0:
+            bin_ixs, bin_centers = layer.cluster_diffs(Diffs, grid_mode=inr.grid_mode)
 
-        else:
-            bin_ixs, bin_centers = layer.kmeans(Diffs)
             if layer.groups != 1:
                 w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
                 Wsplit = w_o.index_select(dim=0, index=bin_ixs).split(lens)
                 for ix,y in enumerate(Ysplit):
-                    newVals.append(torch.einsum('bi,bi->i',y,Wsplit[ix]))
+                    newVals.append(torch.einsum('ni,ni->i',y,Wsplit[ix])/y.size(0))
             else:
                 w_oi = layer.interpolate_weights(-bin_centers)
                 Wsplit = w_oi.index_select(dim=0, index=bin_ixs).split(lens)
                 for ix,y in enumerate(Ysplit):
-                    newVals.append(torch.einsum('bi,boi->o',y,Wsplit[ix]))
-
+                    newVals.append(torch.einsum('ni,noi->o',y,Wsplit[ix])/y.size(0))
+                    
+        else:
+            Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
+            if layer.groups != 1:
+                for ix,y in enumerate(Ysplit):
+                    w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
+                    newVals.append(torch.einsum('ni,ni->i',y,w_o)/y.size(0))
+            else:
+                for ix,y in enumerate(Ysplit):
+                    w_oi = layer.interpolate_weights(-Dsplit[ix])
+                    newVals.append(torch.einsum('ni,noi->o',y,w_oi)/y.size(0))
+        
     else:
         if layer.N_bins == 0:
             #Wsplit = layer.K(Diffs).split(lens)
@@ -84,6 +87,7 @@ def conv(values, inr, layer, query_coords=None):
                     newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
                     
     newVals = torch.stack(newVals, dim=0)
+    newVals *= padding_ratio.unsqueeze(-1)
 
     if layer.bias is not None:
         newVals = newVals + layer.bias
@@ -179,14 +183,19 @@ def normalize(values, inr, layer):
 
 ### Misc
 
-def generate_quasirandom_sequence(d=3, n=128, dtype=torch.float, device="cuda"):
+def generate_quasirandom_sequence(d=2, n=128, bbox=None, dtype=torch.float, device="cuda"):
     if math.log2(n) % 1 == 0:
         sampler = qmc.Sobol(d=d)
         sample = sampler.random_base2(m=int(math.log2(n)))
     else:
         sampler = qmc.Halton(d=d)
         sample = sampler.random(n=n)
-    return torch.as_tensor(sample).to(dtype=dtype, device=device)
+    out = torch.as_tensor(sample, dtype=dtype, device=device)
+    if bbox is not None:
+        # bbox has form (x1,x2, y1,y2) in 2D
+        out[:,0] = out[:,0] * (bbox[1]-bbox[0]) + bbox[0]
+        out[:,1] = out[:,1] * (bbox[3]-bbox[2]) + bbox[2]
+    return out
 
 def get_minNN_points_in_disk(N, radius=1., eps=0., dtype=torch.float, device="cuda"):
     # what we really want is a Voronoi partition that minimizes the
