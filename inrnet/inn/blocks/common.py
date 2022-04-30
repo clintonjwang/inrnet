@@ -1,4 +1,4 @@
-import torch
+import torch, pdb
 nn = torch.nn
 F = nn.functional
 
@@ -16,8 +16,15 @@ class ResBlock(nn.Module):
         super().__init__()
         self.sequential = sequential
     def forward(self, inr):
-        # return inr + self.sequential(inr)
-        return inn.ResINR(inr, self.sequential)
+        return inr + self.sequential(inr.create_derived_inr())
+        # return inn.ResINR(inr, self.sequential)
+
+class ResTest(nn.Module):
+    def __init__(self, C):
+        super().__init__()
+        self.block = nn.Sequential(nn.Conv2d(C,C,3,1,1,bias=False))
+    def forward(self, x):
+        return x + self.block(x)
 
 class ResConv(nn.Module):
     def __init__(self, C, **kwargs):

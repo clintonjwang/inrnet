@@ -5,16 +5,21 @@ from time import time
 import numpy as np
 
 from inrnet.data import dataloader
+from inrnet.inn.blocks.common import ResTest
 from inrnet import jobs as job_mgmt
 from inrnet import inn, util, experiments, models
 from inrnet.models.inrs.siren import to_black_box
 
 def test_equivalence():
     # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
-    C = 24
+    # C = 3
+    img_shape = h,w = 128,128
+    # zz = torch.zeros(h*w, C)
+    # zz[0,0] = 1
+    # zz[-2,1] = 1
     # class dummy_inr(nn.Module):
     #     def forward(self, coords):
-    #         return torch.randn(coords.size(0), C).to(dtype=coords.dtype, device=coords.device)
+    #         return zz.to(dtype=coords.dtype, device=coords.device)
     # inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=C, input_dims=2, domain=(-1,1)).cuda()
     args = job_mgmt.get_job_args("dep1")
     data_loader = dataloader.get_inr_dataloader(args["data loading"])
@@ -24,10 +29,15 @@ def test_equivalence():
 
     with torch.no_grad():
         model = torchvision.models.efficientnet_b0(pretrained=True)
-        img_shape = h,w = 16,16
-        # discrete_model = model.eval().cuda()
-        discrete_model = nn.Sequential(nn.Conv2d(3,C,1,1,0),
-            model.features[2][1]).cuda().eval()
+        discrete_model = model.features[:5].eval().cuda()
+        # cv = nn.Conv2d(C,C,3,1,1,bias=False)
+        # cv.weight.data.zero_()
+        # cv.weight.data[:,:,1,1].fill_(1.)
+        # cv = ResTest(C=C)
+        # cv.block[0].weight.data.zero_()
+        # cv.block[0].weight.data[:,:,1,1].fill_(1.)
+        # discrete_model = nn.Sequential(cv).cuda().eval()
+        # discrete_model = nn.Sequential(model.features[2][1]).cuda().eval()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
 
         coords = util.meshgrid_coords(h,w)
@@ -44,9 +54,10 @@ def test_equivalence():
             out = out.reshape(*output_shape,-1).permute(2,0,1).unsqueeze(0)
         
         torch.cuda.empty_cache()
-        img = inr.produce_image(h,w, split=2)
+        img = inr.produce_image(h,w)#, split=2)
         x = torch.tensor(img).permute(2,0,1).unsqueeze(0).cuda()
         y = discrete_model(x)
+
 
     if y.shape != out.shape:
         print('shape mismatch')

@@ -5,6 +5,23 @@ nn=torch.nn
 
 ### Convolutions
 
+class Integrator:
+    def __init__(self, function, name, inr=None, layer=None):
+        self.function = function
+        self.name = name
+        self.inr = inr
+        self.layer = layer
+    def __repr__(self):
+        return self.name
+    def __call__(self, values):
+        kwargs = {}
+        if self.inr is not None:
+            kwargs['inr'] = self.inr
+        if self.layer is not None:
+            kwargs['layer'] = self.layer
+        return self.function(values, **kwargs)
+
+
 def conv(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:

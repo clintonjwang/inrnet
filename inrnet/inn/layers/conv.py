@@ -121,7 +121,7 @@ class SplineConv(Conv):
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.conv, inr=new_inr, layer=self)
+        new_inr.set_integrator(inrF.conv, 'SplineConv', layer=self)
         new_inr.channels = self.out_channels
         return new_inr
 

@@ -34,5 +34,5 @@ class SqueezeExcitation(nn.Module):
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = self.integrator
+        new_inr.set_integrator(self.integrator, 'SqueezeExcitation')
         return new_inr

@@ -3,6 +3,7 @@ nn = torch.nn
 
 from inrnet import inn
 from inrnet.inn.blocks.effnet import translate_SE
+from inrnet.inn.blocks.common import ResTest
 from torchvision.ops.misc import SqueezeExcitation
 from torchvision.models.efficientnet import EfficientNet, MBConv
 
@@ -39,6 +40,10 @@ def translate_sequential_layer(layers, current_shape, extrema):
                     layer.block, current_shape, extrema)[0])
             else:
                 cont_layer, current_shape, extrema = translate_sequential_layer(layer.block, current_shape, extrema)
+
+        elif isinstance(layer, ResTest):
+            cont_layer = inn.blocks.ResBlock(translate_sequential_layer(
+                layer.block, current_shape, extrema)[0])
 
         else:
             cont_layer = inn.conversion.translate_simple_layer(layer)

@@ -37,5 +37,5 @@ class ChannelNorm(nn.Module):
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.normalize, inr=inr, layer=self)
+        new_inr.set_integrator(inrF.normalize, 'ChannelNorm', layer=self)
         return new_inr

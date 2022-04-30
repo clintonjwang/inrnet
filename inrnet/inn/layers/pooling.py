@@ -33,7 +33,7 @@ class AvgPool(nn.Module):
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.avg_pool, inr=new_inr, layer=self)
+        new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
 
 class MaxPool(nn.Module):
@@ -44,7 +44,7 @@ class MaxPool(nn.Module):
         self.shift = shift
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)
+        new_inr.set_integrator(inrF.max_pool, 'MaxPool', layer=self)
         return new_inr
 
 class MaxPoolBall(nn.Module):
@@ -57,7 +57,7 @@ class MaxPoolBall(nn.Module):
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.max_pool, inr=new_inr, layer=self)
+        new_inr.set_integrator(inrF.max_pool, 'MaxPoolBall', layer=self)
         return new_inr
 
 class GlobalAvgPoolSequence(nn.Module):
@@ -69,7 +69,8 @@ class GlobalAvgPoolSequence(nn.Module):
     #     return self.layers(values.mean(0, keepdim=True))
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = lambda values: self.layers(values.mean(0, keepdim=True))
+        new_inr.integrator = inrF.Integrator(lambda values: self.layers(values.mean(0, keepdim=True)),
+                'GlobalPool')
         return new_inr
 
 # class GlobalAvgPool(nn.Module):
