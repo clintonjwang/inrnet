@@ -1,2 +1,11 @@
+parent: classify
 data loading:
-  dataset: CIFAR-100
+  dataset: cifar10
+  batch size: 8
+  initial sample points: 65536
+  image shape:
+  - 32
+  - 32
+optimizer:
+  learning rate: 1e-5
+  max steps: 1000

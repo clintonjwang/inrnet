@@ -6,8 +6,8 @@ F = nn.functional
 from inrnet.inn import functional as inrF
 
 def translate_norm(norm):
-    layer = ChannelNorm(channels=norm.num_features, affine=norm.affine,
-                momentum=0.1, track_running_stats=norm.track_running_stats)
+    layer = ChannelNorm(channels=norm.num_features, batchnorm=isinstance(norm, nn.modules.batchnorm._BatchNorm),
+            affine=norm.affine, momentum=0.1, track_running_stats=norm.track_running_stats)
     if norm.affine:
         layer.weight.data = norm.weight.data
         layer.bias.data = norm.bias.data
@@ -19,12 +19,13 @@ def translate_norm(norm):
 
 
 class ChannelNorm(nn.Module):
-    def __init__(self, channels=None, affine=True, momentum=0.1,
+    def __init__(self, channels=None, batchnorm=True, affine=True, momentum=0.1,
             track_running_stats=True, eps=1e-5, device=None, dtype=torch.float):
         super().__init__()
         factory_kwargs = {'device': device, 'dtype': dtype}
         self.momentum = momentum
         self.eps = eps
+        self.batchnorm = batchnorm
         if affine:
             self.bias = nn.Parameter(torch.zeros(channels, **factory_kwargs))
             self.weight = nn.Parameter(torch.ones(channels, **factory_kwargs))
@@ -37,5 +38,8 @@ class ChannelNorm(nn.Module):
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.normalize, 'ChannelNorm', layer=self)
+        if self.batchnorm:
+            new_inr.set_integrator(inrF.batch_normalize, 'BatchNorm', layer=self)
+        else:
+            new_inr.set_integrator(inrF.inst_normalize, 'InstanceNorm', layer=self)
         return new_inr

@@ -5,8 +5,14 @@ F = nn.functional
 
 from inrnet import inn
 
-def to_black_box(siren, **kwargs):
-    return inn.BlackBoxINR(evaluator=siren, channels=siren.out_channels, input_dims=2, domain=(-1,1), **kwargs)
+def get_siren_keys():
+    return ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight',
+        'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight',
+        'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
+
+def to_black_box(siren_list, **kwargs):
+    return inn.BlackBoxINR(siren_list, channels=siren_list[0].out_channels,
+        input_dims=2, domain=(-1,1), **kwargs)
 
 class Siren(nn.Module):
     def __init__(self, C=256, in_dims=2, out_channels=3, layers=3, outermost_linear=True, 

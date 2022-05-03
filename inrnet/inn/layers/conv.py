@@ -237,7 +237,7 @@ class BallConv(Conv):
             raise NotImplementedError(f"unsupported parameterization {parameterization}")
         if padding_mode not in ["cutoff"]:#, "zeros", "shrink domain", "evaluate"]:
             # cutoff: at each point, evaluate the integral under B intersect I
-            # zeros: let the INR be 0 outside I
+            # zeros: let the inr be 0 outside I
             # shrink domain: only evaluate points whose ball is contained in I
             # evaluate: sample points outside I
             raise NotImplementedError("TODO: padding modes")

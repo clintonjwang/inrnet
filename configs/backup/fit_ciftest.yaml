@@ -1,0 +1,9 @@
+parent: fit_siren
+data loading:
+  subset: test
+  interval: 1000
+  end_ix: 5000
+  dataset: cifar10
+  variables: img, cls
+optimizer:
+  max steps: 1000

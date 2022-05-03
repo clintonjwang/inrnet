@@ -1,13 +1,10 @@
 parent: classify
 data loading:
   batch size: 16
-  subset: train
+  subset: val
   dataset: inet12
   classes: 12
   initial sample points: 1024
   image shape:
   - 32
   - 32
-optimizer:
-  learning rate: 1e-4
-  max steps: 1000

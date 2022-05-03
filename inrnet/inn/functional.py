@@ -23,9 +23,12 @@ class Integrator:
         return self.function(values, *args, **kwargs)
 
 
-def conv(values, inr, layer, query_coords=None):
+def conv(values: torch.Tensor, # [B,N,c_in]
+    inr, layer: nn.Module,
+    query_coords=None):
+
     dtype = layer.dtype
-    coords = inr.sampled_coords.to(dtype=dtype)
+    coords = inr.sampled_coords.to(dtype=dtype) #[N,d]
     if query_coords is None:
         if layer.stride != 0:
             inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
@@ -47,10 +50,10 @@ def conv(values, inr, layer, query_coords=None):
     if layer.dropout > 0 and (inr.training and layer.training):
         mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
-    Y = values[torch.where(mask)[1]].to(dtype=dtype) # flattened list of values of neighborhood points
+    Y = values[:,torch.where(mask)[1]].to(dtype=dtype) # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
-    Ysplit = Y.split(lens) # list of values at neighborhood points
+    Ysplit = Y.split(lens, dim=1) # list of values at neighborhood points
     newVals = []
 
     if hasattr(layer, "interpolate_weights"):
@@ -61,32 +64,33 @@ def conv(values, inr, layer, query_coords=None):
                 w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
                 Wsplit = w_o.index_select(dim=0, index=bin_ixs).split(lens)
                 for ix,y in enumerate(Ysplit):
-                    newVals.append(torch.einsum('ni,ni->i',y,Wsplit[ix])/y.size(0))
+                    newVals.append(torch.einsum('bni,ni->bi',y,Wsplit[ix])/y.size(1))
             else:
                 w_oi = layer.interpolate_weights(-bin_centers)
                 Wsplit = w_oi.index_select(dim=0, index=bin_ixs).split(lens)
                 for ix,y in enumerate(Ysplit):
-                    newVals.append(torch.einsum('ni,noi->o',y,Wsplit[ix])/y.size(0))
+                    newVals.append(torch.einsum('bni,noi->bo',y,Wsplit[ix])/y.size(1))
                     
         else:
             Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
             if layer.groups != 1:
                 for ix,y in enumerate(Ysplit):
                     w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
-                    newVals.append(torch.einsum('ni,ni->i',y,w_o)/y.size(0))
+                    newVals.append(torch.einsum('bni,ni->bi',y,w_o)/y.size(1))
             else:
                 for ix,y in enumerate(Ysplit):
                     w_oi = layer.interpolate_weights(-Dsplit[ix])
-                    newVals.append(torch.einsum('ni,noi->o',y,w_oi)/y.size(0))
+                    newVals.append(torch.einsum('bni,noi->bo',y,w_oi)/y.size(1))
         
     else:
         if layer.N_bins == 0:
             #Wsplit = layer.K(Diffs).split(lens)
             Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
             for ix,y in enumerate(Ysplit):
-                if y.size(0) == 0:
-                    newVals.append(y.new_zeros(layer.out_channels))
+                if y.size(1) == 0:
+                    newVals.append(y.new_zeros(y.size(0), layer.out_channels))
                 else:
+                    raise NotImplementedError('convball')
                     W = layer.weight(-Dsplit[ix])
                     newVals.append(y.unsqueeze(1).matmul(W).squeeze(1).mean(0))
 
@@ -99,12 +103,13 @@ def conv(values, inr, layer, query_coords=None):
             
             newVals = []
             for ix,y in enumerate(Ysplit):
-                if y.size(0) == 0:
+                raise NotImplementedError('convball')
+                if y.size(1) == 0:
                     newVals.append(y.new_zeros(layer.out_channels))
                 else:
                     newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
                     
-    newVals = torch.stack(newVals, dim=0)
+    newVals = torch.stack(newVals, dim=1) #[B,N,c_out]
     newVals *= padding_ratio.unsqueeze(-1)
 
     if layer.bias is not None:
@@ -182,8 +187,8 @@ def avg_pool(values, inr, layer, query_coords=None):
 
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = layer.norm(Diffs) < layer.radius 
-    Y = values[torch.where(mask)[1]]
-    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(1)))])
+    Y = values[:,torch.where(mask)[1]]
+    return torch.stack([y.mean(1) for y in Y.split(tuple(mask.sum(1)), dim=1)])
 
 def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
@@ -197,7 +202,7 @@ def max_pool(values, inr, layer, query_coords=None):
         query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-    return values[mask].max(dim=1).values
+    return values[:,mask].max(dim=-1).values
 
 
 
@@ -225,21 +230,44 @@ def adaptive_avg_pool(values, inr, layer):
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
 
-def normalize(values, inr, layer):
-    mean = values.mean(0)
-    var = values.pow(2).mean(0) - mean.pow(2)
-    if hasattr(layer, "running_mean"):
-        if inr.training and layer.training:
-            with torch.no_grad():
-                layer.running_mean = layer.momentum * layer.running_mean + (1-layer.momentum) * mean
-                layer.running_var = layer.momentum * layer.running_var + (1-layer.momentum) * var
+def inst_normalize(values, inr, layer):
+    if hasattr(layer, "running_mean") and not (inr.training and layer.training):
         mean = layer.running_mean
         var = layer.running_var
+    else:
+        mean = values.mean(1)
+        var = values.pow(2).mean(1) - mean.pow(2)
+        if hasattr(layer, "running_mean"):
+            with torch.no_grad():
+                layer.running_mean = layer.momentum * layer.running_mean + (1-layer.momentum) * mean.mean()
+                layer.running_var = layer.momentum * layer.running_var + (1-layer.momentum) * var.mean()
+            mean = layer.running_mean
+            var = layer.running_var
 
     if hasattr(layer, "weight"):
         return (values - mean)/(var.sqrt() + layer.eps) * layer.weight + layer.bias
     else:
         return (values - mean)/(var.sqrt() + layer.eps)
+
+def batch_normalize(values, inr, layer):
+    if hasattr(layer, "running_mean") and not (inr.training and layer.training):
+        mean = layer.running_mean
+        var = layer.running_var
+    else:
+        mean = values.mean(dim=(0,1))
+        var = values.pow(2).mean(dim=(0,1)) - mean.pow(2)
+        if hasattr(layer, "running_mean"):
+            with torch.no_grad():
+                layer.running_mean = layer.momentum * layer.running_mean + (1-layer.momentum) * mean
+                layer.running_var = layer.momentum * layer.running_var + (1-layer.momentum) * var
+            mean = layer.running_mean
+            var = layer.running_var
+
+    if hasattr(layer, "weight"):
+        return (values - mean)/(var.sqrt() + layer.eps) * layer.weight + layer.bias
+    else:
+        return (values - mean)/(var.sqrt() + layer.eps)
+
 
 
 

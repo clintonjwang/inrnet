@@ -9,14 +9,14 @@ from inrnet import util
 from inrnet.inn import functional as inrF
 
 
-class INR(nn.Module):
+class INRBatch(nn.Module):
     def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1)):
         super().__init__()
         self.input_dims = input_dims # input coord size
         self.channels = channels # output size
         self.domain = domain
         self.modifiers = [] # in-place/pointwise modifiers
-        self.integrator = None # operator requiring integration
+        self.integrator = None # operators requiring integration
         self.sample_size = sample_size
         self.detached = False
         self.grid_mode = False
@@ -53,7 +53,7 @@ class INR(nn.Module):
         return self
 
     def __add__(self, other):
-        if isinstance(other, INR):
+        if isinstance(other, INRBatch):
             return SumINR(self, other)
         else:
             return self.create_modified_copy(lambda x: x+other)
@@ -62,7 +62,7 @@ class INR(nn.Module):
         return self
 
     def __sub__(self, other):
-        if isinstance(other, INR):
+        if isinstance(other, INRBatch):
             return SumINR(self, -other)
         else:
             return self.create_modified_copy(lambda x: x-other)
@@ -71,7 +71,7 @@ class INR(nn.Module):
         return self
 
     def __mul__(self, other):
-        if isinstance(other, INR):
+        if isinstance(other, INRBatch):
             return MulINR(self, -other)
         else:
             return self.create_modified_copy(lambda x: x*other)
@@ -80,7 +80,7 @@ class INR(nn.Module):
         return self
 
     def __truediv__(self, other):
-        if isinstance(other, INR):
+        if isinstance(other, INRBatch):
             return MulINR(self, 1/other)
         else:
             return self.create_modified_copy(lambda x: x/other)
@@ -124,7 +124,7 @@ class INR(nn.Module):
         return new_inr
 
     def create_derived_inr(self):
-        new_inr = INR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
+        new_inr = INRBatch(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
         new_inr.evaluator = self
         return new_inr
     def create_conditional_inr(self):
@@ -168,7 +168,7 @@ class INR(nn.Module):
             return self.create_modified_copy(lambda x: torch.softmax(x,dim=-1))
 
     def matmul(self, other, inplace=False):
-        if isinstance(other, INR):
+        if isinstance(other, INRBatch):
             return MatMulINR(self, other)
         elif inplace:
             self.add_modification(lambda x: torch.matmul(x,other))
@@ -188,30 +188,6 @@ class INR(nn.Module):
     def detach(self):
         self.detached = True
         return self
-
-    def produce_image(self, H,W, split=None, format="numpy"):
-        with torch.no_grad():
-            if split == None:
-                xy_grid = util.meshgrid_coords(H,W)
-                output = self.forward(xy_grid)
-                output = util.realign_values(output, coords_gt=xy_grid, inr=self)
-                output = output.reshape(H,W,-1)
-            else:
-                outs = []
-                xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
-                for xy_grid in xy_grids:
-                    output = self.forward(xy_grid.cuda())
-                    outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
-                    torch.cuda.empty_cache()
-                xy_grid = util.meshgrid_coords(H,W)
-                output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
-                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
-                output = output.reshape(H,W,-1)
-        if format == 'numpy':
-            return output.squeeze(-1).cpu().float().numpy()
-        else:
-            return output.permute(2,0,1).unsqueeze(0).float()
-
 
     def forward(self, coords):
         if self.detached:
@@ -242,6 +218,30 @@ class INR(nn.Module):
             self.cached_outputs = out
         return out
 
+    def produce_images(self, H,W, split=None, dtype=torch.float):
+        with torch.no_grad():
+            if split == None:
+                xy_grid = util.meshgrid_coords(H,W)
+                output = self.forward(xy_grid)
+                output = util.realign_values(output, coords_gt=xy_grid, inr=self)
+                output = output.reshape(output.size(0),H,W,-1)
+            else:
+                outs = []
+                xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
+                for xy_grid in xy_grids:
+                    output = self.forward(xy_grid.cuda())
+                    outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
+                    torch.cuda.empty_cache()
+                xy_grid = util.meshgrid_coords(H,W)
+                output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
+                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
+                output = output.reshape(output.size(0),H,W,-1)
+        if dtype == 'numpy':
+            return output.squeeze(-1).cpu().float().numpy()
+        else:
+            return output.permute(0,3,1,2).to(dtype=dtype)
+
+
     # def integrator_time(self):
     #     if hasattr(self, 'int_time'):
     #         it = [self.int_time]
@@ -255,23 +255,26 @@ class INR(nn.Module):
     #         return it
 
 
-class BlackBoxINR(INR):
-    # wrapper for arbitrary INR architectures (SIREN, NeRF, etc.)
-    def __init__(self, evaluator, channels, device="cuda", dtype=torch.float, **kwargs):
+class BlackBoxINR(INRBatch):
+    """wrapper for arbitrary INR architectures (SIREN, NeRF, etc.)"""
+    def __init__(self, inr_list, channels, device="cuda", dtype=torch.float, **kwargs):
         super().__init__(channels=channels, **kwargs)
-        self.evaluator = evaluator.to(device=device, dtype=dtype)
+        if isinstance(inr_list, nn.Module):
+            inr_list = [inr_list]
+        self.evaluator = nn.ModuleList(inr_list).to(device=device, dtype=dtype)
 
     def __repr__(self):
-        return f"""BlackBoxINR(channels={self.channels}, modifiers={self.modifiers})"""
-
+        return f"""BlackBoxINR(batch_size={len(self.evaluator)}, channels={self.channels}, modifiers={self.modifiers})"""
 
     def forward(self, coords):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
-
         self.sampled_coords = coords
         with torch.no_grad():
-            out = self.evaluator(coords)
+            out = []
+            for inr in self.evaluator:
+                out.append(inr(coords))
+            out = torch.stack(out, dim=0)
         for m in self.modifiers:
             out = m(out)
         self.cached_outputs = out
@@ -279,13 +282,16 @@ class BlackBoxINR(INR):
 
     def forward_with_grad(self, coords):
         self.sampled_coords = coords
-        out = self.evaluator(coords)
+        out = []
+        for inr in self.evaluator:
+            out.append(inr(coords))
+        out = torch.stack(out, dim=0)
         for m in self.modifiers:
             out = m(out)
         return out
 
 
-class CondINR(INR):
+class CondINR(INRBatch):
     def __init__(self, channels, cond_integrator=False, sample_size=256, input_dims=2, domain=(-1,1)):
         super().__init__(channels, sample_size, input_dims, domain)
         self.cond_integrator = cond_integrator
@@ -333,7 +339,7 @@ def set_difference(x,y):
     uniques, counts = combined.unique(return_counts=True)
     return uniques[counts == 1]
 
-class MergeINR(INR):
+class MergeINR(INRBatch):
     def __init__(self, inr1, inr2, channels, merge_function):
         domain = merge_domains(inr1.domain, inr2.domain)
         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
@@ -401,16 +407,14 @@ class SumINR(MergeINR):
 #             merge_function=lambda x,y:torch.cat((x,y),dim=-1))
 
 
-class SplitINR(INR):
+class SplitINR(INRBatch):
     # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
     def __init__(self, inr, split_channel, merge_function):
         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
         self.inr1 = inr1
         self.channels1 = split_channel
         self.channels2 = inr1.channels - split_channel
-        raise NotImplementedError
+        raise NotImplementedError('splitinr')
 
     def forward(self, coords):
-        raise NotImplementedError
         return torch.split(self.inr1(coords))
-

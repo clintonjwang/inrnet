@@ -11,6 +11,9 @@ rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
 def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
+    # out - (B,N,C)
+    # coords_gt - (N,D)
+
     if coords_out is None:
         coords_out = inr.sampled_coords
     # coords_gt = coords_gt[:,0]*4 + coords_gt[:,1]
@@ -33,14 +36,11 @@ def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
             del diffs, matches
             torch.cuda.empty_cache()
         indices = torch.cat(indices,dim=0)
-    if indices.size(0) != out.size(0):
+    if indices.size(0) != out.size(1):
         print("realignment failed")
         pdb.set_trace()
         # raise ValueError("realignment failed")
-    return out[indices]
-    # O = coords_out.cpu().numpy().tolist()
-    # indices = [O.index(G) for G in coords_gt.cpu().numpy()]
-    # return out[indices]
+    return out[:,indices]
 
 def meshgrid(*tensors, indexing='ij'):
     try:

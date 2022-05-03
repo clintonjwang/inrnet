@@ -81,21 +81,21 @@ def test_equivalence_dummy():
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
-    inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=C, input_dims=2, domain=(-1,1)).cuda()
+    inrs = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
-        img = inr.produce_image(h,w)
-        x = torch.tensor(img).unsqueeze(0).unsqueeze(0).cuda()
-        # conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
-        # conv.weight.data.fill_(0.)
-        # conv.weight.data[0,0,1,1].fill_(1.)
+        x = inrs.produce_images(h,w)
+        conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
+        conv.weight.data.fill_(0.)
+        conv.weight.data[0,0,1,1].fill_(1.)
         # conv.bias.data.fill_(1.)
 
-        discrete_layer = nn.Sequential(nn.Upsample(scale_factor=2), nn.MaxPool2d(2,stride=2)).cuda()
+        discrete_layer = nn.Sequential(conv).cuda()
+        # discrete_layer = nn.Sequential(nn.Upsample(scale_factor=2), nn.MaxPool2d(2,stride=2)).cuda()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_layer, (h,w))
         y = discrete_layer(x)
 
         coords = util.meshgrid_coords(h,w)
-        out_inr = InrNet.cuda()(inr)
+        out_inr = InrNet.cuda()(inrs)
         out_inr.toggle_grid_mode()
         out = out_inr.eval()(coords)
         
@@ -108,7 +108,7 @@ def test_equivalence_dummy():
     if y.shape != out.shape:
         print('shape mismatch')
         pdb.set_trace()
-    if not torch.allclose(y, out):#, rtol=1e-5, atol=1e-3):
+    if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
         print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max())
         pdb.set_trace()
     pdb.set_trace()
