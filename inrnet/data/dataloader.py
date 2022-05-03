@@ -22,9 +22,9 @@ class jpgDS(torchvision.datasets.VisionDataset):
         return len(self.paths)
 
 class INetDS(torchvision.datasets.VisionDataset):
-    def __init__(self, root, *args, **kwargs):
+    def __init__(self, root, phase, *args, **kwargs):
         super().__init__(root, *args, **kwargs)
-        self.subpaths = open(self.root+"/val.txt", "r").read().split('\n')
+        self.subpaths = open(self.root+f"/{phase}.txt", "r").read().split('\n')
         classes = open(self.root+"/labels.txt", 'r').read().split('\n')
         self.classes = [c[:c.find(',')] for c in classes]
     def __getitem__(self, ix):
@@ -43,7 +43,13 @@ def get_img_dataset(args):
             transforms.ToTensor(),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
-        dataset = INetDS(DS_DIR+"/imagenet_pytorch", transform=trans)
+        dataset = INetDS(DS_DIR+"/imagenet_pytorch", transform=trans, phase='val')
+    elif dl_args["dataset"] == "inet1k_train":
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        dataset = INetDS(DS_DIR+"/imagenet_pytorch", transform=trans, phase='train')
 
     elif dl_args["dataset"] == "coco":
         trans = transforms.Compose([transforms.ToTensor()])
@@ -80,29 +86,35 @@ def get_inr_dataloader(dl_args):
         return get_inr_loader_for_imgds("horse"), get_inr_loader_for_imgds("zebra")
     elif dl_args["dataset"] == "imagenet1k":
         return get_inr_loader_for_cls_ds("imagenet1k")
+    elif dl_args["dataset"] == "inet1k_train":
+        return get_inr_loader_for_cls_ds("inet1k_train")
     else:
         raise NotImplementedError
 
+def get_imagenet_classes():
+    classes = open(DS_DIR+"/imagenet_pytorch/labels.txt", 'r').read().split('\n')
+    return [c[:c.find(',')] for c in classes]
+
 def get_inr_loader_for_cls_ds(dataset):
     inr = siren.Siren(out_channels=3)
-    paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))
+    paths = glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt")
     keys = ['net.0.linear.weight', 'net.0.linear.bias', 'net.1.linear.weight', 'net.1.linear.bias', 'net.2.linear.weight', 'net.2.linear.bias', 'net.3.linear.weight', 'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
-    def ordered_loader():
-        for path in paths:
-            data, classes = torch.load(path)
-            for ix in range(len(data)):
+    def random_loader():
+        while True:
+            np.random.shuffle(paths)
+            for path in paths:
+                data, classes = torch.load(path)
+                indices = list(range(len(data)))
+                # for ix in indices:
+                ix = np.random.choice(indices)
                 param_dict = {k:data[k][ix] for k in keys}
                 try:
                     inr.load_state_dict(param_dict)
                 except RuntimeError:
                     continue
                 yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
-    # dataset = 
-    raise NotImplementedError("inr loader is not randomized")
-    return torch.utils.data.DataLoader(dataset)
+    return random_loader()
 
-class ClsDS(torch.utils.data.IterableDataset):
-    pass
     
 def get_inr_loader_for_imgds(dataset):
     inr = siren.Siren(out_channels=3)

@@ -14,7 +14,6 @@ from PIL import Image
 
 import numpy as np
 from tqdm import tqdm
-from einops import rearrange
 
 try:
     from apex import amp

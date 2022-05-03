@@ -1,6 +1,6 @@
 network:
   task: classify
-  type: effnet-b0
+  type: inr-effnet-b0
 data loading:
   validation sample points: 1024
 optimizer: null

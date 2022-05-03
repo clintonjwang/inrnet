@@ -6,27 +6,29 @@ nn=torch.nn
 ### Convolutions
 
 class Integrator:
-    def __init__(self, function, name, inr=None, layer=None):
+    def __init__(self, function, name, inr=None, layer=None, **kwargs):
         self.function = function
         self.name = name
         self.inr = inr
         self.layer = layer
+        self.kwargs = kwargs
     def __repr__(self):
         return self.name
-    def __call__(self, values):
-        kwargs = {}
+    def __call__(self, values, *args):
+        kwargs = self.kwargs.copy()
         if self.inr is not None:
             kwargs['inr'] = self.inr
         if self.layer is not None:
             kwargs['layer'] = self.layer
-        return self.function(values, **kwargs)
+        return self.function(values, *args, **kwargs)
 
 
 def conv(values, inr, layer, query_coords=None):
-    coords = inr.sampled_coords
+    dtype = layer.dtype
+    coords = inr.sampled_coords.to(dtype=dtype)
     if query_coords is None:
         if layer.stride != 0:
-            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
         else:
             query_coords = coords
 
@@ -34,19 +36,18 @@ def conv(values, inr, layer, query_coords=None):
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = layer.norm(Diffs) < layer.radius
     else:
-        if torch.amax(layer.shift) > 0:
-            query_coords = query_coords + layer.shift
-        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        center_coords = query_coords + layer.shift
+        Diffs = center_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-        padding_ratio = layer.kernel_intersection_ratio(query_coords)
+        padding_ratio = layer.kernel_intersection_ratio(center_coords)
         # scaling factor
 
-    # Diffs = query_coords.unsqueeze(0) - coords.unsqueeze(1)
+    # Diffs = center_coords.unsqueeze(0) - coords.unsqueeze(1)
     # mask = layer.norm(Diffs) < layer.radius
     if layer.dropout > 0 and (inr.training and layer.training):
         mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
-    Y = values[torch.where(mask)[1]] # flattened list of values of neighborhood points
+    Y = values[torch.where(mask)[1]].to(dtype=dtype) # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
     Ysplit = Y.split(lens) # list of values at neighborhood points
@@ -54,7 +55,7 @@ def conv(values, inr, layer, query_coords=None):
 
     if hasattr(layer, "interpolate_weights"):
         if inr.grid_mode or layer.N_bins != 0:
-            bin_ixs, bin_centers = layer.cluster_diffs(Diffs, grid_mode=inr.grid_mode)
+            bin_ixs, bin_centers = cluster_diffs(Diffs, layer=layer, grid_mode=inr.grid_mode)
 
             if layer.groups != 1:
                 w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
@@ -110,6 +111,60 @@ def conv(values, inr, layer, query_coords=None):
         newVals = newVals + layer.bias
     return newVals
 
+
+def cluster_diffs(x, layer, tol=.005, grid_mode=False):
+    """Based on kmeans in https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
+    if grid_mode:
+        c = layer.grid_points  # Initialize centroids to grid
+    else:
+        c = layer.sample_points # Initialize centroids with low-disc seq
+    x_i = x.unsqueeze(1)  # (N, 1, D) samples
+    c_j = c.unsqueeze(0)  # (1, K, D) centroids
+
+    D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) symbolic squared distances
+    minD, indices = D_ij.min(dim=1)
+    cl = indices.view(-1)  # Points -> Nearest cluster
+    if grid_mode and minD.mean() > tol:
+        print("bad grid alignment")
+        pdb.set_trace()
+
+    return cl, c
+
+def interpolate_weights_single_channel(xy, tx,ty,c, order=2):
+    W = []
+    X = xy[:,0].unsqueeze(1)
+    Y = xy[:,1].unsqueeze(1)
+    px = py = order
+
+    values, kx = (tx<=X).min(dim=-1)
+    values, ky = (ty<=Y).min(dim=-1)
+    kx -= 1
+    ky -= 1
+    kx[values] = tx.size(-1)-px-2
+    ky[values] = ty.size(-1)-py-2
+
+    for z in range(X.size(0)):
+        D = c[kx[z]-px : kx[z]+1, ky[z]-py : ky[z]+1].clone()
+
+        for r in range(1, px + 1):
+            try:
+                alphax = (X[z,0] - tx[kx[z]-px+1:kx[z]+1]) / (
+                    tx[2+kx[z]-r:2+kx[z]-r+px] - tx[kx[z]-px+1:kx[z]+1])
+            except RuntimeError:
+                print("input off the grid")
+                pdb.set_trace()
+            for j in range(px, r - 1, -1):
+                D[j] = (1-alphax[j-1]) * D[j-1] + alphax[j-1] * D[j].clone()
+
+        for r in range(1, py + 1):
+            alphay = (Y[z,0] - ty[ky[z]-py+1:ky[z]+1]) / (
+                ty[2+ky[z]-r:2+ky[z]-r+py] - ty[ky[z]-py+1:ky[z]+1])
+            for j in range(py, r-1, -1):
+                D[px,j] = (1-alphay[j-1]) * D[px,j-1].clone() + alphay[j-1] * D[px,j].clone()
+        
+        W.append(D[px,py])
+    return torch.stack(w_oi)
+
 # def gridconv(values, inr, layer):
 #     # applies conv once to each patch (token)
 #     coords = inr.sampled_coords
@@ -130,7 +185,6 @@ def avg_pool(values, inr, layer, query_coords=None):
     Y = values[torch.where(mask)[1]]
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(1)))])
 
-
 def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
@@ -139,19 +193,11 @@ def max_pool(values, inr, layer, query_coords=None):
         else:
             query_coords = coords
 
-    if hasattr(layer, "norm"):
-        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-        mask = layer.norm(Diffs) < layer.radius
-    else:
-        query_coords = query_coords + torch.tensor(layer.shift, dtype=query_coords.dtype, device=query_coords.device)
-        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-    lens = tuple(mask.sum(1))
-    Y = values[torch.where(mask)[1]]
-    Ysplit = Y.split(lens)
-    return torch.stack([y.max(0).values for y in Ysplit], dim=0)
-
-#((Diffs[:,-1,0].abs() <= layer.kernel_size[0]) * (Diffs[:,-1,1].abs() <= layer.kernel_size[1])).sum()
+    if torch.amax(layer.shift) > 0:
+        query_coords = query_coords + layer.shift
+    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+    mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
+    return values[mask].max(dim=1).values
 
 
 

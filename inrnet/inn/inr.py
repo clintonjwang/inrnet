@@ -95,21 +95,21 @@ class INR(nn.Module):
     def generate_sample_points(self, method="qmc", sample_size=None, dims=None):
         if sample_size is None:
             sample_size = self.sample_size
-        if method == "qmc":
+        if method == "grid" or self.grid_mode:
+            return util.meshgrid_coords(*dims)
+        elif method == "qmc":
             return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size) * \
                     (self.domain[1]-self.domain[0]) - self.domain[0]
-        elif method == "grid":
-            return util.meshgrid_coords(*dims)
         else:
             raise NotImplementedError("invalid method: "+method)
 
-    def set_integrator(self, function, name, layer=None):
-        self.integrator = inrF.Integrator(function, name, inr=self, layer=layer)
+    def set_integrator(self, function, name, layer=None, **kwargs):
+        self.integrator = inrF.Integrator(function, name, inr=self, layer=layer, **kwargs)
 
     def add_modification(self, modification):
         self.sampled_coords = torch.empty(0)
         self.modifiers.append(modification)
-        test_output = modification(torch.randn(1,self.channels).cuda())
+        test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
         self.channels = test_output.size(1)
 
     def create_modified_copy(self, modification):
@@ -125,6 +125,10 @@ class INR(nn.Module):
 
     def create_derived_inr(self):
         new_inr = INR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
+        new_inr.evaluator = self
+        return new_inr
+    def create_conditional_inr(self):
+        new_inr = CondINR(cond_integrator=True, channels=self.channels, input_dims=self.input_dims, domain=self.domain)
         new_inr.evaluator = self
         return new_inr
 
@@ -185,13 +189,13 @@ class INR(nn.Module):
         self.detached = True
         return self
 
-    def produce_image(self, H,W, split=None):
+    def produce_image(self, H,W, split=None, format="numpy"):
         with torch.no_grad():
             if split == None:
                 xy_grid = util.meshgrid_coords(H,W)
                 output = self.forward(xy_grid)
                 output = util.realign_values(output, coords_gt=xy_grid, inr=self)
-                return output.reshape(H,W,-1).squeeze(-1).float().cpu().numpy()
+                output = output.reshape(H,W,-1)
             else:
                 outs = []
                 xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
@@ -202,7 +206,12 @@ class INR(nn.Module):
                 xy_grid = util.meshgrid_coords(H,W)
                 output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
                             coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
-                return output.reshape(H,W,-1).squeeze(-1).cpu().float().numpy()
+                output = output.reshape(H,W,-1)
+        if format == 'numpy':
+            return output.squeeze(-1).cpu().float().numpy()
+        else:
+            return output.permute(2,0,1).unsqueeze(0).float()
+
 
     def forward(self, coords):
         if self.detached:
@@ -276,36 +285,45 @@ class BlackBoxINR(INR):
         return out
 
 
-# class ResINR(INR):
-#     def __init__(self, base_inr, layers1, layers2=None):
-#         super().__init__(channels=base_inr.channels)
-#         self.evaluator = base_inr
-#         new_inr = INR(channels=base_inr.channels,
-#             input_dims=base_inr.input_dims, domain=base_inr.domain)
-#         new_inr.evaluator = nn.Identity()
-#         new_inr.origin = base_inr
-#         self.res_inr = layers1(new_inr)
-#         # self.layers2 = layers2
-#     def _forward(self, coords):
-#         # if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
-#         #     return self.cached_outputs
-#         intermediate = self.evaluator(coords)
-#         residual = self.res_inr(intermediate)
-#         # if self.layers2 is None:
-#         out = intermediate + residual
-#         # else:
-#         #     out = self.layers2(out) + residual
-#         self.sampled_coords = self.evaluator.sampled_coords
-#         if self.integrator is not None:
-#             out = self.integrator(out)
-#         for m in self.modifiers:
-#             out = m(out)
-#         #aa = self.res_inr.parent(3)(intermediate)
-#         # self.cached_outputs = out
-#         return out
-#         #torch.allclose(self.res_inr.sampled_coords, self.evaluator.sampled_coords)
-
-
+class CondINR(INR):
+    def __init__(self, channels, cond_integrator=False, sample_size=256, input_dims=2, domain=(-1,1)):
+        super().__init__(channels, sample_size, input_dims, domain)
+        self.cond_integrator = cond_integrator
+    def create_derived_inr(self):
+        new_inr = CondINR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
+        new_inr.evaluator = self
+        return new_inr
+    def create_conditional_inr(self):
+        new_inr = CondINR(cond_integrator=True, channels=self.channels, input_dims=self.input_dims, domain=self.domain)
+        new_inr.evaluator = self
+        return new_inr
+    def forward(self, coords, condition):
+        if self.detached:
+            with torch.no_grad():
+                return self._forward(coords, condition)
+        else:
+            return self._forward(coords, condition)
+    def _forward(self, coords, condition):
+        if hasattr(self, "cached_outputs"):
+            return self.cached_outputs
+        if isinstance(self.evaluator, CondINR):
+            out = self.evaluator(coords, condition)
+        else:
+            out = self.evaluator(coords)
+        try:
+            self.sampled_coords = self.evaluator.sampled_coords
+        except AttributeError:
+            self.sampled_coords = self.origin.sampled_coords
+        if self.integrator is not None:
+            if self.cond_integrator:
+                out = self.integrator(out, condition)
+            else:
+                out = self.integrator(out)
+        for m in self.modifiers:
+            out = m(out)
+        if self.caching_enabled:
+            self.cached_outputs = out
+        return out
 
 def merge_domains(d1, d2):
     return (max(d1[0], d2[0]), min(d1[1], d2[1]))
@@ -349,7 +367,7 @@ class MergeINR(INR):
         
         return torch.cat((merged_outs, values1[extra_x], values2[extra_y]), dim=0)
 
-    def forward(self, coords):
+    def _forward(self, coords):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
         out1 = self.inr1(coords)

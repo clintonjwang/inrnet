@@ -16,14 +16,14 @@ def translate_conv1x1(conv):
 
 
 class ChannelMixer(nn.Module):
-    def __init__(self, in_channels, out_channels, normalized=False, bias=True):
+    def __init__(self, in_channels, out_channels, normalized=False, bias=True, dtype=torch.float):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.weight = nn.Parameter(torch.empty(in_channels, out_channels))
+        self.weight = nn.Parameter(torch.empty(in_channels, out_channels, dtype=dtype))
         he_init(self.weight, mode='fan_out', nonlinearity='relu')
         if bias:
-            self.bias = nn.Parameter(torch.zeros(out_channels))
+            self.bias = nn.Parameter(torch.zeros(out_channels, dtype=dtype))
         self.normalized = normalized
 
     def __repr__(self):

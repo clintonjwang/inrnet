@@ -118,28 +118,3 @@ def train_cyclegan(args):
             break
 
     # torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "final.pth"))
-
-def getGenerator(args):
-    net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=3, spatial_dim=2, dropout=net_args["dropout"])
-    if net_args["G type"] == "UNet":
-        model = inn.nets.UNet(min_channels=net_args["min channels"], **kwargs)
-    elif net_args["G type"] == "ConvCM":
-        model = inn.nets.ConvCM(min_channels=net_args["min channels"], **kwargs)
-    elif net_args["G type"] == "FPN":
-        model = inn.nets.FPN(min_channels=net_args["min channels"], **kwargs)
-    else:
-        raise NotImplementedError
-    return model.cuda()
-
-def getDiscriminator(args):
-    net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, activation=net_args["activation"], 
-        final_activation=net_args["final activation"], dropout=net_args["dropout"])
-    if net_args["D type"] == "Conv4":
-        model = inn.nets.Conv4(min_channels=net_args["min channels"], **kwargs)
-    elif net_args["D type"] == "ResNet":
-        model = inn.nets.ResNet(min_channels=net_args["min channels"], **kwargs)
-    else:
-        raise NotImplementedError
-    return model.cuda()

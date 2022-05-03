@@ -1,6 +1,6 @@
 parent: classify
 data loading:
-  dataset: imagenet1k
+  dataset: inet1k_train
   initial sample points: 65536
   image shape:
   - 256

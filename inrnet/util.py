@@ -1,16 +1,11 @@
-import os, torch, cv2, math, pdb, torch, yaml, PIL
+import os, torch, math, pdb, yaml, PIL
 import numpy as np
-import nibabel as nib
 osp = os.path
-from torch.nn.functional import avg_pool3d
-import pandas as pd 
 from glob import glob
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import seaborn as sns
 import monai.transforms as mtr
 from scipy.stats.qmc import Sobol
+import seaborn as sns
 
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
@@ -47,9 +42,15 @@ def realign_values(out, coords_gt, inr=None, coords_out=None, split=None):
     # indices = [O.index(G) for G in coords_gt.cpu().numpy()]
     # return out[indices]
 
+def meshgrid(*tensors, indexing='ij'):
+    try:
+        return torch.meshgrid(*tensors, indexing=indexing)
+    except TypeError:
+        return torch.meshgrid(*tensors)
+
 def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.float, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
     return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 
@@ -58,13 +59,13 @@ def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.float, devi
         raise NotImplementedError
 
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
     splitgrids = (mgrid[::2,::2], mgrid[1::2,::2], mgrid[::2,1::2], mgrid[1::2,1::2])
     return [mg.reshape(-1, len(dims)).to(dtype=dtype, device=device) for mg in splitgrids]
 
 def first_split_meshgrid(*dims, split=2, domain=(-1,1), dtype=torch.float, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
     splitgrid = mgrid[::split,::split]
     return splitgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
@@ -83,10 +84,13 @@ def load_checkpoint(model, paths):
         model.load_state_dict(checkpoint_sd, strict=False)
 
 
-def generate_quasirandom_sequence(d=3, n=64):
+def generate_quasirandom_sequence(d=3, n=64, like=None):
     sobol = Sobol(d=d)
     sample = sobol.random_base2(m=int(math.ceil(np.log2(n))))
-    return sample
+    if like is None:
+        return sample
+    else:
+        return torch.tensor(sample, dtype=like.dtype, device=like.device)
 
 def cycle(iterator):
     while True:
@@ -202,6 +206,20 @@ class MetricTracker:
             plt.savefig(path)
             plt.clf()
 
+    def plot_running_average(self, path, phase='val'):
+        _,axis = plt.subplots()
+        N = 10
+        x = self.epoch_history[phase]
+        if len(x) == 0:
+            x = self.minibatch_values[phase]
+        if len(x) <= N:
+            return
+        x = np.convolve(x, np.ones(N)/N, mode='valid')
+        sns.lineplot(y=x[::N//2], ax=axis, label=phase)
+        axis.set_ylabel(self.name)
+        plt.savefig(path)
+        plt.close()
+
     def lineplot(self, path=None):
         _,axis = plt.subplots()
 
@@ -294,18 +312,6 @@ def save_example(path, img, gt_seg, pred_logit):
     except ValueError:
         pass #encountered empty seg
 
-def draw_segs_as_contours(img, seg1, seg2, colors=([255, 0, 0], [0, 100, 255])):
-    img, seg1, seg2 = [i.detach().cpu().squeeze().numpy() for i in (img, seg1, seg2)]
-    img = to_rgb(img)
-    contour1 = cv2.findContours((seg1>.5).astype('uint8'), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
-    contour1 = cv2.drawContours(np.zeros_like(img), contour1, -1, colors[0], 1)
-    contour2 = cv2.findContours((seg2>.5).astype('uint8'), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)[0]
-    contour2 = cv2.drawContours(np.zeros_like(img), contour2, -1, colors[1], 1)
-    # contour1[contour2 != 0] = 0
-    img *= (contour1 == 0) * (contour2 == 0)
-    img += contour1 + contour2
-    return img
-
 def save_example_slices(img, gt_seg, pred_seg, root):
     if isinstance(img, torch.Tensor):
         img = img.detach().cpu().squeeze().numpy()
@@ -329,181 +335,3 @@ def save_example_slices(img, gt_seg, pred_seg, root):
         plt.imsave(f"{root}/{z}.png", img_slice)
     plt.close("all")
 
-
-
-
-
-
-
-
-
-def get_per_patient_stats(img_names, metric_scores):
-    '''
-    Returns a dictionary with per-patient stats. Assumes the naming convention MAP-C303, etc...
-    Inputs:
-        img_names: list of image names
-        metric_scores: list of corresponding metric scores
-    Returns:
-        dictionary with stats per patient
-    '''
-    name_subjs = [n[0:8] for n in img_names]
-    setn = set(name_subjs)
-    name_subjs = list(setn)
-    metric_patient = dict()
-    for name in name_subjs:
-        inds = [ name in name_subjs for name_subjs in img_names]
-        inds = [i for i, x in enumerate(inds) if x]
-        metric_ct = 0.
-        ct = 0
-        for i in inds:
-            metric_ct = metric_ct + metric_scores[i]
-            ct = ct + 1
-        metric_patient[name] = metric_ct/ct
-    
-    return metric_patient
-
-def crop_range(img, shape, dim):
-    """
-    Computes the range of indices in the resized images for a given dimension. 
-
-    Params:
-    img: the original image
-    shape: the resized shape
-    dim: the dimension to compute
-
-    Return: a list containing the range of indices in the resized image for a given dimension
-    where the original image will be placed. 
-    """
-    offset = -(img.shape[dim] - shape[dim]) // 2
-    if offset >= 0:
-        return list(range(offset, offset + img.shape[dim]))
-    else:
-        return list(range(0, shape[dim]))
-
-def get_crop_indices(img, shape):
-    """
-    Computes the range of indices in the resized images where the old image will be placed. 
-
-    Params:
-    img: the original image
-    shape: the resized shape
-
-    Return: a list containing the range of indices in the resized image
-    where the original image will be placed. 
-    """
-    return crop_range(img, shape, 0), crop_range(img, shape, 1), crop_range(img, shape, 2)
-
-def img_range(img, shape, dim):
-    """
-    Computes the range of indices in the original image that will be placed in the new image,
-    for the given dimension. 
-
-    Params: 
-    img: the original image
-    shape: the shape of the new image
-    dim: the dimension to compute 
-
-    Return: a list of indices. 
-    """
-    if img.shape[dim] <= shape[dim]:
-        return list(range(0, img.shape[dim]))
-    else:
-        offset = (img.shape[dim] - shape[dim]) // 2
-        return list(range(offset, offset + shape[dim]))
-
-def get_img_indices(img, shape):
-    """
-    Computes the range of indices in the original image that will be placed in the new image.
-
-    Params: 
-    img: the original image
-    shape: the shape of the new image
-
-    Return: a list of indices. 
-    """
-    return img_range(img, shape, 0), img_range(img, shape, 1), img_range(img, shape, 2)
-
-def crop_or_pad(img, shape, distr, labels=False):
-    """
-    crops or pads an image to the new shape, filling padding with noise. 
-
-    Params:
-    img: the original image
-    shape: the desired size
-    distr: the distribution for the padding noise
-    labels: bool, True if the image is a label
-
-    Return: the resized image
-    """
-    x, y, z = get_crop_indices(img, shape)
-    new_img = np.zeros(shape)
-    if not labels:
-        new_img = np.random.normal(loc=distr[0], scale=distr[1], size=shape)
-        new_img[new_img < 0] = 0
-    x_crop, y_crop, z_crop = get_crop_indices(img, shape)
-    x_img, y_img, z_img = get_img_indices(img, shape)
-    new_img[np.ix_(x_crop, y_crop, z_crop)] = img[np.ix_(x_img, y_img, z_img)]
-    return new_img
-
-def load_img(path):
-    """
-    loads an image. 
-
-    Params:
-    path: the path to the file that should be loaded
-    """
-    img = nib.load(path)
-    img = np.array(img.dataobj)
-    return img.astype(float)
-
-def save_img(data, path, fn):
-    """
-    saves an image as a nifti. 
-
-    Params:
-    data: the image to be saved. 
-    path: the path to the file where the image should be saved. 
-    fn: the filename that the image should be saved at. 
-    """
-    img = nib.Nifti1Image(data, np.eye(4))
-    nib.save(img, osp.join(path, fn))
-
-def find_patient_file(patient_id, data_dir, return_list=False): 
-    """
-    recursively looks for a filename including patient id in dir 
-    
-    patient_id: str patient id 
-    data_dir: full directory path to search in
-    return_list: if True, will return whole list of matches instead of just first
-    """
-    search = osp.join(data_dir, '**/{}*.nii*'.format(patient_id))
-    files = glob(search, recursive = True) 
-    if return_list:
-        return files
-    return files[0]
-
-def best_metrics(csvfile, output_dir):
-    """
-    get best metrics from an existing csv file 
-    """
-    MAX_METRICS = ['val_dice','train_dice']
-    MIN_METRICS = ['val_loss', 'train_loss']
-    #get the rows with the best of each metric, save to csv
-    df = pd.read_csv(csvfile)
-
-    best_metrics = []
-    for metric in MAX_METRICS:
-        ind = df.index[df[metric] == df[metric].max()]
-        s = df.iloc[ind,:]
-        if len(s) > 1:
-            s = s.iloc[0,:]
-        best_metrics.append(s)
-    for metric in MIN_METRICS:
-        ind = df.index[df[metric] == df[metric].min()]
-        s = df.iloc[ind,:]        
-        if len(s) > 1:
-            s = s.iloc[0,:]
-        best_metrics.append(s)
-    best_of_each_df = pd.concat(best_metrics)
-    best_of_each_df["optimized_metric"] = MAX_METRICS+MIN_METRICS
-    best_of_each_df.to_csv(osp.join(output_dir,'best_metrics.csv'), index=False)

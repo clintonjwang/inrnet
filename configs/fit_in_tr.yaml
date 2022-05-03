@@ -1,0 +1,8 @@
+parent: fit_siren
+data loading:
+  interval: 32
+  end_ix: 800
+  dataset: inet1k_train
+  variables: img, cls
+optimizer:
+  max steps: 2000
