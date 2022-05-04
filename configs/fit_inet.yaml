@@ -3,6 +3,7 @@ data loading:
   interval: 32
   end_ix: 800
   dataset: imagenet1k
+  subset: val
   variables: img, cls
 optimizer:
   max steps: 2000

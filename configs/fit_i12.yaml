@@ -1,0 +1,6 @@
+parent: fit_siren
+data loading:
+  end_ix: 100
+  dataset: inet12
+optimizer:
+  max steps: 2000

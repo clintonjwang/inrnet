@@ -1,6 +1,8 @@
 network:
   task: classify
   type: inr-effnet-s3
+  pretrained: true
 data loading:
+  subset: siren
   validation sample points: 1024
 optimizer: null

@@ -10,35 +10,29 @@ import inn
 TMP_DIR = osp.expanduser("~/code/diffcoord/temp")
 rescale_float = mtr.ScaleIntensity()
 
-def train_seg_model(args):
+def finetune_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
     global_step = 0
-    scaler = torch.cuda.amp.GradScaler()
     InrNet = getSegNet(args).train()
     optimizer = torch.optim.Adam(InrNet.parameters(), lr=args["optimizer"]["learning rate"])
     H,W = dl_args["image shape"]
     loss_tracker = util.MetricTracker("loss", function=losses.L1_dist)
-    for img_inr, xyz in data_loader:
+    for img_inr, seg in data_loader:
         global_step += 1
-        print(".",end="",flush=True)
         xyz[0,:,0] /= W/2
         xyz[0,:,1] /= H/2
         xyz[0,:,:2] -= 1
         xyz = xyz.half()
         img_inr = to_black_box(img_inr)
-        with torch.cuda.amp.autocast():
-            Seg_inr = InrNet(img_inr)
-            seg_pred = Seg_inr(xyz[0,:,:2])
-            loss = loss_tracker(z_pred, xyz[0,:,-1])
+        Seg_inr = InrNet(img_inr)
+        seg_pred = Seg_inr(xyz[0,:,:2])
+        loss = loss_tracker(z_pred, xyz[0,:,-1])
         optimizer.zero_grad()
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-        # loss.backward()
-        # optimizer.step()
+        loss.backward()
+        optimizer.step()
 
         if global_step % 10 == 0:
             print(loss.item(),flush=True)
@@ -78,21 +72,3 @@ def train_seg_model(args):
             break
 
     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "final.pth"))
-
-def getSegNet(args):
-    net_args=args["network"]
-    kwargs = dict(in_channels=3, out_channels=1, spatial_dim=2, radius=net_args["radius"],
-        mid_channels=net_args["min channels"])
-    if net_args["type"] == "ConvCM":
-        model = inn.nets.ConvCM(steerable=net_args["steerable"], dropout=net_args["dropout"], **kwargs)
-    elif net_args["type"] == "ConvCmConv":
-        model = inn.nets.ConvCmConv(dropout=net_args["dropout"], **kwargs)
-    elif net_args["type"] == "CmPlCm":
-        model = inn.nets.CmPlCm(**kwargs)
-    elif net_args["type"] == "ResNet":
-        model = inn.nets.ResNet(**kwargs)
-    else:
-        raise NotImplementedError
-
-    #load_checkpoint(model, paths)
-    return model.cuda().eval()

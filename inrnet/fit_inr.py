@@ -5,9 +5,10 @@ import matplotlib.pyplot as plt
 import monai.transforms as mtr
 
 import args as args_module
-import optim, util, losses
-from data import dataloader
-from models.inrs import siren
+from inrnet import optim, util, losses
+from inrnet.data import dataloader
+from inrnet.models.inrs import siren
+from inrnet.data import inet
 
 DATA_DIR = osp.expanduser("/data/vision/polina/scratch/clintonw/datasets/inrnet")
 
@@ -21,7 +22,7 @@ def train_siren(args):
     end_ix = start_ix+dl_args["end_ix"]
     total_steps = args["optimizer"]["max steps"]
 
-    while osp.exists(DATA_DIR+f"/{ds_name}/siren_{start_ix+interval-1}.pt"):
+    while osp.exists(DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{start_ix+interval-1}.pt"):
         start_ix += interval
     other_data = []
     print("Starting", flush=True)
@@ -30,7 +31,7 @@ def train_siren(args):
     for ix in range(start_ix,end_ix):
         data = dataset[ix]
         if isinstance(data, tuple):
-            data = {'img':data[0], 'cls':data[1]}
+            data = {dl_args["variables"].split(', ')[ix]:d for ix,d in enumerate(data)}
         if data is None:
             continue
         if dl_args["variables"] is None:
@@ -38,6 +39,7 @@ def train_siren(args):
         else:
             img = data.pop("img")
             other_data.append(data)
+
         imgFit = siren.ImageFitting(img.unsqueeze_(0))
         H,W = imgFit.H, imgFit.W
         dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
@@ -53,13 +55,13 @@ def train_siren(args):
             loss.backward()
             optim.step()
         print("Loss %0.4f" % (loss), flush=True)
+
         for k,v in inr.state_dict().items():
             param_dicts[k].append(v.cpu())
 
-        if 'subset' in dl_args:
-            path = DATA_DIR+f"/{ds_name}_{dl_args['subset']}/siren_{ix}.pt"
-        else:
-            path = DATA_DIR+f"/{ds_name}/siren_{ix}.pt"
+        path = DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{ix}.pt"
+        loss_path = DATA_DIR+f"/{ds_name}/loss_{dl_args['subset']}_{ix}.txt"
+        open(loss_path, 'w').write(str(loss.item()))
 
         if ix % interval == interval-1:
             if dl_args["variables"] is None:
@@ -89,11 +91,60 @@ def main(args):
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
 
-    if args["network"]["type"] == "SIREN":
+    if args["data loading"]["dataset"] == "inet12":
+        train_inet12(args)
+    elif args["network"]["type"] == "SIREN":
         train_siren(args)
     else:
         raise NotImplementedError
 
+
+def train_inet12(args):
+    dl_args = args["data loading"]
+    keys = siren.get_siren_keys()
+    start_ix = int(args["start_ix"])
+    cls, start_ix = start_ix // 1000, start_ix % 1000
+    if start_ix < 800:
+        subset='train'
+    else:
+        subset='test'
+        start_ix -= 800
+    end_ix = start_ix+100
+    total_steps = args["optimizer"]["max steps"]
+
+    os.makedirs(DATA_DIR+f"/inet12/{cls}", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/inet12/{cls}/{subset}_{start_ix}.pt"):
+        start_ix += 1
+    print("Starting", flush=True)
+
+    dataset = inet.INet12(subset=subset, cls=cls)
+    param_dict = {}
+    for ix in range(start_ix,end_ix):
+        img = dataset[ix]
+        imgFit = siren.ImageFitting(img.unsqueeze_(0))
+        H,W = imgFit.H, imgFit.W
+        dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
+        inr = siren.Siren(out_channels=img.size(1)).cuda()
+        optim = torch.optim.Adam(lr=1e-4, params=inr.parameters())
+        model_input, ground_truth = next(iter(dl))
+        model_input, ground_truth = model_input.cuda(), ground_truth.cuda()
+
+        for step in range(total_steps):
+            model_output = inr(model_input)    
+            loss = (losses.mse_loss(model_output, ground_truth)).mean()
+            optim.zero_grad()
+            loss.backward()
+            optim.step()
+        print("Loss %0.4f" % (loss), flush=True)
+        for k,v in inr.state_dict().items():
+            param_dict[k] = v.cpu()
+
+        path = DATA_DIR+f"/inet12/{cls}/{subset}_{ix}.pt"
+        torch.save(param_dict, path)
+        loss_path = DATA_DIR+f"/inet12/{cls}/loss_{subset}_{ix}.txt"
+        open(loss_path, 'w').write(str(loss.item()))
+
+    print("Finished")
 
 if __name__ == "__main__":
     # from data import kitti

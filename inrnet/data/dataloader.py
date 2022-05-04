@@ -7,7 +7,7 @@ import numpy as np
 
 from inrnet.models.inrs import siren
 from inrnet.util import glob2
-from inrnet.data import kitti
+from inrnet.data import kitti, inet, cityscapes
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
@@ -20,29 +20,14 @@ class jpgDS(torchvision.datasets.VisionDataset):
     def __len__(self):
         return len(self.paths)
 
-class INetDS(torchvision.datasets.VisionDataset):
-    def __init__(self, root, subset, *args, **kwargs):
-        super().__init__(root, *args, **kwargs)
-        self.subpaths = open(self.root+f"/{subset}.txt", "r").read().split('\n')
-        classes = open(self.root+"/labels.txt", 'r').read().split('\n')
-        self.classes = [c[:c.find(',')] for c in classes]
-    def __getitem__(self, ix):
-        try:
-            return {"cls":self.classes.index(osp.basename(osp.dirname(self.subpaths[ix]))),
-                "img":self.transform(Image.open(osp.join(self.root, self.subpaths[ix])))}
-        except RuntimeError:
-            return None
-    def __len__(self):
-        return len(self.subpaths)
-
 def get_img_dataset(args):
+    totorch_norm = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    ])
     dl_args = args["data loading"]
     if dl_args["dataset"] == "imagenet1k":
-        trans = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        ])
-        dataset = INetDS(DS_DIR+"/imagenet_pytorch", transform=trans, subset=dl_args['subset'])
+        dataset = inet.INetDS(DS_DIR+"/imagenet_pytorch", subset=dl_args['subset'])
 
     elif dl_args["dataset"] == "kitti":
         raise NotImplementedError("kitti dataset")
@@ -58,16 +43,23 @@ def get_img_dataset(args):
         dataset = jpgDS(DS_DIR+"/inrnet/horse2zebra/trainB", transform=transforms.ToTensor())
 
     elif dl_args["dataset"] == "places_std":
-        trans = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        ])
         dataset = torchvision.datasets.ImageFolder(
-            DS_DIR+"/places365_standard/val", transform=trans)
+            DS_DIR+"/places365_standard/val", transform=totorch_norm)
 
     elif dl_args["dataset"] == "cifar10":
         return torchvision.datasets.CIFAR10(root=DS_DIR, train=dl_args['subset'] == 'train',
             transform=transforms.ToTensor())
+
+    elif dl_args["dataset"] == "cityscapes":
+        size = dl_args['image shape']
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize(size),
+            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        ])
+        return torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
+            split=dl_args['subset'], mode='coarse', target_type='semantic',
+            transform=trans, target_transform=cityscapes.seg_transform)
 
     else:
         raise NotImplementedError
@@ -83,46 +75,9 @@ def get_inr_dataloader(dl_args):
         return get_inr_loader_for_cls_ds(dl_args["dataset"],
             bsz=dl_args['batch size'], subset=dl_args['subset'])
     elif dl_args["dataset"] == "inet12":
-        return get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
+        return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
     else:
         raise NotImplementedError(dl_args["dataset"])
-
-def get_imagenet_classes():
-    classes = open(DS_DIR+"/imagenet_pytorch/labels.txt", 'r').read().split('\n')
-    return [c[:c.find(',')] for c in classes]
-
-def get_inr_loader_for_inet12(bsz, subset):
-    cls_map_path = f"{DS_DIR}/inrnet/big_12.pkl"
-    _, _, sub_to_super = pickle.load(open(cls_map_path, 'rb'))
-
-    inr = siren.Siren(out_channels=3)
-    paths = glob2(f"{DS_DIR}/inrnet/imagenet1k_{subset}/siren_*.pt")
-    keys = siren.get_siren_keys()
-    def random_loader():
-        inrs = []
-        classes = []
-        while True:
-            np.random.shuffle(paths)
-            for path in paths:
-                data, cl = torch.load(path)
-                indices = list(range(len(data)))
-                # for ix in indices:
-                ix = np.random.choice(indices)
-                param_dict = {k:data[k][ix] for k in keys}
-                try:
-                    inr.load_state_dict(param_dict)
-                except RuntimeError:
-                    continue
-                cl = cl[ix]['cls']
-                if cl not in sub_to_super:
-                    continue
-                inrs.append(inr.cuda())
-                classes.append(torch.tensor(sub_to_super[cl]).unsqueeze(0).cuda())
-
-                if len(inrs) == bsz:
-                    yield inrs, torch.stack(classes)
-    return random_loader()
-
 
 def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
     inr = siren.Siren(out_channels=3)

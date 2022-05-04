@@ -212,10 +212,12 @@ class MetricTracker:
         x = self.epoch_history[phase]
         if len(x) == 0:
             x = self.minibatch_values[phase]
+        pdb.set_trace()
         if len(x) <= N:
             return
-        x = np.convolve(x, np.ones(N)/N, mode='valid')
-        sns.lineplot(y=x[::N//2], ax=axis, label=phase)
+        spacing = N//2
+        y = np.convolve(x, np.ones(N)/N, mode='valid')[::spacing]
+        sns.lineplot(x=range(0, len(y)*spacing, spacing), y=y, ax=axis, label=phase)
         axis.set_ylabel(self.name)
         plt.savefig(path)
         plt.close()

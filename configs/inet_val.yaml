@@ -1,10 +1,10 @@
 parent: classify
 data loading:
-  batch size: 16
-  subset: val
+  batch size: 48
+  subset: test
   dataset: inet12
   classes: 12
-  initial sample points: 1024
+  sample points: 1024
   image shape:
   - 32
   - 32

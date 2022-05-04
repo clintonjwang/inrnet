@@ -118,7 +118,7 @@ def GAPseq(values, layer, inr):
         layer.train()
     else:
         layer.eval()
-    return layer.layers(values.mean(0, keepdim=True).float())
+    return layer.layers(values.mean(1).float())
 # class GlobalAvgPool(nn.Module):
 #     def __init__(self, sampling="input"):
 #         super().__init__()

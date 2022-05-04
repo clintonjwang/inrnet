@@ -16,21 +16,28 @@ rescale_float = mtr.ScaleIntensity()
 
 def load_pretrained_classifier(args):
     net_args = args["network"]
-    if net_args["type"] == "inr-effnet-b0":
-        base = torchvision.models.efficientnet_b0(pretrained=True)
-    elif net_args["type"] == "effnet-b0":
-        return torchvision.models.efficientnet_b0(pretrained=True)
-    elif net_args["type"] == "inr-effnet-b1":
-        base = torchvision.models.efficientnet_b1(pretrained=True)
-    elif net_args["type"] == "inr-effnet-b2":
-        base = torchvision.models.efficientnet_b2(pretrained=True)
+    pretrained = net_args['pretrained']
+    # if net_args["type"] == "inr-effnet-b0":
+    #     base = torchvision.models.efficientnet_b0(pretrained=pretrained)
+    # elif net_args["type"] == "effnet-b0":
+    #     return torchvision.models.efficientnet_b0(pretrained=pretrained)
+
+    if net_args["type"] == "effnet-s3":
+        m = torchvision.models.efficientnet_b0(pretrained=pretrained)
+        return nn.Sequential(m.features[:3],
+            nn.AdaptiveAvgPool2d(output_size=1),
+            nn.Flatten(1),
+            nn.Linear(24, args["data loading"]['classes']))
+
     elif net_args["type"] == "inr-effnet-s3":
-        m = torchvision.models.efficientnet_b0(pretrained=True)
+        m = torchvision.models.efficientnet_b0(pretrained=pretrained)
         base = nn.Sequential(m.features[:3],
             nn.AdaptiveAvgPool2d(output_size=1),
             nn.Linear(24, args["data loading"]['classes']))
+
     else:
         raise NotImplementedError
+        
     img_shape = args["data loading"]["image shape"]
     InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
     return InrNet
@@ -48,11 +55,34 @@ def finetune_classifier(args):
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
     global_step = 0
-    scaler = torch.cuda.amp.GradScaler()
     loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
-    top5_tracker = util.MetricTracker("top5")
-    top1_tracker = util.MetricTracker("top1")
-    top_5, top_1 = 0,0
+    top5 = lambda labels, pred_cls: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
+    top1 = lambda labels, pred_cls: (labels.unsqueeze(1) == pred_cls[:,0]).float().mean()
+    top5_tracker = util.MetricTracker("top5", function=top5)
+    top1_tracker = util.MetricTracker("top1", function=top1)
+    bsz = dl_args['batch size']
+
+    def backprop():
+        loss = loss_tracker(logits, labels)
+        pred_cls = logits.topk(k=5).indices
+        top_5 = top5_tracker(labels,pred_cls).item()
+        top_1 = top1_tracker(labels,pred_cls).item()
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if global_step % 20 == 0:
+            print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5, decimals=2),
+                "; top_1:", np.round(top_1, decimals=2),
+                flush=True)
+        if global_step % 100 == 0:
+            torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+            loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
+            top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
+            top5_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top5.png")
+        # if attr_tracker.is_at_min("train"):
+        #     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
 
     if args["network"]['type'].startswith('inr'):
         N = dl_args["initial sample points"]
@@ -60,33 +90,11 @@ def finetune_classifier(args):
         optimizer = torch.optim.Adam(InrNet.parameters(), lr=args["optimizer"]["learning rate"])
         for img_inr, labels in data_loader:
             global_step += 1
-            # if global_step == N//4:
-            #     N *= 2
             img_inr = to_black_box(img_inr)
-            pdb.set_trace()
             logit_fxn = InrNet(img_inr)
             coords = logit_fxn.generate_sample_points(sample_size=N)
             logits = logit_fxn(coords)
-            pred_cls = logits.topk(k=5).indices.cpu()
-            top_5 += labels in pred_cls
-            top_1 += (labels == pred_cls[0,0]).item()
-            loss = loss_tracker(logits, labels)
-
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            if global_step % 20 == 0:
-                print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5/global_step, decimals=3), "; top_1:",
-                    np.round(top_1/global_step, decimals=3),
-                    flush=True)
-            if global_step % 100 == 0:
-                torch.cuda.empty_cache()
-                torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-                loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            # if attr_tracker.is_at_min("train"):
-            #     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+            backprop()
             if global_step > args["optimizer"]["max steps"]:
                 break
 
@@ -96,30 +104,11 @@ def finetune_classifier(args):
     else:
         EffNet = load_pretrained_classifier(args).cuda()
         optimizer = torch.optim.Adam(EffNet.parameters(), lr=args["optimizer"]["learning rate"])
-        for img_inr, class_ix in data_loader:
+        for img_inr, labels in data_loader:
             global_step += 1
-            img = to_black_box(img_inr).produce_image(*dl_args['image shape'], split=2, format='torch')
+            img = to_black_box(img_inr).produce_images(*dl_args['image shape'])
             logits = EffNet(img)
-            pred_cls = logits.topk(k=5).indices.cpu()
-            top_5 += class_ix in pred_cls
-            top_1 += (class_ix == pred_cls[0,0]).item()
-            loss = loss_tracker(logits, class_ix.cuda())
-
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-            if global_step % 50 == 0:
-                print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5/global_step, decimals=3), "; top_1:",
-                    np.round(top_1/global_step, decimals=3),
-                    flush=True)
-            if global_step % 500 == 0:
-                torch.cuda.empty_cache()
-                torch.save(EffNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-                loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            # if attr_tracker.is_at_min("train"):
-            #     torch.save(EffNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+            backprop()
             if global_step > args["optimizer"]["max steps"]:
                 break
 

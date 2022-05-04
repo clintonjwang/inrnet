@@ -1,6 +1,8 @@
 parent: classify
+network:
+  type: inr-effnet-s3
 data loading:
-  batch size: 16
+  batch size: 48
   subset: train
   dataset: inet12
   classes: 12
@@ -10,4 +12,4 @@ data loading:
   - 32
 optimizer:
   learning rate: 1e-4
-  max steps: 1000
+  max steps: 2000

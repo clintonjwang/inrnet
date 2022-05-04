@@ -1,0 +1,12 @@
+parent: fit_siren
+data loading:
+  interval: 1
+  end_ix: 100
+  dataset: cityscapes
+  subset: train
+  variables: img, seg
+  image shape:
+  - 256
+  - 512
+optimizer:
+  max steps: 3000
