@@ -2,7 +2,8 @@ from functools import partial
 from typing import Union, List, Dict, Any, Optional, cast
 
 import torch
-nn=torch.nn
+nn = torch.nn
+F = nn.functional
 
 def get_vgg11():
     src_model = torchvision.models.vgg11(pretrained=True)

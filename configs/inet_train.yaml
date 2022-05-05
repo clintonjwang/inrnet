@@ -6,10 +6,10 @@ data loading:
   subset: train
   dataset: inet12
   classes: 12
-  initial sample points: 1024
+  sample points: 1024
   image shape:
   - 32
   - 32
 optimizer:
   learning rate: 1e-4
-  max steps: 2000
+  max steps: 8000

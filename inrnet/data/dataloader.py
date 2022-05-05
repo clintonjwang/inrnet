@@ -1,4 +1,4 @@
-import os, torch, pdb, pickle
+import os, torch, pdb
 osp=os.path
 import torchvision
 from torchvision import transforms
@@ -61,6 +61,15 @@ def get_img_dataset(args):
             split=dl_args['subset'], mode='coarse', target_type='semantic',
             transform=trans, target_transform=cityscapes.seg_transform)
 
+    elif dl_args["dataset"] == "flowers":
+        size = dl_args['image shape']
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize(size),
+        ])
+        return torchvision.datasets.Flowers102(DS_DIR,
+            split=dl_args['subset'], transform=trans)
+
     else:
         raise NotImplementedError
     return dataset
@@ -89,7 +98,6 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
             for path in paths:
                 data, classes = torch.load(path)
                 indices = list(range(len(data)))
-                # for ix in indices:
                 ix = np.random.choice(indices)
                 param_dict = {k:data[k][ix] for k in keys}
                 try:

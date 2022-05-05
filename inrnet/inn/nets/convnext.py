@@ -4,286 +4,200 @@ from functools import partial
 nn = torch.nn
 F = nn.functional
 
+from inrnet import inn
 from inrnet.inn import functional as inrF
 
-class ConvNeXtBlock(BaseModule):
-    """ConvNeXt Block.
-    Args:
-        in_channels (int): The number of input channels.
-        norm_cfg (dict): The config dict for norm layers.
-            Defaults to ``dict(type='LN2d', eps=1e-6)``.
-        act_cfg (dict): The config dict for activation between pointwise
-            convolution. Defaults to ``dict(type='GELU')``.
-        mlp_ratio (float): The expansion ratio in both pointwise convolution.
-            Defaults to 4.
-        linear_pw_conv (bool): Whether to use linear layer to do pointwise
-            convolution. More details can be found in the note.
-            Defaults to True.
-        drop_path_rate (float): Stochastic depth rate. Defaults to 0.
-        layer_scale_init_value (float): Init value for Layer Scale.
-            Defaults to 1e-6.
-    Note:
-        There are two equivalent implementations:
-        1. DwConv -> LayerNorm -> 1x1 Conv -> GELU -> 1x1 Conv;
-           all outputs are in (N, C, H, W).
-        2. DwConv -> LayerNorm -> Permute to (N, H, W, C) -> Linear -> GELU
-           -> Linear; Permute back
-        As default, we use the second to align with the official repository.
-        And it may be slightly faster.
-    """
+def translate_convnext_model(input_shape, n_stages=3):
+    extrema = ((-1,1),(-1,1))
+    current_shape = input_shape
+    sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
 
-    def __init__(self,
-                 in_channels,
-                 norm_cfg=dict(type='LN2d', eps=1e-6),
-                 act_cfg=dict(type='GELU'),
-                 mlp_ratio=4.,
-                 linear_pw_conv=True,
-                 drop_path_rate=0.,
-                 layer_scale_init_value=1e-6):
+    root = 'backbone.downsample_layers.0.'
+    bb_ds_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+
+    out_,in_,kw,kh = bb_ds_sd['0.weight'].shape
+    cv = nn.Conv2d(in_, out_, kernel_size=(4,4), stride=(2,2), padding=(1,1))
+    cv.weight.data = bb_ds_sd['0.weight']
+    cv.bias.data = bb_ds_sd['0.bias']
+
+    norm = nn.InstanceNorm2d(out_, affine=True)
+    norm.weight.data = bb_ds_sd['1.weight']
+    norm.bias.data = bb_ds_sd['1.bias']
+
+    stem, current_shape, extrema = inn.conversion.translate_sequential_layer(
+        nn.Sequential(cv, norm), current_shape, extrema)
+
+
+    root = 'backbone.downsample_layers.0.'
+    bb_ds_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+
+    out_,in_,kw,kh = bb_ds_sd['0.weight'].shape
+    cv = nn.Conv2d(in_, out_, kernel_size=(4,4), stride=(2,2), padding=(1,1))
+    cv.weight.data = bb_ds_sd['0.weight']
+    cv.bias.data = bb_ds_sd['0.bias']
+
+    norm = nn.InstanceNorm2d(out_, affine=True)
+    norm.weight.data = bb_ds_sd['1.weight']
+    norm.bias.data = bb_ds_sd['1.bias']
+    
+    stem, current_shape, extrema = inn.conversion.translate_sequential_layer(
+        nn.Sequential(cv, norm), current_shape, extrema)
+
+    stage0_blocks = []
+    for d in range(3):
+        root = f'backbone.stages.0.{d}.'
+        bb_st_d_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+        stage0_blocks.append(translate_convnext_block(bb_st_d_sd, current_shape, extrema))
+    stage0 = nn.Sequential(stem, *stage0_blocks)
+
+    stages = [stage0]
+    for stage in range(1,n_stages):
+        root = 'backbone.downsample_layers.0.'
+        bb_ds_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+
+        out_,in_,kw,kh = bb_ds_sd['1.weight'].shape
+        norm = nn.InstanceNorm2d(in_, affine=True)
+        norm.weight.data = bb_ds_sd['0.weight']
+        norm.bias.data = bb_ds_sd['0.bias']
+        
+        cv = nn.Conv2d(in_, out_, kernel_size=(2,2), stride=(2,2))
+        cv.weight.data = bb_ds_sd['1.weight']
+        cv.bias.data = bb_ds_sd['1.bias']
+
+        norm_ds, current_shape, extrema = inn.conversion.translate_sequential_layer(
+            nn.Sequential(norm, cv), current_shape, extrema)
+
+        stage_blocks = []
+        for d in range(3):
+            root = f'backbone.stages.{stage}.{d}.'
+            bb_st_d_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+            stage_blocks.append(translate_convnext_block(bb_st_d_sd, current_shape, extrema))
+        stages.append(nn.Sequential(norm_ds, *stage_blocks))
+
+
+    norms = []
+    for i in n_stages:
+        ch = sd[f'backbone.norm{i}.weight'].size(0)
+        norm = nn.InstanceNorm2d(ch, affine=True)
+        norm.weight.data = sd[f'backbone.norm{i}.weight']
+        norm.bias.data = sd[f'backbone.norm{i}.bias']
+        norms.append(inn.conversion.translate_simple_layer(norm))
+
+    root = 'decode_head.lateral_convs.'
+    dec_lateral_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+    lateral_convs = []
+    for i in range(n_stages-1):
+        out_, in_ = dec_lateral_sd[f'{i}.conv.weight'].shape[:2]
+        cv = inn.ChannelMixer(in_, out_, bias=False)
+        cv.weight.data = dec_lateral_sd[f'{i}.conv.weight'].squeeze()
+        norm = nn.BatchNorm2d(ch)
+        norm.weight.data = dec_lateral_sd[f'{i}.bn.weight']
+        norm.bias.data = dec_lateral_sd[f'{i}.bn.bias']
+        norm.running_mean.data = dec_lateral_sd[f'{i}.bn.running_mean']
+        norm.running_var.data = dec_lateral_sd[f'{i}.bn.running_var']
+        norm = inn.conversion.translate_simple_layer(norm)
+        act = inn.ReLU()
+        lateral_convs.append(nn.Sequential(cv, norm, act))
+
+    root = 'decode_head.fpn_convs.'
+    dec_fpn_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+    fpn_convs = []
+    for i in range(n_stages-1):
+        out_, in_ = dec_lateral_sd[f'{i}.conv.weight'].shape[:2]
+        cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
+        cv.weight.data = dec_lateral_sd[f'{i}.conv.weight']
+        norm = nn.BatchNorm2d(ch)
+        norm.weight.data = dec_lateral_sd[f'{i}.bn.weight']
+        norm.bias.data = dec_lateral_sd[f'{i}.bn.bias']
+        norm.running_mean.data = dec_lateral_sd[f'{i}.bn.running_mean']
+        norm.running_var.data = dec_lateral_sd[f'{i}.bn.running_var']
+        norm = inn.conversion.translate_simple_layer(norm)
+        act = inn.ReLU()
+        fpn_convs.append(nn.Sequential(cv, norm, act))
+
+    root = 'decode_head.fpn_bottleneck.'
+    fpn_bot_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+    fpn_bottleneck
+
+    seg_cls = inn.Conv(num_classes)
+
+    decoder = nn.ModuleDict(lateral_convs, fpn_convs)
+
+    # root = 'auxiliary_head.'
+    # aux_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
+    # w = aux_sd['conv_seg.weight']
+    # aux_sd['conv_seg.bias']
+
+    convnext = ConvNeXt(stages, norms, decoder)
+
+
+class ConvNeXt(nn.Module):
+    def __init__(self, stages, norms, decoder):
         super().__init__()
-        self.depthwise_conv = nn.Conv2d(
-            in_channels,
-            in_channels,
-            kernel_size=7,
-            padding=3,
-            groups=in_channels)
+        self.num_classes = decoder.num_classes
+        self.stages = nn.ModuleList(stages)
+        self.norms = nn.ModuleList(norms)
+        self.decoder = decoder
+    def integrator(self, values):
+        x = self.stages[0](values)
+        out0 = self.norms[0](x)
+        x = self.stages[1](x)
+        out1 = self.norms[1](x)
+        x = self.stages[2](x)
+        out2 = self.norms[2](x)
+        return decoder(out0, out1, out2)
+    def forward(self, inr):
+        new_inr = inr.create_derived_inr()
+        new_inr.set_integrator(self.integrator, 'ConvNeXt')
+        new_inr.channels = self.num_classes
+        return new_inr
 
-        self.linear_pw_conv = linear_pw_conv
-        self.norm = build_norm_layer(norm_cfg, in_channels)[1]
-
-        mid_channels = int(mlp_ratio * in_channels)
-        if self.linear_pw_conv:
-            # Use linear layer to do pointwise conv.
-            pw_conv = nn.Linear
-        else:
-            pw_conv = partial(nn.Conv2d, kernel_size=1)
-
-        self.pointwise_conv1 = pw_conv(in_channels, mid_channels)
-        self.act = build_activation_layer(act_cfg)
-        self.pointwise_conv2 = pw_conv(mid_channels, in_channels)
-
-        self.gamma = nn.Parameter(
-            layer_scale_init_value * torch.ones((in_channels)),
-            requires_grad=True) if layer_scale_init_value > 0 else None
-
-        self.drop_path = DropPath(
-            drop_path_rate) if drop_path_rate > 0. else nn.Identity()
-
-    def forward(self, x):
-        shortcut = x
-        x = self.depthwise_conv(x)
-        x = self.norm(x)
-
-        if self.linear_pw_conv:
-            x = x.permute(0, 2, 3, 1)  # (N, C, H, W) -> (N, H, W, C)
-
-        x = self.pointwise_conv1(x)
-        x = self.act(x)
-        x = self.pointwise_conv2(x)
-
-        if self.linear_pw_conv:
-            x = x.permute(0, 3, 1, 2)  # permute back
-
-        if self.gamma is not None:
-            x = x.mul(self.gamma.view(1, -1, 1, 1))
-
-        x = shortcut + self.drop_path(x)
-        return x
+class Decoder(nn.Module):
+    def __init__(self, lateral_convs, fpn_convs, fpn_bottleneck, seg_cls):
+        super().__init__()
+        self.lateral_convs = lateral_convs
+        self.fpn_convs = fpn_convs
+        self.fpn_bottleneck = fpn_bottleneck
+        self.seg_cls = seg_cls
+        self.up2 = inn.upsample.Upsample(2, mode='bilinear')
+        self.up4 = inn.upsample.Upsample(4, mode='bilinear')
+    def integrator(self, out0, out1, out2):
+        l1 = self.lateral_convs[0](out0)
+        l1 = self.lateral_convs[1](out1)
+        l1 = self.lateral_convs[2](out2)
+        return seg
 
 
-class ConvNeXt(BaseBackbone):
-    """ConvNeXt.
-    A PyTorch implementation of : `A ConvNet for the 2020s
-    <https://arxiv.org/pdf/2201.03545.pdf>`_
-    Modified from the `official repo
-    <https://github.com/facebookresearch/ConvNeXt/blob/main/models/convnext.py>`_
-    and `timm
-    <https://github.com/rwightman/pytorch-image-models/blob/master/timm/models/convnext.py>`_.
-    Args:
-        arch (str | dict): The model's architecture. If string, it should be
-            one of architecture in ``ConvNeXt.arch_settings``. And if dict, it
-            should include the following two keys:
-            - depths (list[int]): Number of blocks at each stage.
-            - channels (list[int]): The number of channels at each stage.
-            Defaults to 'tiny'.
-        in_channels (int): Number of input image channels. Defaults to 3.
-        stem_patch_size (int): The size of one patch in the stem layer.
-            Defaults to 4.
-        norm_cfg (dict): The config dict for norm layers.
-            Defaults to ``dict(type='LN2d', eps=1e-6)``.
-        act_cfg (dict): The config dict for activation between pointwise
-            convolution. Defaults to ``dict(type='GELU')``.
-        linear_pw_conv (bool): Whether to use linear layer to do pointwise
-            convolution. Defaults to True.
-        drop_path_rate (float): Stochastic depth rate. Defaults to 0.
-        layer_scale_init_value (float): Init value for Layer Scale.
-            Defaults to 1e-6.
-        out_indices (Sequence | int): Output from which stages.
-            Defaults to -1, means the last stage.
-        frozen_stages (int): Stages to be frozen (all param fixed).
-            Defaults to 0, which means not freezing any parameters.
-        gap_before_final_norm (bool): Whether to globally average the feature
-            map before the final norm layer. In the official repo, it's only
-            used in classification task. Defaults to True.
-        init_cfg (dict, optional): Initialization config dict
-    """  # noqa: E501
-    arch_settings = {
-        'tiny': {
-            'depths': [3, 3, 9, 3],
-            'channels': [96, 192, 384, 768]
-        },
-        'small': {
-            'depths': [3, 3, 27, 3],
-            'channels': [96, 192, 384, 768]
-        },
-        'base': {
-            'depths': [3, 3, 27, 3],
-            'channels': [128, 256, 512, 1024]
-        },
-        'large': {
-            'depths': [3, 3, 27, 3],
-            'channels': [192, 384, 768, 1536]
-        },
-        'xlarge': {
-            'depths': [3, 3, 27, 3],
-            'channels': [256, 512, 1024, 2048]
-        },
-    }
 
-    def __init__(self,
-                 arch='tiny',
-                 in_channels=3,
-                 stem_patch_size=4,
-                 norm_cfg=dict(type='LN2d', eps=1e-6),
-                 act_cfg=dict(type='GELU'),
-                 linear_pw_conv=True,
-                 drop_path_rate=0.,
-                 layer_scale_init_value=1e-6,
-                 out_indices=-1,
-                 frozen_stages=0,
-                 gap_before_final_norm=True,
-                 init_cfg=None):
-        super().__init__(init_cfg=init_cfg)
+def translate_convnext_block(state_dict, current_shape, extrema):
+    mid,in_ = state_dict['pointwise_conv1.weight'].shape
+    depthwise_conv = nn.Conv2d(in_, in_, kernel_size=7, padding=3, groups=in_)
+    depthwise_conv.weight.data = state_dict['depthwise_conv.weight']
+    depthwise_conv.bias.data = state_dict['depthwise_conv.bias']
+    depthwise_conv = inn.conversion.translate_strided_layer(norm, current_shape, extrema)[0]
 
-        if isinstance(arch, str):
-            assert arch in self.arch_settings, \
-                f'Unavailable arch, please choose from ' \
-                f'({set(self.arch_settings)}) or pass a dict.'
-            arch = self.arch_settings[arch]
-        elif isinstance(arch, dict):
-            assert 'depths' in arch and 'channels' in arch, \
-                f'The arch dict must have "depths" and "channels", ' \
-                f'but got {list(arch.keys())}.'
+    norm = nn.InstanceNorm2d(in_, affine=True)
+    norm.weight.data = state_dict['norm.weight']
+    norm.bias.data = state_dict['norm.bias']
+    norm = inn.conversion.translate_simple_layer(norm)
+    
+    pointwise_conv1 = inn.ChannelMixer(in_, mid, bias=True)
+    pointwise_conv1.weight.data = state_dict['pointwise_conv1.weight']
+    pointwise_conv1.bias.data = state_dict['pointwise_conv1.bias']
 
-        self.depths = arch['depths']
-        self.channels = arch['channels']
-        assert (isinstance(self.depths, Sequence)
-                and isinstance(self.channels, Sequence)
-                and len(self.depths) == len(self.channels)), \
-            f'The "depths" ({self.depths}) and "channels" ({self.channels}) ' \
-            'should be both sequence with the same length.'
+    pointwise_conv2 = inn.ChannelMixer(mid_, in_, bias=True)
+    pointwise_conv2.weight.data = state_dict['pointwise_conv2.weight']
+    pointwise_conv2.bias.data = state_dict['pointwise_conv2.bias']
 
-        self.num_stages = len(self.depths)
+    layers = nn.Sequential(depthwise_conv, norm, pointwise_conv1, inn.GeLU(), pointwise_conv2)
+    return CNBlock(layers, state_dict['gamma'])
 
-        if isinstance(out_indices, int):
-            out_indices = [out_indices]
-        assert isinstance(out_indices, Sequence), \
-            f'"out_indices" must by a sequence or int, ' \
-            f'get {type(out_indices)} instead.'
-        for i, index in enumerate(out_indices):
-            if index < 0:
-                out_indices[i] = 4 + index
-                assert out_indices[i] >= 0, f'Invalid out_indices {index}'
-        self.out_indices = out_indices
 
-        self.frozen_stages = frozen_stages
-        self.gap_before_final_norm = gap_before_final_norm
-
-        # stochastic depth decay rule
-        dpr = [
-            x.item()
-            for x in torch.linspace(0, drop_path_rate, sum(self.depths))
-        ]
-        block_idx = 0
-
-        # 4 downsample layers between stages, including the stem layer.
-        self.downsample_layers = ModuleList()
-        stem = nn.Sequential(
-            nn.Conv2d(
-                in_channels,
-                self.channels[0],
-                kernel_size=stem_patch_size,
-                stride=stem_patch_size),
-            build_norm_layer(norm_cfg, self.channels[0])[1],
-        )
-        self.downsample_layers.append(stem)
-
-        # 4 feature resolution stages, each consisting of multiple residual
-        # blocks
-        self.stages = nn.ModuleList()
-
-        for i in range(self.num_stages):
-            depth = self.depths[i]
-            channels = self.channels[i]
-
-            if i >= 1:
-                downsample_layer = nn.Sequential(
-                    LayerNorm2d(self.channels[i - 1]),
-                    nn.Conv2d(
-                        self.channels[i - 1],
-                        channels,
-                        kernel_size=2,
-                        stride=2),
-                )
-                self.downsample_layers.append(downsample_layer)
-
-            stage = Sequential(*[
-                ConvNeXtBlock(
-                    in_channels=channels,
-                    drop_path_rate=dpr[block_idx + j],
-                    norm_cfg=norm_cfg,
-                    act_cfg=act_cfg,
-                    linear_pw_conv=linear_pw_conv,
-                    layer_scale_init_value=layer_scale_init_value)
-                for j in range(depth)
-            ])
-            block_idx += depth
-
-            self.stages.append(stage)
-
-            if i in self.out_indices:
-                norm_layer = build_norm_layer(norm_cfg, channels)[1]
-                self.add_module(f'norm{i}', norm_layer)
-
-        self._freeze_stages()
-
-    def forward(self, x):
-        outs = []
-        for i, stage in enumerate(self.stages):
-            x = self.downsample_layers[i](x)
-            x = stage(x)
-            if i in self.out_indices:
-                norm_layer = getattr(self, f'norm{i}')
-                if self.gap_before_final_norm:
-                    gap = x.mean([-2, -1], keepdim=True)
-                    outs.append(norm_layer(gap).flatten(1))
-                else:
-                    # The output of LayerNorm2d may be discontiguous, which
-                    # may cause some problem in the downstream tasks
-                    outs.append(norm_layer(x).contiguous())
-
-        return tuple(outs)
-
-    def _freeze_stages(self):
-        for i in range(self.frozen_stages):
-            downsample_layer = self.downsample_layers[i]
-            stage = self.stages[i]
-            downsample_layer.eval()
-            stage.eval()
-            for param in chain(downsample_layer.parameters(),
-                               stage.parameters()):
-                param.requires_grad = False
-
-    def train(self, mode=True):
-        super(ConvNeXt, self).train(mode)
-        self._freeze_stages()
+class CNBlock(nn.Module):
+    def __init__(self, layers, gamma):
+        super().__init__()
+        self.layers = layers
+        self.gamma = nn.Parameter(gamma)
+        #self.drop_path_rate = 0
+    def forward(self, inr, inr=None):
+        return inr + self.layers(inr.create_derived_inr())*self.gamma

@@ -12,66 +12,59 @@ from inrnet.data import inet
 
 DATA_DIR = osp.expanduser("/data/vision/polina/scratch/clintonw/datasets/inrnet")
 
+def fit_img_to_siren(img, total_steps):
+    imgFit = siren.ImageFitting(img.unsqueeze_(0))
+    H,W = imgFit.H, imgFit.W
+    dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
+    inr = siren.Siren(out_channels=img.size(1)).cuda()
+    optim = torch.optim.Adam(lr=1e-4, params=inr.parameters())
+    model_input, ground_truth = next(iter(dl))
+    model_input, ground_truth = model_input.cuda(), ground_truth.cuda()
+
+    for step in range(total_steps):
+        model_output = inr(model_input)    
+        loss = (losses.mse_loss(model_output, ground_truth)).mean()
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
+    print("Loss %0.4f" % (loss), flush=True)
+    return inr, loss
+
+
 def train_siren(args):
     dl_args = args["data loading"]
     ds_name = dl_args["dataset"]
-    interval = dl_args["interval"]
     keys = siren.get_siren_keys()
-    param_dicts = {k:[] for k in keys}
     start_ix = int(args["start_ix"])
     end_ix = start_ix+dl_args["end_ix"]
     total_steps = args["optimizer"]["max steps"]
 
-    while osp.exists(DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{start_ix+interval-1}.pt"):
-        start_ix += interval
-    other_data = []
+    while osp.exists(DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{start_ix}.pt"):
+        start_ix += 1
     print("Starting", flush=True)
 
     dataset = dataloader.get_img_dataset(args)
+    param_dict = {}
     for ix in range(start_ix,end_ix):
         data = dataset[ix]
         if isinstance(data, tuple):
-            data = {dl_args["variables"].split(', ')[ix]:d for ix,d in enumerate(data)}
-        if data is None:
-            continue
-        if dl_args["variables"] is None:
-            img = data
+            img, data = data[0], data[1:]
         else:
-            img = data.pop("img")
-            other_data.append(data)
+            img = data
 
-        imgFit = siren.ImageFitting(img.unsqueeze_(0))
-        H,W = imgFit.H, imgFit.W
-        dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
-        inr = siren.Siren(out_channels=img.size(1)).cuda()
-        optim = torch.optim.Adam(lr=1e-4, params=inr.parameters())
-        model_input, ground_truth = next(iter(dl))
-        model_input, ground_truth = model_input.cuda(), ground_truth.cuda()
-
-        for step in range(total_steps):
-            model_output = inr(model_input)    
-            loss = (losses.mse_loss(model_output, ground_truth)).mean()
-            optim.zero_grad()
-            loss.backward()
-            optim.step()
-        print("Loss %0.4f" % (loss), flush=True)
-
+        inr,loss = fit_img_to_siren(img, total_steps)
         for k,v in inr.state_dict().items():
-            param_dicts[k].append(v.cpu())
+            param_dict[k] = v.cpu()
 
         path = DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{ix}.pt"
         loss_path = DATA_DIR+f"/{ds_name}/loss_{dl_args['subset']}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 
-        if ix % interval == interval-1:
-            if dl_args["variables"] is None:
-                torch.save(param_dicts, path)
-            else:
-                torch.save((param_dicts, other_data), path)
-                other_data = []
-            param_dicts = {k:[] for k in keys}
+        if dl_args["variables"] is None:
+            torch.save(param_dict, path)
+        else:
+            torch.save((param_dict, data[1:]), path)
 
-    print("Finished")
 
     # import monai.transforms as mtr
     # rescale_float = mtr.ScaleIntensity()
@@ -93,6 +86,11 @@ def main(args):
 
     if args["data loading"]["dataset"] == "inet12":
         train_inet12(args)
+    elif args["data loading"]["dataset"] == "cityscapes":
+        train_cityscapes(args)
+    elif args["data loading"]["dataset"] == "flowers":
+        train_flowers(args)
+        
     elif args["network"]["type"] == "SIREN":
         train_siren(args)
     else:
@@ -112,8 +110,8 @@ def train_inet12(args):
     end_ix = start_ix+100
     total_steps = args["optimizer"]["max steps"]
 
-    os.makedirs(DATA_DIR+f"/inet12/{cls}", exist_ok=True)
-    while osp.exists(DATA_DIR+f"/inet12/{cls}/{subset}_{start_ix}.pt"):
+    os.makedirs(DATA_DIR+f"/inet12_nonorm/{cls}", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/inet12_nonorm/{cls}/{subset}_{start_ix}.pt"):
         start_ix += 1
     print("Starting", flush=True)
 
@@ -121,30 +119,93 @@ def train_inet12(args):
     param_dict = {}
     for ix in range(start_ix,end_ix):
         img = dataset[ix]
-        imgFit = siren.ImageFitting(img.unsqueeze_(0))
-        H,W = imgFit.H, imgFit.W
-        dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
-        inr = siren.Siren(out_channels=img.size(1)).cuda()
-        optim = torch.optim.Adam(lr=1e-4, params=inr.parameters())
-        model_input, ground_truth = next(iter(dl))
-        model_input, ground_truth = model_input.cuda(), ground_truth.cuda()
-
-        for step in range(total_steps):
-            model_output = inr(model_input)    
-            loss = (losses.mse_loss(model_output, ground_truth)).mean()
-            optim.zero_grad()
-            loss.backward()
-            optim.step()
-        print("Loss %0.4f" % (loss), flush=True)
+        inr,loss = fit_img_to_siren(img, total_steps)
         for k,v in inr.state_dict().items():
             param_dict[k] = v.cpu()
 
-        path = DATA_DIR+f"/inet12/{cls}/{subset}_{ix}.pt"
+        path = DATA_DIR+f"/inet12_nonorm/{cls}/{subset}_{ix}.pt"
         torch.save(param_dict, path)
-        loss_path = DATA_DIR+f"/inet12/{cls}/loss_{subset}_{ix}.txt"
+        loss_path = DATA_DIR+f"/inet12_nonorm/{cls}/loss_{subset}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 
-    print("Finished")
+
+def train_flowers(args):
+    args["start_ix"] = int(args["start_ix"])
+    if args["start_ix"] < 1020:
+        args["data loading"]['subset']='train'
+    elif args["start_ix"] < 2040:
+        args["data loading"]['subset']='val'
+        args["start_ix"] -= 1020
+    else:
+        args["data loading"]['subset']='test'
+        args["start_ix"] -= 2040
+    return train_siren(args)
+
+def train_cityscapes(args):
+    dl_args = args["data loading"]
+    keys = siren.get_siren_keys()
+    start_ix = int(args["start_ix"])
+    if start_ix < 1020:
+        dl_args['subset']='train'
+    elif start_ix < 2040:
+        dl_args['subset']='val'
+        start_ix -= 1020
+    else:
+        dl_args['subset']='test'
+        start_ix -= 2040
+    end_ix = start_ix+100
+    total_steps = args["optimizer"]["max steps"]
+    subset=dl_args['subset']
+
+    os.makedirs(DATA_DIR+f"/cityscapes", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/cityscapes/{subset}_{start_ix}.pt"):
+        start_ix += 1
+    print("Starting", flush=True)
+
+    dataset = dataloader.get_img_dataset(args)
+    param_dict = {}
+    for ix in range(start_ix,end_ix):
+        img,seg = dataset[ix]
+        inr,loss = fit_img_to_siren(img, total_steps)
+        for k,v in inr.state_dict().items():
+            param_dict[k] = v.cpu()
+
+        path = DATA_DIR+f"/cityscapes/{subset}_{ix}.pt"
+        torch.save((param_dict, seg.squeeze(0)), path)
+        loss_path = DATA_DIR+f"/cityscapes/loss_{subset}_{ix}.txt"
+        open(loss_path, 'w').write(str(loss.item()))
+
+
+def train_flower(args):
+    dl_args = args["data loading"]
+    keys = siren.get_siren_keys()
+    start_ix = int(args["start_ix"])
+    if start_ix < 2975:
+        subset=dl_args['subset']='train'
+    else:
+        subset=dl_args['subset']='val'
+        start_ix -= 2975
+    end_ix = start_ix+100
+    total_steps = args["optimizer"]["max steps"]
+
+    os.makedirs(DATA_DIR+f"/cityscapes", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/cityscapes/{subset}_{start_ix}.pt"):
+        start_ix += 1
+    print("Starting", flush=True)
+
+    dataset = dataloader.get_img_dataset(args)
+    param_dict = {}
+    for ix in range(start_ix,end_ix):
+        img,seg = dataset[ix]
+        inr,loss = fit_img_to_siren(img, total_steps)
+        for k,v in inr.state_dict().items():
+            param_dict[k] = v.cpu()
+
+        path = DATA_DIR+f"/cityscapes/{subset}_{ix}.pt"
+        torch.save((param_dict, seg.squeeze(0)), path)
+        loss_path = DATA_DIR+f"/cityscapes/loss_{subset}_{ix}.txt"
+        open(loss_path, 'w').write(str(loss.item()))
+
 
 if __name__ == "__main__":
     # from data import kitti

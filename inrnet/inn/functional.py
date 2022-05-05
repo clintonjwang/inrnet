@@ -31,7 +31,10 @@ def conv(values: torch.Tensor, # [B,N,c_in]
     coords = inr.sampled_coords.to(dtype=dtype) #[N,d]
     if query_coords is None:
         if layer.stride != 0:
-            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
+            if inr.grid_mode:
+                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
+            else:
+                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -181,7 +184,10 @@ def avg_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            if inr.grid_mode:
+                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            else:
+                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -190,11 +196,15 @@ def avg_pool(values, inr, layer, query_coords=None):
     Y = values[:,torch.where(mask)[1]]
     return torch.stack([y.mean(1) for y in Y.split(tuple(mask.sum(1)), dim=1)])
 
+
 def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            if inr.grid_mode:
+                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            else:
+                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -202,7 +212,7 @@ def max_pool(values, inr, layer, query_coords=None):
         query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-    return values[:,mask].max(dim=-1).values
+    return values[:,mask].max(dim=2).values
 
 
 
@@ -274,12 +284,12 @@ def batch_normalize(values, inr, layer):
 
 ### Misc
 
-def generate_quasirandom_sequence(d=2, n=128, bbox=None, dtype=torch.float, device="cuda"):
+def generate_quasirandom_sequence(d=2, n=128, bbox=None, scramble=False, dtype=torch.float, device="cuda"):
     if math.log2(n) % 1 == 0:
-        sampler = qmc.Sobol(d=d)
+        sampler = qmc.Sobol(d=d, scramble=scramble)
         sample = sampler.random_base2(m=int(math.log2(n)))
     else:
-        sampler = qmc.Halton(d=d)
+        sampler = qmc.Halton(d=d, scramble=scramble)
         sample = sampler.random(n=n)
     out = torch.as_tensor(sample, dtype=dtype, device=device)
     if bbox is not None:

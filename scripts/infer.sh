@@ -5,7 +5,7 @@ then
 fi
 sbatch <<EOT
 #! /bin/bash
-#SBATCH --partition=${3:-gpu}
+#SBATCH --partition=${4:-gpu}
 #SBATCH --time=0
 #SBATCH -J $1
 #SBATCH --gres=gpu:1
@@ -17,7 +17,7 @@ sbatch <<EOT
 
 cd /data/vision/polina/users/clintonw/code/diffcoord/inrnet
 source .bashrc
-python infer.py -j=$1 -c=$2
+python infer.py -j=$1 -c=$2 --target_job=$3
 exit()
 EOT
 

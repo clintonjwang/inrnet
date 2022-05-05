@@ -4,5 +4,6 @@ network:
   pretrained: true
 data loading:
   subset: siren
-  validation sample points: 1024
-optimizer: null
+  sample points: 1024
+optimizer:
+  type: Adam

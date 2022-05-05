@@ -11,15 +11,7 @@ from inrnet.models.inrs.siren import to_black_box
 
 def test_equivalence():
     # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
-    # C = 3
     img_shape = h,w = 128,128
-    # zz = torch.zeros(h*w, C)
-    # zz[0,0] = 1
-    # zz[-2,1] = 1
-    # class dummy_inr(nn.Module):
-    #     def forward(self, coords):
-    #         return zz.to(dtype=coords.dtype, device=coords.device)
-    # inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=C, input_dims=2, domain=(-1,1)).cuda()
     args = job_mgmt.get_job_args("dep1")
     data_loader = dataloader.get_inr_dataloader(args["data loading"])
     for inr, _ in data_loader:
@@ -28,20 +20,7 @@ def test_equivalence():
 
     with torch.no_grad():
         model = torchvision.models.efficientnet_b0(pretrained=True)
-        # model = torchvision.models.squeezenet1_1(pretrained=True)
-        # model.features[0].padding=(1,1)
-        # model.features[5].padding=(1,1)
-        # model.features[8].padding=(1,1)
         discrete_model = model.eval().cuda()
-        # discrete_model = nn.Sequential(model.features[:5]).eval().cuda()
-        # cv = nn.Conv2d(C,C,3,1,1,bias=False)
-        # cv.weight.data.zero_()
-        # cv.weight.data[:,:,1,1].fill_(1.)
-        # cv = ResTest(C=C)
-        # cv.block[0].weight.data.zero_()
-        # cv.block[0].weight.data[:,:,1,1].fill_(1.)
-        # discrete_model = nn.Sequential(cv).cuda().eval()
-        # discrete_model = nn.Sequential(model.features[2][1]).cuda().eval()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
 
         coords = util.meshgrid_coords(h,w)
@@ -52,9 +31,9 @@ def test_equivalence():
         print(f"produced INR in {np.round(time()-t, decimals=3)}s")
 
         if output_shape is not None:
-            split = w // output_shape[-1]
-            coords = util.first_split_meshgrid(h,w, split=split)
-            out = util.realign_values(out, coords_gt=coords, inr=out_inr)
+            # split = w // output_shape[-1]
+            # coords = util.first_split_meshgrid(h,w, split=split)
+            # out = util.realign_values(out, coords_gt=coords, inr=out_inr)
             out = out.reshape(*output_shape,-1).permute(2,0,1).unsqueeze(0)
         
         torch.cuda.empty_cache()
@@ -70,27 +49,29 @@ def test_equivalence():
         print((y-out).abs().mean().item(), y.abs().mean().item(), out.abs().mean().item())
         pdb.set_trace()
 
+
 def test_equivalence_dummy():
     C = 1
-    img_shape = h,w = 4,4
+    img_shape = h,w = 3,3
     zz = torch.zeros(h*w, C)
     zz[0,0] = 1
-    zz[-6,0] = 1
-    zz[-5,0] = 2
-    zz[5,0] = 2
+    zz[-4,0] = 1
+    zz[-2,0] = 2
+    zz[2,0] = 2
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
     inrs = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
         x = inrs.produce_images(h,w)
-        conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
-        conv.weight.data.fill_(0.)
-        conv.weight.data[0,0,1,1].fill_(1.)
+        conv = nn.Upsample(scale_factor=2, mode='nearest')#, mode='bilinear', align_corners=True)#nn.Conv2d(1,1,3,1,padding=1,bias=False)
+        # conv.weight.data.fill_(0.)
+        # conv.weight.data[0,0,1,1].fill_(1.)
         # conv.bias.data.fill_(1.)
 
         discrete_layer = nn.Sequential(conv).cuda()
-        # discrete_layer = nn.Sequential(nn.Upsample(scale_factor=2), nn.MaxPool2d(2,stride=2)).cuda()
+        # discrete_layer = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear'),
+        #     nn.MaxPool2d(2,stride=2)).cuda()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_layer, (h,w))
         y = discrete_layer(x)
 
@@ -100,10 +81,10 @@ def test_equivalence_dummy():
         out = out_inr.eval()(coords)
         
         if output_shape is not None:
-            split = w // output_shape[-1]
-            coords = util.first_split_meshgrid(h,w, split=split)
-            out = util.realign_values(out, coords_gt=coords, inr=out_inr)
-            out = out.reshape(*output_shape,-1).permute(2,0,1).unsqueeze(0)
+            # split = w // output_shape[-1]
+            # coords_gt = util.first_split_meshgrid(h,w, split=split)
+            out = util.realign_values(out, inr=out_inr)
+            out = out.reshape(1,*output_shape,-1).permute(0,3,1,2)
         
     if y.shape != out.shape:
         print('shape mismatch')

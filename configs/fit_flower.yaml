@@ -1,10 +1,10 @@
 parent: fit_siren
 data loading:
   end_ix: 100
-  dataset: cityscapes
-  variables: img, seg
+  dataset: flowers
+  variables: null
   image shape:
   - 256
-  - 512
+  - 256
 optimizer:
-  max steps: 3000
+  max steps: 2000

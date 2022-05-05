@@ -34,7 +34,10 @@ def max_pool_kernel(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            if inr.grid_mode:
+                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            else:
+                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 

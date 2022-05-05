@@ -8,6 +8,7 @@ import numpy as np
 from inrnet.models.inrs import siren
 from inrnet.util import glob2
 from inrnet.data import kitti
+from inrnet.models.inrs.siren import to_black_box
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
@@ -20,7 +21,7 @@ class INet12(torchvision.datasets.VisionDataset):
         trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((256,256)),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         root = DS_DIR+"/imagenet_pytorch"
         super().__init__(root, *args, transform=trans, **kwargs)
@@ -43,7 +44,7 @@ class INetDS(torchvision.datasets.VisionDataset):
         trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((256,256)),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         super().__init__(root, *args, transform=trans, **kwargs)
         self.subpaths = open(self.root+f"/{subset}.txt", "r").read().split('\n')
@@ -57,6 +58,40 @@ class INetDS(torchvision.datasets.VisionDataset):
             return None
     def __len__(self):
         return len(self.subpaths)
+
+def get_inr_loader_for_inet12(bsz, subset):
+    paths = [glob2(f"{DS_DIR}/inrnet/inet12/{c}/{subset}_*.pt") for c in range(12)]
+    if subset == 'train':
+        N = 800
+        loop = True
+    else:
+        N = 200
+        loop = False
+    for p in paths:
+        assert len(p)==N, 'incomplete subset'
+
+    keys = siren.get_siren_keys()
+    assert bsz % 12 == 0, 'expect batch size to be a multiple of the number of classes'
+    n_per_cls = bsz // 12
+    if N % bsz != 0:
+        print('warning: dropping last minibatch')
+        N = (N // bsz) * bsz
+    def random_loader(loop=True):
+        while True:
+            for p in paths:
+                np.random.shuffle(p)
+            for path_ix in range(0,N, n_per_cls):
+                inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
+                for i in range(n_per_cls):
+                    for cl in range(12):
+                        param_dict = torch.load(paths[cl][path_ix+i])
+                        inrs[i*12+cl].load_state_dict(param_dict)
+                labels = torch.arange(12).tile(n_per_cls)
+                yield to_black_box(inrs).cuda(), labels.cuda()
+            if not loop:
+                break
+    return random_loader(loop=loop)
+
 
 # def generate_inet12(n_train=800, n_val=200):
 #     cls_map_path = f"{DS_DIR}/inrnet/big_12.pkl"
@@ -88,39 +123,4 @@ class INetDS(torchvision.datasets.VisionDataset):
 #                 break
     
 
-
-
-def get_inr_loader_for_inet12(bsz, subset):
-    cls_map_path = f"{DS_DIR}/inrnet/big_12.pkl"
-    _, _, sub_to_super = pickle.load(open(cls_map_path, 'rb'))
-
-    inr = siren.Siren(out_channels=3)
-    paths = glob2(f"{DS_DIR}/inrnet/imagenet1k_{subset}/siren_*.pt")
-    keys = siren.get_siren_keys()
-    def random_loader():
-        inrs = []
-        classes = []
-        while True:
-            np.random.shuffle(paths)
-            for path in paths:
-                data, cl = torch.load(path)
-                indices = list(range(len(data)))
-                # for ix in indices:
-                ix = np.random.choice(indices)
-                param_dict = {k:data[k][ix] for k in keys}
-                try:
-                    inr.load_state_dict(param_dict)
-                except RuntimeError:
-                    continue
-                cl = cl[ix]['cls']
-                if cl not in sub_to_super:
-                    continue
-                inrs.append(inr.cuda())
-                classes.append(torch.tensor(sub_to_super[cl]).cuda())
-
-                if len(inrs) == bsz:
-                    yield inrs, torch.stack(classes)
-                    inrs = []
-                    classes = []
-    return random_loader()
 

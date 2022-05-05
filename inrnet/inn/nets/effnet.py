@@ -1,4 +1,7 @@
 
+import torch
+nn = torch.nn
+F = nn.functional
 
 class EfficientNetB0(nn.Module):
     def __init__(self, in_channels, out_dims, min_channels=16, radius=.2, spatial_dim=2, steerable=False, dropout=0.):

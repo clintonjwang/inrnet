@@ -4,7 +4,6 @@ F = nn.functional
 
 from inrnet import inn
 
-
 class UNet(nn.Module):
     def __init__(self, in_channels, out_channels, min_channels=16, spatial_dim=2, final_activation=None, **kwargs):
         super().__init__()

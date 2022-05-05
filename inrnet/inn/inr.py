@@ -97,8 +97,9 @@ class INRBatch(nn.Module):
             sample_size = self.sample_size
         if method == "grid" or self.grid_mode:
             return util.meshgrid_coords(*dims)
-        elif method == "qmc":
-            return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size) * \
+        elif method in ("qmc", 'rqmc'):
+            return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
+                scramble=(method=='rqmc')) * \
                     (self.domain[1]-self.domain[0]) - self.domain[0]
         else:
             raise NotImplementedError("invalid method: "+method)
@@ -220,22 +221,22 @@ class INRBatch(nn.Module):
 
     def produce_images(self, H,W, split=None, dtype=torch.float):
         with torch.no_grad():
-            if split == None:
-                xy_grid = util.meshgrid_coords(H,W)
-                output = self.forward(xy_grid)
-                output = util.realign_values(output, coords_gt=xy_grid, inr=self)
-                output = output.reshape(output.size(0),H,W,-1)
-            else:
-                outs = []
-                xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
-                for xy_grid in xy_grids:
-                    output = self.forward(xy_grid.cuda())
-                    outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
-                    torch.cuda.empty_cache()
-                xy_grid = util.meshgrid_coords(H,W)
-                output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
-                            coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
-                output = output.reshape(output.size(0),H,W,-1)
+            # if split == None:
+            xy_grid = util.meshgrid_coords(H,W)
+            output = self.forward(xy_grid)
+            output = util.realign_values(output, inr=self)#)#, coords_gt=xy_grid
+            output = output.reshape(output.size(0),H,W,-1)
+            # else:
+            #     outs = []
+            #     xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
+            #     for xy_grid in xy_grids:
+            #         output = self.forward(xy_grid.cuda())
+            #         outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
+            #         torch.cuda.empty_cache()
+            #     xy_grid = util.meshgrid_coords(H,W)
+            #     output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
+            #                 coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
+            #     output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
