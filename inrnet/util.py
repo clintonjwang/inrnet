@@ -13,39 +13,7 @@ rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0,
 def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, split=None):
     if coords is None:
         coords = inr.sampled_coords
-    indices = torch.sort(coords[:,0]*10 + coords[:,1]).indices
-    return out[:,indices]
-
-    # out - (B,N,C)
-    # coords_gt - (N,D)
-
-    # coords_gt = coords_gt[:,0]*4 + coords_gt[:,1]
-    # coords_out = coords_out[:,0]*4 + coords_out[:,1]
-
-    if coords_out is None:
-        coords_out = inr.sampled_coords
-    if split is None:
-        # matches = (coords_gt.unsqueeze(1) == coords_out.unsqueeze(0)).min(dim=-1).values
-        diffs = coords_out.unsqueeze(0) - coords_gt.unsqueeze(1)
-        matches = diffs.abs().sum(-1) == 0
-        indices = torch.where(matches)[1]
-    else:
-        N = coords_out.size(0)
-        dx = N//split
-        indices = []
-        for ix in range(0,N,dx):
-            diffs = coords_out.unsqueeze(0) - coords_gt[ix:ix+dx].unsqueeze(1)
-            matches = diffs.abs().sum(-1) == 0
-            indices.append(torch.where(matches)[1])
-            # matches = (coords_gt[ix:ix+dx].unsqueeze(1) == coords_out.unsqueeze(0)).min(dim=-1).values
-            # indices.append(torch.where(matches)[1])
-            del diffs, matches
-            torch.cuda.empty_cache()
-        indices = torch.cat(indices,dim=0)
-    if indices.size(0) != out.size(1):
-        print("realignment failed")
-        pdb.set_trace()
-        # raise ValueError("realignment failed")
+    indices = torch.sort((coords[:,0]+2)*coords.size(0)/2 + coords[:,1]).indices
     return out[:,indices]
 
 def meshgrid(*tensors, indexing='ij'):
@@ -58,22 +26,6 @@ def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.float, device="cuda"):
     tensors = [torch.linspace(*domain, steps=d) for d in dims]
     mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
     return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
-
-
-def meshgrid_split_coords(*dims, split=2, domain=(-1,1), dtype=torch.float, device="cuda"):
-    if len(dims) != 2 or split != 2:
-        raise NotImplementedError
-
-    tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
-    splitgrids = (mgrid[::2,::2], mgrid[1::2,::2], mgrid[::2,1::2], mgrid[1::2,1::2])
-    return [mg.reshape(-1, len(dims)).to(dtype=dtype, device=device) for mg in splitgrids]
-
-def first_split_meshgrid(*dims, split=2, domain=(-1,1), dtype=torch.float, device="cuda"):
-    tensors = [torch.linspace(*domain, steps=d) for d in dims]
-    mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
-    splitgrid = mgrid[::split,::split]
-    return splitgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:

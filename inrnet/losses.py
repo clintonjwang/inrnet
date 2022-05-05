@@ -33,7 +33,7 @@ def l2_dist_inr(N=128):
 
 def L1_dist(inr, gt_values, coords):
     pred = inr(coords)
-    pred = util.realign_values(pred, coords_gt=coords, inr=inr)
+    #pred = util.realign_values(pred, coords_gt=coords, inr=inr)
     return (pred-gt_values).abs().mean()
 
 def mse_loss(pred,target):

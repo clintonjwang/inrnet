@@ -116,12 +116,6 @@ class INRBatch(nn.Module):
     def create_modified_copy(self, modification):
         new_inr = self.create_derived_inr()
         new_inr.add_modification(modification)
-        # self.sampled_coords = torch.empty(0)
-        # new_inr = copy.copy(self)
-        # new_inr.modifiers = self.modifiers.copy()
-        # new_inr.add_modification(modification)
-        # if new_inr.integrator is not None:
-        #     new_inr.integrator.inr = new_inr
         return new_inr
 
     def create_derived_inr(self):
@@ -208,52 +202,24 @@ class INRBatch(nn.Module):
             self.sampled_coords = self.origin.sampled_coords
 
         if self.integrator is not None:
-            # t = time()
             out = self.integrator(out)
-            # self.int_time = time()-t
-        # t = time()
         for m in self.modifiers:
             out = m(out)
-        # self.mod_time = time()-t
         if self.caching_enabled:
             self.cached_outputs = out
         return out
 
-    def produce_images(self, H,W, split=None, dtype=torch.float):
+    def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            # if split == None:
             xy_grid = util.meshgrid_coords(H,W)
             output = self.forward(xy_grid)
-            output = util.realign_values(output, inr=self)#)#, coords_gt=xy_grid
+            output = util.realign_values(output, inr=self)
             output = output.reshape(output.size(0),H,W,-1)
-            # else:
-            #     outs = []
-            #     xy_grids = util.meshgrid_split_coords(H,W,split=split, device="cpu")
-            #     for xy_grid in xy_grids:
-            #         output = self.forward(xy_grid.cuda())
-            #         outs.append(util.realign_values(output, coords_gt=xy_grid.cuda(), inr=self, split=16).cpu())
-            #         torch.cuda.empty_cache()
-            #     xy_grid = util.meshgrid_coords(H,W)
-            #     output = util.realign_values(torch.cat(outs, dim=0).cuda(), coords_gt=xy_grid,
-            #                 coords_out=torch.cat(xy_grids, dim=0).cuda(), split=32)
-            #     output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
             return output.permute(0,3,1,2).to(dtype=dtype)
 
-
-    # def integrator_time(self):
-    #     if hasattr(self, 'int_time'):
-    #         it = [self.int_time]
-    #     else:
-    #         it = []
-    #     if isinstance(self, MergeINR):
-    #         return self.inr1.integrator_time() + self.inr2.integrator_time() + it
-    #     elif not isinstance(self.evaluator, BlackBoxINR):
-    #         return self.evaluator.integrator_time() + it
-    #     else:   
-    #         return it
 
 
 class BlackBoxINR(INRBatch):
@@ -396,16 +362,16 @@ class MergeINR(INRBatch):
 class SumINR(MergeINR):
     def __init__(self, inr1, inr2):
         super().__init__(inr1, inr2, channels=inr1.channels, merge_function=operator.__add__)
-# class MulINR(MergeINR):
-#     def __init__(self, inr1, inr2):
-#         super().__init__(inr1, inr2, channels=inr1.channels, merge_function=operator.__mul__)
+class MulINR(MergeINR):
+    def __init__(self, inr1, inr2):
+        super().__init__(inr1, inr2, channels=inr1.channels, merge_function=operator.__mul__)
 # class MatMulINR(MergeINR):
 #     def __init__(self, inr1, inr2):
 #         super().__init__(inr1, inr2, channels=inr2.channels, merge_function=torch.matmul)
-# class CatINR(MergeINR):
-#     def __init__(self, inr1, inr2):
-#         super().__init__(inr1, inr2, channels=inr1.channels+inr2.channels,
-#             merge_function=lambda x,y:torch.cat((x,y),dim=-1))
+class CatINR(MergeINR):
+    def __init__(self, inr1, inr2):
+        super().__init__(inr1, inr2, channels=inr1.channels+inr2.channels,
+            merge_function=lambda x,y:torch.cat((x,y),dim=-1))
 
 
 class SplitINR(INRBatch):

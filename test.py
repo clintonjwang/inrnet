@@ -52,19 +52,20 @@ def test_equivalence():
 
 def test_equivalence_dummy():
     C = 1
-    img_shape = h,w = 3,3
-    zz = torch.zeros(h*w, C)
-    zz[0,0] = 1
-    zz[-4,0] = 1
-    zz[-2,0] = 2
-    zz[2,0] = 2
+    img_shape = h,w = 6,6
+    # zz = torch.zeros(h*w, C)
+    # zz[0,0] = 1
+    # zz[-4,0] = 1
+    # zz[-2,0] = 2
+    # zz[2,0] = 2
+    zz = torch.round(torch.randn(h*w, C), decimals=1)
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
     inrs = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
         x = inrs.produce_images(h,w)
-        conv = nn.Upsample(scale_factor=2, mode='nearest')#, mode='bilinear', align_corners=True)#nn.Conv2d(1,1,3,1,padding=1,bias=False)
+        conv = nn.Upsample(scale_factor=2, mode='nearest')#nn.Conv2d(1,1,3,1,padding=1,bias=False)
         # conv.weight.data.fill_(0.)
         # conv.weight.data[0,0,1,1].fill_(1.)
         # conv.bias.data.fill_(1.)
@@ -81,8 +82,6 @@ def test_equivalence_dummy():
         out = out_inr.eval()(coords)
         
         if output_shape is not None:
-            # split = w // output_shape[-1]
-            # coords_gt = util.first_split_meshgrid(h,w, split=split)
             out = util.realign_values(out, inr=out_inr)
             out = out.reshape(1,*output_shape,-1).permute(0,3,1,2)
         
