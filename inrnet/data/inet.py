@@ -85,7 +85,12 @@ def get_inr_loader_for_inet12(bsz, subset):
                 for i in range(n_per_cls):
                     for cl in range(12):
                         param_dict = torch.load(paths[cl][path_ix+i])
-                        inrs[i*12+cl].load_state_dict(param_dict)
+                        try:
+                            inrs[i*12+cl].load_state_dict(param_dict)
+                        except RuntimeError:
+                            param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
+                            param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
+                            inrs[i*12+cl].load_state_dict(param_dict)
                 labels = torch.arange(12).tile(n_per_cls)
                 yield to_black_box(inrs).cuda(), labels.cuda()
             if not loop:

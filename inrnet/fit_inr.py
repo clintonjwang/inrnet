@@ -145,20 +145,17 @@ def train_cityscapes(args):
     dl_args = args["data loading"]
     keys = siren.get_siren_keys()
     start_ix = int(args["start_ix"])
-    if start_ix < 1020:
+    if start_ix < 2975:
         dl_args['subset']='train'
-    elif start_ix < 2040:
-        dl_args['subset']='val'
-        start_ix -= 1020
     else:
-        dl_args['subset']='test'
-        start_ix -= 2040
+        dl_args['subset']='val'
+        start_ix -= 2975
     end_ix = start_ix+100
     total_steps = args["optimizer"]["max steps"]
     subset=dl_args['subset']
 
-    os.makedirs(DATA_DIR+f"/cityscapes", exist_ok=True)
-    while osp.exists(DATA_DIR+f"/cityscapes/{subset}_{start_ix}.pt"):
+    os.makedirs(DATA_DIR+f"/cityscapes_nonorm", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/cityscapes_nonorm/{subset}_{start_ix}.pt"):
         start_ix += 1
     print("Starting", flush=True)
 
@@ -170,40 +167,9 @@ def train_cityscapes(args):
         for k,v in inr.state_dict().items():
             param_dict[k] = v.cpu()
 
-        path = DATA_DIR+f"/cityscapes/{subset}_{ix}.pt"
+        path = DATA_DIR+f"/cityscapes_nonorm/{subset}_{ix}.pt"
         torch.save((param_dict, seg.squeeze(0)), path)
-        loss_path = DATA_DIR+f"/cityscapes/loss_{subset}_{ix}.txt"
-        open(loss_path, 'w').write(str(loss.item()))
-
-
-def train_flower(args):
-    dl_args = args["data loading"]
-    keys = siren.get_siren_keys()
-    start_ix = int(args["start_ix"])
-    if start_ix < 2975:
-        subset=dl_args['subset']='train'
-    else:
-        subset=dl_args['subset']='val'
-        start_ix -= 2975
-    end_ix = start_ix+100
-    total_steps = args["optimizer"]["max steps"]
-
-    os.makedirs(DATA_DIR+f"/cityscapes", exist_ok=True)
-    while osp.exists(DATA_DIR+f"/cityscapes/{subset}_{start_ix}.pt"):
-        start_ix += 1
-    print("Starting", flush=True)
-
-    dataset = dataloader.get_img_dataset(args)
-    param_dict = {}
-    for ix in range(start_ix,end_ix):
-        img,seg = dataset[ix]
-        inr,loss = fit_img_to_siren(img, total_steps)
-        for k,v in inr.state_dict().items():
-            param_dict[k] = v.cpu()
-
-        path = DATA_DIR+f"/cityscapes/{subset}_{ix}.pt"
-        torch.save((param_dict, seg.squeeze(0)), path)
-        loss_path = DATA_DIR+f"/cityscapes/loss_{subset}_{ix}.txt"
+        loss_path = DATA_DIR+f"/cityscapes_nonorm/loss_{subset}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 
 

@@ -8,6 +8,7 @@ from inrnet.data import dataloader
 from inrnet import jobs as job_mgmt
 from inrnet import inn, util, experiments, models
 from inrnet.models.inrs.siren import to_black_box
+from inrnet.inn.nets import convnext
 
 def test_equivalence():
     # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
@@ -51,8 +52,8 @@ def test_equivalence():
 
 
 def test_equivalence_dummy():
-    C = 1
-    img_shape = h,w = 6,6
+    C = 3
+    img_shape = h,w = 16,16
     # zz = torch.zeros(h*w, C)
     # zz[0,0] = 1
     # zz[-4,0] = 1
@@ -65,32 +66,34 @@ def test_equivalence_dummy():
     inrs = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
         x = inrs.produce_images(h,w)
-        conv = nn.Upsample(scale_factor=2, mode='nearest')#nn.Conv2d(1,1,3,1,padding=1,bias=False)
+        conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
         # conv.weight.data.fill_(0.)
         # conv.weight.data[0,0,1,1].fill_(1.)
         # conv.bias.data.fill_(1.)
 
-        discrete_layer = nn.Sequential(conv).cuda()
-        # discrete_layer = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear'),
+        # discrete_model = nn.Sequential(conv).cuda()
+        # discrete_model = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear'),
         #     nn.MaxPool2d(2,stride=2)).cuda()
-        InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_layer, (h,w))
-        y = discrete_layer(x)
+        # InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
+        # y = conv(x)
 
         coords = util.meshgrid_coords(h,w)
+        InrNet = convnext.translate_convnext_model(img_shape)
         out_inr = InrNet.cuda()(inrs)
-        out_inr.toggle_grid_mode()
+        out_inr.toggle_grid_mode(True)
+        pdb.set_trace()
         out = out_inr.eval()(coords)
         
         if output_shape is not None:
             out = util.realign_values(out, inr=out_inr)
             out = out.reshape(1,*output_shape,-1).permute(0,3,1,2)
         
-    if y.shape != out.shape:
-        print('shape mismatch')
-        pdb.set_trace()
-    if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
-        print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max())
-        pdb.set_trace()
+    # if y.shape != out.shape:
+    #     print('shape mismatch')
+    #     pdb.set_trace()
+    # if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
+    #     print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max())
+    #     pdb.set_trace()
     pdb.set_trace()
 
 test_equivalence_dummy()

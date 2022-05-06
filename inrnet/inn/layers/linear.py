@@ -9,7 +9,7 @@ from inrnet.inn import functional as inrF, polynomials
 def translate_conv1x1(conv):
     bias = conv.bias is not None
     layer = ChannelMixer(in_channels=conv.weight.size(1), out_channels=conv.weight.size(0), bias=bias)
-    layer.weight.data = conv.weight.data.squeeze(-1).squeeze(-1).T
+    layer.weight.data = conv.weight.data.squeeze(-1).squeeze(-1)
     if bias:
         layer.bias.data = conv.bias.data
     return layer
@@ -20,7 +20,7 @@ class ChannelMixer(nn.Module):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.weight = nn.Parameter(torch.empty(in_channels, out_channels, dtype=dtype))
+        self.weight = nn.Parameter(torch.empty(out_channels, in_channels, dtype=dtype))
         he_init(self.weight, mode='fan_out', nonlinearity='relu')
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channels, dtype=dtype))
@@ -33,11 +33,12 @@ class ChannelMixer(nn.Module):
 
     def forward(self, inr):
         if self.normalized:
-            out = inr.matmul(torch.softmax(self.weight, dim=-1))
+            out = inr.matmul(torch.softmax(self.weight.T, dim=-1))
         else:
-            out = inr.matmul(self.weight)
+            out = inr.matmul(self.weight.T)
         if hasattr(self, "bias"):
             out += self.bias
+        out.channels = self.out_channels
         return out
 
 

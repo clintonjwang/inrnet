@@ -4,7 +4,6 @@ import numpy as np
 nn=torch.nn
 
 ### Convolutions
-
 class Integrator:
     def __init__(self, function, name, inr=None, layer=None, **kwargs):
         self.function = function
@@ -48,10 +47,8 @@ def conv(values: torch.Tensor, # [B,N,c_in]
         padding_ratio = layer.kernel_intersection_ratio(center_coords)
         # scaling factor
 
-    # Diffs = center_coords.unsqueeze(0) - coords.unsqueeze(1)
-    # mask = layer.norm(Diffs) < layer.radius
-    if layer.dropout > 0 and (inr.training and layer.training):
-        mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
+    # if layer.dropout > 0 and (inr.training and layer.training):
+    #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
 
     Y = values[:,torch.where(mask)[1]].to(dtype=dtype) # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
@@ -129,7 +126,7 @@ def cluster_diffs(x, layer, tol=.005, grid_mode=False):
     x_i = x.unsqueeze(1)  # (N, 1, D) samples
     c_j = c.unsqueeze(0)  # (1, K, D) centroids
 
-    D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) symbolic squared distances
+    D_ij = ((x_i - c_j) ** 2).sum(-1)  # (N, K) squared distances
     minD, indices = D_ij.min(dim=1)
     cl = indices.view(-1)  # Points -> Nearest cluster
     if grid_mode and minD.mean() > tol:

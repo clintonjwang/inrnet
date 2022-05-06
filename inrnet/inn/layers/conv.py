@@ -12,9 +12,11 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
     h,w = input_shape # shape of input features/image
     out_, in_, k1, k2 = conv2d.weight.shape
     extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
+    if h == 1 or w == 1:
+        raise ValueError('input shape too small')
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     K = k1 * spacing[0], k2 * spacing[1]
-    order = k1//2 + 1
+    order = min(3,k1-1)
 
     if k1 > 3:
         smoothing = 0.

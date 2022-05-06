@@ -44,6 +44,8 @@ class INRBatch(nn.Module):
     def toggle_grid_mode(self, mode=None):
         if mode is None:
             mode = not self.grid_mode
+        elif self.grid_mode == mode:
+            return
         self.grid_mode = mode
         if hasattr(self.evaluator, 'toggle_grid_mode'):
             self.evaluator.toggle_grid_mode(mode=mode)
@@ -92,6 +94,12 @@ class INRBatch(nn.Module):
         # self.add_modification(lambda x: other/x)
         # return self
     
+    def cat(self, other):
+        if isinstance(other, INRBatch):
+            return CatINR(self, other)
+        else:
+            return self.create_modified_copy(lambda x: torch.cat(x,other))
+
     def generate_sample_points(self, method="qmc", sample_size=None, dims=None):
         if sample_size is None:
             sample_size = self.sample_size
@@ -110,8 +118,8 @@ class INRBatch(nn.Module):
     def add_modification(self, modification):
         self.sampled_coords = torch.empty(0)
         self.modifiers.append(modification)
-        test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
-        self.channels = test_output.size(1)
+        # test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
+        # self.channels = test_output.size(1)
 
     def create_modified_copy(self, modification):
         new_inr = self.create_derived_inr()
@@ -318,10 +326,20 @@ class MergeINR(INRBatch):
     def merge_coords(self, values1, values2):
         x = self.inr1.sampled_coords
         y = self.inr2.sampled_coords
-        if len(x) == len(y) and torch.all(x == y):
-            self.sampled_coords = x
-            out = self.merge_function(values1, values2)
-            return out
+        if len(x) == len(y):
+            if torch.all(x == y):
+                self.sampled_coords = x
+                out = self.merge_function(values1, values2)
+                return out
+            else:
+                x_indices = torch.sort((x[:,0]+2)*x.size(0)/2 + x[:,1]).indices
+                y_indices = torch.sort((y[:,0]+2)*y.size(0)/2 + y[:,1]).indices
+                self.sampled_coords = x[x_indices]
+                if torch.all(self.sampled_coords == y[y_indices]):
+                    return self.merge_function(values1[x_indices], values2[y_indices])
+                else:
+                    print('coord_conflict')
+                    pdb.set_trace()
 
         pdb.set_trace()
         coord_diffs = x.unsqueeze(0) - y.unsqueeze(1)
@@ -357,6 +375,7 @@ class MergeINR(INRBatch):
         if mode is None:
             mode = not self.grid_mode
         self.grid_mode = mode
+        self.inr1.toggle_grid_mode(mode=mode)
         self.inr2.toggle_grid_mode(mode=mode)
 
 class SumINR(MergeINR):

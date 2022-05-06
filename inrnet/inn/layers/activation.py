@@ -47,7 +47,7 @@ class LeakyReLU(nn.Module):
         return inr
 class GELU(nn.Module):
     def forward(self, inr):
-        inr.add_modification(nn.GELU(inplace=True))
+        inr.add_modification(nn.GELU())
         return inr
 class SiLU(nn.Module):
     def forward(self, inr):

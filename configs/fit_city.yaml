@@ -7,4 +7,4 @@ data loading:
   - 256
   - 512
 optimizer:
-  max steps: 3000
+  max steps: 2500

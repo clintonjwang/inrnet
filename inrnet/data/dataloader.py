@@ -55,7 +55,7 @@ def get_img_dataset(args):
         trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize(size),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
         return torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
             split=dl_args['subset'], mode='coarse', target_type='semantic',
