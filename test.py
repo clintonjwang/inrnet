@@ -12,13 +12,13 @@ from inrnet.inn.nets import convnext
 
 def test_equivalence():
     # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
+    C = 3
     img_shape = h,w = 128,128
-    args = job_mgmt.get_job_args("dep1")
-    data_loader = dataloader.get_inr_dataloader(args["data loading"])
-    for inr, _ in data_loader:
-        inr = to_black_box(inr).cuda()
-        break
-
+    zz = torch.randn(h*w, C)
+    class dummy_inr(nn.Module):
+        def forward(self, coords):
+            return zz.to(dtype=coords.dtype, device=coords.device)
+    inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
         model = torchvision.models.efficientnet_b0(pretrained=True)
         discrete_model = model.eval().cuda()
@@ -54,18 +54,17 @@ def test_equivalence():
 def test_equivalence_dummy():
     C = 3
     img_shape = h,w = 16,16
-    # zz = torch.zeros(h*w, C)
-    # zz[0,0] = 1
-    # zz[-4,0] = 1
-    # zz[-2,0] = 2
-    # zz[2,0] = 2
-    zz = torch.round(torch.randn(h*w, C), decimals=1)
+    zz = torch.zeros(h*w, C)
+    zz[0,0] = 1
+    zz[-4,0] = 1
+    zz[-2,0] = 2
+    zz[2,0] = 2
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
-    inrs = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
+    inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
-        x = inrs.produce_images(h,w)
+        x = inr.produce_images(h,w)
         conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
         # conv.weight.data.fill_(0.)
         # conv.weight.data[0,0,1,1].fill_(1.)
@@ -79,9 +78,8 @@ def test_equivalence_dummy():
 
         coords = util.meshgrid_coords(h,w)
         InrNet = convnext.translate_convnext_model(img_shape)
-        out_inr = InrNet.cuda()(inrs)
+        out_inr = InrNet.cuda()(inr)
         out_inr.toggle_grid_mode(True)
-        pdb.set_trace()
         out = out_inr.eval()(coords)
         
         if output_shape is not None:

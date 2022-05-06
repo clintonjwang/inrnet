@@ -1,0 +1,6 @@
+parent: inet_train
+network:
+  type: inr-effnet-s3
+  pretrained: inet_nn_train
+optimizer:
+  learning rate: 1e-4

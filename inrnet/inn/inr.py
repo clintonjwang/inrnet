@@ -107,8 +107,7 @@ class INRBatch(nn.Module):
             return util.meshgrid_coords(*dims)
         elif method in ("qmc", 'rqmc'):
             return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
-                scramble=(method=='rqmc')) * \
-                    (self.domain[1]-self.domain[0]) - self.domain[0]
+                bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
         else:
             raise NotImplementedError("invalid method: "+method)
 
@@ -335,8 +334,8 @@ class MergeINR(INRBatch):
                 x_indices = torch.sort((x[:,0]+2)*x.size(0)/2 + x[:,1]).indices
                 y_indices = torch.sort((y[:,0]+2)*y.size(0)/2 + y[:,1]).indices
                 self.sampled_coords = x[x_indices]
-                if torch.all(self.sampled_coords == y[y_indices]):
-                    return self.merge_function(values1[x_indices], values2[y_indices])
+                if torch.allclose(self.sampled_coords, y[y_indices]):
+                    return self.merge_function(values1[:,x_indices], values2[:,y_indices])
                 else:
                     print('coord_conflict')
                     pdb.set_trace()

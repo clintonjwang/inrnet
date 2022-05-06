@@ -2,43 +2,31 @@ import os, pdb, torch
 osp = os.path
 nn = torch.nn
 F = nn.functional
+import monai.transforms as mtr
 import numpy as np
 import matplotlib.pyplot as plt
-import torchvision.models
 
 from inrnet.data import dataloader
 from inrnet import inn, util, losses, jobs as job_mgmt
+import inrnet.inn.nets.convnext
+import inrnet.models.convnext
+
+rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=5, upper=95, b_min=0, b_max=255, clip=True, dtype=np.uint8)
+rescale_float = mtr.ScaleIntensity()
 
 def load_pretrained_model(args):
     net_args = args["network"]
     pretrained = net_args['pretrained']
     if isinstance(pretrained, str):
+        raise NotImplementedError
         base = load_model_from_job(pretrained)
     else:
-        # if net_args["type"] == "inr-effnet-b0":
-        #     base = torchvision.models.efficientnet_b0(pretrained=pretrained)
-        # elif net_args["type"] == "effnet-b0":
-        #     return torchvision.models.efficientnet_b0(pretrained=pretrained)
-        out = nn.Linear(24, args["data loading"]['classes'])
-        nn.init.kaiming_uniform_(out.weight, mode='fan_in')
-        out.bias.data.zero_()
-        if net_args["type"] == "effnet-s3":
-            m = torchvision.models.efficientnet_b0(pretrained=pretrained)
-            return nn.Sequential(m.features[:3],
-                nn.AdaptiveAvgPool2d(output_size=1),
-                nn.Flatten(1), out)
-
-        elif net_args["type"] == "inr-effnet-s3":
-            m = torchvision.models.efficientnet_b0(pretrained=pretrained)
-            base = nn.Sequential(m.features[:3],
-                nn.AdaptiveAvgPool2d(output_size=1), out)
-
+        if net_args["type"] == "convnext":
+            return inrnet.models.convnext.mini_convnext()
+        elif net_args["type"] == "inr-convnext":
+            return inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
         else:
             raise NotImplementedError
-        
-    img_shape = args["data loading"]["image shape"]
-    InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
-    return InrNet
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
@@ -47,21 +35,24 @@ def load_model_from_job(origin):
     model.load_state_dict(torch.load(path))
     return model
 
+def pixel_acc(pred_seg, gt_seg):
+    return (pred_seg == gt_seg).float().mean()
 
-def finetune_classifier(args):
+def finetune_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
     global_step = 0
     loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
-    top5 = lambda pred_cls, labels: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
-    top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
-    top5_tracker = util.MetricTracker("top5", function=top5)
-    top1_tracker = util.MetricTracker("top1", function=top1)
+    iou = lambda pred_cls, labels: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
+    acc = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
+    iou_tracker = util.MetricTracker("IoU", function=iou)
+    acc_tracker = util.MetricTracker("acc", function=acc)
     bsz = dl_args['batch size']
 
     def backprop(network):
         loss = loss_tracker(logits, labels)
+        pred_seg = logits.max(1).indices
         pred_cls = logits.topk(k=5).indices
         top_5 = top5_tracker(pred_cls, labels).item()
         top_1 = top1_tracker(pred_cls, labels).item()
@@ -77,26 +68,59 @@ def finetune_classifier(args):
         if global_step % 100 == 0:
             torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
             loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
-            top5_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top5.png")
+            iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
+            acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
         # if attr_tracker.is_at_min("train"):
         #     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+
+        # img_inr = to_black_box(img_inr)
+        # Seg_inr = InrNet(img_inr)
+        # seg_pred = Seg_inr(xyz[0,:,:2])
+        # loss = loss_tracker(z_pred, xyz[0,:,-1])
+        # optimizer.zero_grad()
+        # loss.backward()
+        # optimizer.step()
+
+        # if global_step % 10 == 0:
+        #     print(loss.item(),flush=True)
+        #     del loss, z_pred
+        #     torch.cuda.empty_cache()
+        #     with torch.no_grad():
+        #         with torch.cuda.amp.autocast():
+        #             h,w = H//4, W//4
+        #             tensors = [torch.linspace(-1, 1, steps=h), torch.linspace(-1, 1, steps=w)]
+        #             mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+        #             xy_grid = mgrid.reshape(-1, 2).half().cuda()
+        #             InrNet.eval()
+        #             z_pred = Seg_inr(xy_grid)
+        #             z_pred = rescale_float(z_pred.reshape(h,w).cpu().float().numpy())
+        #             plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_z.png"), z_pred, cmap="gray")
+
+        #             del z_pred, Seg_inr
+        #             torch.cuda.empty_cache()
+        #             rgb = img_inr.evaluator(xy_grid)
+        #             rgb = rescale_float(rgb.reshape(h,w, 3).cpu().float().numpy())
+        #             plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_rgb.png"), rgb)
+
+        #             torch.cuda.empty_cache()
+        #             InrNet.train()
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
     if args["network"]['type'].startswith('inr'):
         N = dl_args["sample points"]
-        for img_inr, labels in data_loader:
+        for img_inr, seg in data_loader:
             global_step += 1
-            logit_fxn = model(img_inr)
-            coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
-            logits = logit_fxn(coords)
+            seg_inr = model(img_inr)
+            coords = seg_inr.generate_sample_points(sample_size=N, method='rqmc')
+            pdb.set_trace()
+            logits = seg_inr.cuda()(coords)
             backprop(model)
             if global_step >= args["optimizer"]["max steps"]:
                 break
 
     else:
-        for img_inr, labels in data_loader:
+        for img_inr, seg in data_loader:
             global_step += 1
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img)

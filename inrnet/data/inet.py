@@ -7,8 +7,6 @@ import numpy as np
 
 from inrnet.models.inrs import siren
 from inrnet.util import glob2
-from inrnet.data import kitti
-from inrnet.models.inrs.siren import to_black_box
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
@@ -92,7 +90,7 @@ def get_inr_loader_for_inet12(bsz, subset):
                             param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
                             inrs[i*12+cl].load_state_dict(param_dict)
                 labels = torch.arange(12).tile(n_per_cls)
-                yield to_black_box(inrs).cuda(), labels.cuda()
+                yield siren.to_black_box(inrs).cuda(), labels.cuda()
             if not loop:
                 break
     return random_loader(loop=loop)

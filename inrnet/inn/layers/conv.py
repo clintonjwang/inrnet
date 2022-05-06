@@ -7,7 +7,7 @@ F = nn.functional
 from inrnet.inn import functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
-def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,w
+def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bounds=False, smoothing=.05, **kwargs): #h,w
     # offset/grow so that the conv kernel goes a half pixel past the boundary
     h,w = input_shape # shape of input features/image
     out_, in_, k1, k2 = conv2d.weight.shape
@@ -16,7 +16,10 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
         raise ValueError('input shape too small')
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     K = k1 * spacing[0], k2 * spacing[1]
-    order = min(3,k1-1)
+    if zero_at_bounds:
+        order = min(4,k1)
+    else:
+        order = min(3,k1-1)
 
     if k1 > 3:
         smoothing = 0.
@@ -37,7 +40,7 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
         stride = conv2d.stride[0] * spacing[0], conv2d.stride[1] * spacing[1]
         out_shape = (input_shape[0]//2, input_shape[1]//2)
         extrema = ((extrema[0][0], extrema[0][1]-spacing[0]),
-                (extrema[1][0], extrema[1][1]-spacing[1]))
+            (extrema[1][0], extrema[1][1]-spacing[1]))
     else:
         raise NotImplementedError("stride")
 
@@ -46,7 +49,7 @@ def translate_conv2d(conv2d, input_shape, extrema, smoothing=.05, **kwargs): #h,
         init_weights=conv2d.weight.detach().cpu().numpy()*k1*k2,
         # scale up weights since we divide by the number of grid points
         groups=conv2d.groups, padding=conv2d.padding,
-        padded_extrema=padded_extrema,
+        padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
         N_bins=2**math.ceil(math.log2(k1*k2)), shift=shift,
         kernel_size=K, stride=stride, bias=bias, **kwargs)
     if bias:
@@ -88,7 +91,7 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
 
 class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, stride=0.,
-            input_dims=2, N_bins=0, groups=1, padding=0,
+            input_dims=2, N_bins=0, groups=1, padding=0, zero_at_bounds=False,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
@@ -111,6 +114,11 @@ class SplineConv(Conv):
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
         x,y = (np.linspace(bbox[0]/h*(h-1), bbox[1]/h*(h-1), h),
                np.linspace(bbox[2]/w*(w-1), bbox[3]/w*(w-1), w))
+        if zero_at_bounds:
+            x = (bbox[0], *x, bbox[1])
+            y = (bbox[2], *y, bbox[3])
+            init_weights = np.pad(init_weights,((0,0),(0,0),(1,1),(1,1)))
+            # init_weights = F.pad(init_weights,(1,1,1,1))
 
         self.order = order
         C = []
@@ -119,12 +127,9 @@ class SplineConv(Conv):
             for o in range(out_channels):
                 bs = Spline2D(x,y, init_weights[o,i], bbox=bbox, kx=order,ky=order, s=smoothing)
                 tx,ty,c = [torch.tensor(z).to(dtype=dtype) for z in bs.tck]
-                try:
-                    C[-1].append(c.reshape(h,w))
-                except RuntimeError:
-                    h=tx.size(0)-order-1
-                    w=ty.size(0)-order-1
-                    C[-1].append(c.reshape(h,w))
+                h=tx.size(0)-order-1
+                w=ty.size(0)-order-1
+                C[-1].append(c.reshape(h,w))
             C[-1] = torch.stack(C[-1],dim=0)
 
         self.C = nn.Parameter(torch.stack(C, dim=1))

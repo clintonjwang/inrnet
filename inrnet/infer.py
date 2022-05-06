@@ -5,6 +5,7 @@ import args as args_module
 # from experiments.diffusion import train_diffusion_model
 # from experiments.depth import train_depth_model
 from experiments.classify import test_inr_classifier
+from experiments.segment import test_inr_segmenter
 # from experiments.cyclegan import train_cyclegan
 
 def main(args):
@@ -15,7 +16,9 @@ def main(args):
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
 
-    if args["network"]["task"] == "classify":
+    if args["network"]["task"] == "segment":
+        test_inr_segmenter(args)
+    elif args["network"]["task"] == "classify":
         test_inr_classifier(args)
 
 if __name__ == "__main__":

@@ -41,15 +41,6 @@ def load_checkpoint(model, paths):
 
         model.load_state_dict(checkpoint_sd, strict=False)
 
-
-def generate_quasirandom_sequence(d=3, n=64, like=None):
-    sobol = Sobol(d=d)
-    sample = sobol.random_base2(m=int(math.ceil(np.log2(n))))
-    if like is None:
-        return sample
-    else:
-        return torch.tensor(sample, dtype=like.dtype, device=like.device)
-
 def cycle(iterator):
     while True:
         for data in iterator:

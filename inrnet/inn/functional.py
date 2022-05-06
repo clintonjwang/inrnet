@@ -242,19 +242,19 @@ def inst_normalize(values, inr, layer):
         mean = layer.running_mean
         var = layer.running_var
     else:
-        mean = values.mean(1)
-        var = values.pow(2).mean(1) - mean.pow(2)
+        mean = values.mean(1, keepdim=True)
+        var = values.pow(2).mean(1, keepdim=True) - mean.pow(2)
         if hasattr(layer, "running_mean"):
             with torch.no_grad():
                 layer.running_mean = layer.momentum * layer.running_mean + (1-layer.momentum) * mean.mean()
                 layer.running_var = layer.momentum * layer.running_var + (1-layer.momentum) * var.mean()
             mean = layer.running_mean
             var = layer.running_var
-
     if hasattr(layer, "weight"):
         return (values - mean)/(var.sqrt() + layer.eps) * layer.weight + layer.bias
     else:
         return (values - mean)/(var.sqrt() + layer.eps)
+
 
 def batch_normalize(values, inr, layer):
     if hasattr(layer, "running_mean") and not (inr.training and layer.training):
@@ -281,14 +281,19 @@ def batch_normalize(values, inr, layer):
 
 ### Misc
 
-def generate_quasirandom_sequence(d=2, n=128, bbox=None, scramble=False, dtype=torch.float, device="cuda"):
+
+def generate_quasirandom_sequence(d=2, n=128, bbox=(-1,1,-1,1), scramble=False,
+        like=None, dtype=torch.float, device="cuda"):
     if math.log2(n) % 1 == 0:
         sampler = qmc.Sobol(d=d, scramble=scramble)
         sample = sampler.random_base2(m=int(math.log2(n)))
     else:
         sampler = qmc.Halton(d=d, scramble=scramble)
         sample = sampler.random(n=n)
-    out = torch.as_tensor(sample, dtype=dtype, device=device)
+    if like is None:
+        out = torch.as_tensor(sample, dtype=dtype, device=device)
+    else:
+        out = torch.as_tensor(sample, dtype=like.dtype, device=like.device)
     if bbox is not None:
         # bbox has form (x1,x2, y1,y2) in 2D
         out[:,0] = out[:,0] * (bbox[1]-bbox[0]) + bbox[0]

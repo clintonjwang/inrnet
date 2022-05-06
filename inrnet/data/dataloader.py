@@ -83,6 +83,9 @@ def get_inr_dataloader(dl_args):
     elif dl_args["dataset"] in ("imagenet1k", 'cifar10'):
         return get_inr_loader_for_cls_ds(dl_args["dataset"],
             bsz=dl_args['batch size'], subset=dl_args['subset'])
+    elif dl_args["dataset"] == "cityscapes":
+        return cityscapes.get_inr_loader_for_cityscapes(bsz=dl_args['batch size'],
+            subset=dl_args['subset'], size=dl_args['image shape'])
     elif dl_args["dataset"] == "inet12":
         return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
     else:

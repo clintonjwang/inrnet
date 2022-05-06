@@ -4,7 +4,6 @@ from functools import partial
 nn = torch.nn
 F = nn.functional
 
-from inrnet import util
 from inrnet.inn import functional as inrF
 
 def translate_upsample(layer, input_shape, extrema):
@@ -33,7 +32,7 @@ def upsample_nn(values, inr, layer):
             raise NotImplementedError
     else:
         down_size = coords.size(0)
-        new_coords = util.generate_quasirandom_sequence(n=down_size*layer.scale,
+        new_coords = inrF.generate_quasirandom_sequence(n=down_size*layer.scale,
             d=coords.size(1), like=coords)[down_size:]
     
     inr.sampled_coords = torch.cat((coords, new_coords), dim=0)
@@ -58,7 +57,7 @@ def upsample_conv(values, inr, layer):
         ), dim=0)
     else:
         down_size = coords.size(0)
-        new_coords = util.generate_quasirandom_sequence(n=down_size*layer.scale,
+        new_coords = inrF.generate_quasirandom_sequence(n=down_size*layer.scale,
             d=coords.size(1), like=coords)[down_size:]
     
     inr.sampled_coords = torch.cat((coords, new_coords), dim=0)

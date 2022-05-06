@@ -1,7 +1,53 @@
 #https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
 from collections import namedtuple
 from torchvision import transforms
-import torch
+import torch, pdb
+from glob import glob
+import numpy as np
+
+from inrnet.models.inrs import siren
+
+nearest = transforms.InterpolationMode('nearest')
+
+DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
+def get_inr_loader_for_cityscapes(bsz, subset, size):
+    paths = glob(f"{DS_DIR}/inrnet/cityscapes/{subset}_*.pt")
+    if subset == 'train':
+        N = 2975
+        loop = True
+    else:
+        N = 500
+        loop = False
+    assert len(paths) == N, 'incomplete subset'
+
+    keys = siren.get_siren_keys()
+    if N % bsz != 0:
+        print('warning: dropping last minibatch')
+        N = (N // bsz) * bsz
+
+    shrink = transforms.Resize(size, interpolation=nearest)
+
+    def random_loader(loop=True):
+        while True:
+            np.random.shuffle(paths)
+            for path_ix in range(0,N,bsz):
+                inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
+                segs = []
+                for i in range(bsz):
+                    param_dict, seg = torch.load(paths[path_ix+i])
+                    try:
+                        inrs[i].load_state_dict(param_dict)
+                    except RuntimeError:
+                        param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
+                        param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
+                        inrs[i].load_state_dict(param_dict)
+                    segs.append(seg)
+                segs = torch.stack(segs, dim=0).cuda()
+                yield siren.to_black_box(inrs).cuda(), shrink(segs)
+            if not loop:
+                break
+    return random_loader(loop=loop)
+
 
 #--------------------------------------------------------------------------------
 # Definitions
@@ -95,7 +141,6 @@ labels = [
 ]
 
 # id_to_cat = {l.id:l.catId for l in labels}
-nearest = transforms.InterpolationMode('nearest')
 def seg_transform(seg):
     size = (256,512)
     tx = transforms.Compose((transforms.ToTensor(),

@@ -5,7 +5,7 @@ import args as args_module
 from experiments.diffusion import train_diffusion_model
 from experiments.depth import train_depth_model
 from experiments.classify import finetune_classifier
-from experiments.cyclegan import train_cyclegan
+from experiments.segment import finetune_segmenter
 
 def main(args):
     if not torch.cuda.is_available():
@@ -23,6 +23,8 @@ def main(args):
         train_depth_model(args)
     elif args["network"]["task"] == "cyclegan":
         train_cyclegan(args)
+    elif args["network"]["task"] == "segment":
+        finetune_segmenter(args)
 
 if __name__ == "__main__":
     args = args_module.parse_args()
