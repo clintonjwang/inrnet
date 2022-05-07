@@ -43,21 +43,33 @@ def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="c
 
     if c2f:
         x_indices = [0]
-        factor = 2
-        cur_step = dims[0]//2
-        while cur_step > 0:
-            x_indices += list(cur_step * np.arange(1,factor,2))
-            cur_step = cur_step//2
-            factor *= 2
         y_indices = [0]
         factor = 2
-        cur_step = dims[1]//2
-        while cur_step > 0:
-            y_indices += list(cur_step * np.arange(1,factor,2))
-            cur_step = cur_step//2
+        x_step = dims[0]//2
+        y_step = dims[1]//2
+        ind_iters = []
+        while x_step > 0 or y_step > 0:
+            if y_step > 0:
+                new_y_indices = list(y_step * np.arange(1,factor,2))
+                ind_iters += list(itertools.product(x_indices, new_y_indices))
+
+            if x_step > 0:
+                new_x_indices = list(x_step * np.arange(1,factor,2))
+                ind_iters += list(itertools.product(new_x_indices, y_indices))
+
+                if y_step > 0:
+                    ind_iters += list(itertools.product(new_x_indices, new_y_indices))
+                x_indices += new_x_indices
+                x_step = x_step//2
+                
+            if y_step > 0:
+                y_indices += new_y_indices
+                y_step = y_step//2
+
             factor *= 2
+
         flat_grid = mgrid.reshape(-1, len(dims))
-        indices = torch.tensor(list(itertools.product(x_indices, y_indices)), device=device)
+        indices = torch.tensor([(0,0),*ind_iters], device=device)
         indices = indices[:,0]*dims[1] + indices[:,1]
         return flat_grid[indices]
 
