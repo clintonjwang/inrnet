@@ -48,9 +48,10 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
     layer = SplineConv(in_*conv2d.groups, out_, order=order, smoothing=smoothing,
         init_weights=conv2d.weight.detach().cpu().numpy()*k1*k2,
         # scale up weights since we divide by the number of grid points
-        groups=conv2d.groups, padding=conv2d.padding,
+        groups=conv2d.groups, shift=shift,
         padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
-        N_bins=2**math.ceil(math.log2(k1*k2)), shift=shift,
+        #N_bins=0,
+        N_bins=2**math.ceil(math.log2(k1*k2)+4),
         kernel_size=K, stride=stride, bias=bias, **kwargs)
     if bias:
         layer.bias.data = conv2d.bias.data
@@ -73,6 +74,15 @@ class Conv(nn.Module):
         else:
             self.bias = None
 
+    def kernel_intersection_ratio(self, query_coords):
+        if not hasattr(self, 'padded_extrema'):
+            return 1
+        dist_to_boundary = (query_coords.unsqueeze(1) - self.padded_extrema.T.unsqueeze(0)).abs().amin(dim=1)
+        k = self.kernel_size[0]/2, self.kernel_size[1]/2
+        padding_ratio = (self.kernel_size[0] - F.relu(k[0] - dist_to_boundary[:,0])) * (
+            self.kernel_size[1] - F.relu(k[1] - dist_to_boundary[:,1])) / self.kernel_size[0] / self.kernel_size[1]
+        return padding_ratio
+
 
 def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float):
     # K = dims of the entire B spline surface
@@ -91,18 +101,16 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
 
 class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, stride=0.,
-            input_dims=2, N_bins=0, groups=1, padding=0, zero_at_bounds=False,
+            input_dims=2, N_bins=0, groups=1, zero_at_bounds=False,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             stride=stride, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
         self.kernel_size = K = kernel_size
-        self.parameterization = "B-spline"
-        self.dropout = 0
-        self.padding = padding
         self.in_groups = self.in_channels // self.groups
-        self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
+        if padded_extrema is not None:
+            self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         self.register_buffer('shift', torch.tensor(shift, dtype=dtype))
         if groups == 1 or (groups == in_channels and groups == out_channels):
             pass
@@ -135,8 +143,9 @@ class SplineConv(Conv):
         self.C = nn.Parameter(torch.stack(C, dim=1))
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
-        self.register_buffer("sample_points", inrF.generate_quasirandom_sequence(n=N_bins,
-            d=input_dims, bbox=bbox, dtype=dtype))
+        if N_bins > 0:
+            self.register_buffer("sample_points", inrF.generate_quasirandom_sequence(n=N_bins,
+                d=input_dims, bbox=bbox, dtype=dtype))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
         # self.Tx = nn.Parameter(tx)
@@ -151,13 +160,6 @@ class SplineConv(Conv):
         new_inr.set_integrator(inrF.conv, 'SplineConv', layer=self)
         new_inr.channels = self.out_channels
         return new_inr
-
-    def kernel_intersection_ratio(self, query_coords):
-        dist_to_boundary = (query_coords.unsqueeze(1) - self.padded_extrema.T.unsqueeze(0)).abs().amin(dim=1)
-        k = self.kernel_size[0]/2, self.kernel_size[1]/2
-        padding_ratio = (self.kernel_size[0] - F.relu(k[0] - dist_to_boundary[:,0])) * (
-            self.kernel_size[1] - F.relu(k[1] - dist_to_boundary[:,1])) / self.kernel_size[0] / self.kernel_size[1]
-        return padding_ratio
 
     def interpolate_weights(self, xy):
         w_oi = []
@@ -198,6 +200,54 @@ class SplineConv(Conv):
 
         return torch.stack(w_oi).view(xy.size(0), self.out_channels, self.in_groups)
 
+
+class MLPConv(Conv):
+    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), separable=False, stride=0.,
+            input_dims=2, N_bins=0, groups=1, padded_extrema=None, bias=False,
+            dtype=torch.float):
+        super().__init__(in_channels, out_channels, input_dims=input_dims,
+            stride=stride, bias=bias, groups=groups, dtype=dtype)
+        self.N_bins = N_bins
+        self.kernel_size = K = kernel_size
+        self.in_groups = self.in_channels // self.groups
+        if padded_extrema is not None:
+            self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
+        if not (groups == 1 or (groups == in_channels and groups == out_channels)):
+            raise NotImplementedError("groups")
+        if isinstance(mid_ch, int):
+            mid_ch = [mid_ch]
+
+        layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
+        for ix in range(1,len(mid_ch)):
+            layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
+        if self.in_groups == 1:
+            separable = False
+        if separable:
+            raise NotImplementedError
+            self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels + self.in_groups))
+        else:
+            self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.in_groups))
+        self.separable = separable
+
+        for k in range(0,len(self.kernel),2):
+            nn.init.kaiming_uniform_(self.kernel[k].weight)
+            self.kernel[k].bias.data.zero_()
+
+    def __repr__(self):
+        return f"""MLPConv(in_channels={self.in_channels}, out_channels={
+        self.out_channels}, kernel_size={np.round(self.kernel_size, decimals=3)}, bias={self.bias is not None})"""
+
+    def forward(self, inr):
+        new_inr = inr.create_derived_inr()
+        new_inr.set_integrator(inrF.conv, 'MLPConv', layer=self)
+        new_inr.channels = self.out_channels
+        return new_inr
+
+    def interpolate_weights(self, xy):
+        if self.separable:
+            return self.kernel(xy)
+        else:
+            return self.kernel(xy).reshape(xy.size(0), self.out_channels, self.in_groups)
 
 
 

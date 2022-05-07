@@ -30,10 +30,10 @@ def conv(values: torch.Tensor, # [B,N,c_in]
     coords = inr.sampled_coords.to(dtype=dtype) #[N,d]
     if query_coords is None:
         if layer.stride != 0:
-            if inr.grid_mode:
-                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
-            else:
-                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+            # if inr.grid_mode:
+            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
+            # else:
+            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -41,10 +41,11 @@ def conv(values: torch.Tensor, # [B,N,c_in]
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = layer.norm(Diffs) < layer.radius
     else:
-        center_coords = query_coords + layer.shift
-        Diffs = center_coords.unsqueeze(1) - coords.unsqueeze(0)
+        # if inr.grid_mode:
+        query_coords = query_coords + layer.shift
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-        padding_ratio = layer.kernel_intersection_ratio(center_coords)
+        padding_ratio = layer.kernel_intersection_ratio(query_coords)
         # scaling factor
 
     # if layer.dropout > 0 and (inr.training and layer.training):
@@ -68,9 +69,14 @@ def conv(values: torch.Tensor, # [B,N,c_in]
             else:
                 w_oi = layer.interpolate_weights(-bin_centers)
                 Wsplit = w_oi.index_select(dim=0, index=bin_ixs).split(lens)
+                # if layer.separable:
+                #     out_, in_ = 
+                #     for ix,y in enumerate(Ysplit):
+                #         newVals.append(torch.einsum('bni,ni,no->bo',y,Wsplit[ix])/y.size(1))
+                # else:
                 for ix,y in enumerate(Ysplit):
                     newVals.append(torch.einsum('bni,noi->bo',y,Wsplit[ix])/y.size(1))
-                    
+                
         else:
             Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
             if layer.groups != 1:
@@ -170,21 +176,15 @@ def interpolate_weights_single_channel(xy, tx,ty,c, order=2):
         W.append(D[px,py])
     return torch.stack(w_oi)
 
-# def gridconv(values, inr, layer):
-#     # applies conv once to each patch (token)
-#     coords = inr.sampled_coords
-#     n_points = round(2/layer.spacing)
-#     query_coords = util.meshgrid_coords(n_points, n_points, domain=inr.domain)
-#     return apply_conv(coords, values, inr, layer, query_coords=query_coords)
 
 def avg_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            if inr.grid_mode:
-                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            else:
-                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+            # if inr.grid_mode:
+            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            # else:
+            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -198,15 +198,15 @@ def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            if inr.grid_mode:
-                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            else:
-                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+            # if inr.grid_mode:
+            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
+            # else:
+            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
-    if torch.amax(layer.shift) > 0:
-        query_coords = query_coords + layer.shift
+    # if inr.grid_mode:
+    query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
     return values[:,mask].max(dim=2).values

@@ -11,35 +11,37 @@ from inrnet.models.inrs.siren import to_black_box
 from inrnet.inn.nets import convnext
 
 def test_equivalence():
-    # D, D_B, G_A2B, G_B2A = models.cyclegan.load_pretrained_models('horse2zebra')
-    C = 3
-    img_shape = h,w = 128,128
+    from inrnet.experiments import classify
+    from inrnet.data.cityscapes import get_inr_loader_for_cityscapes
+    C = 32
+    img_shape = h,w = 8,8
     zz = torch.randn(h*w, C)
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
     inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
+    # loader = get_inr_loader_for_cityscapes(1, 'train', img_shape)
+    # for inr,_ in loader:
+    #     break
     with torch.no_grad():
-        model = torchvision.models.efficientnet_b0(pretrained=True)
-        discrete_model = model.eval().cuda()
+        # model = torchvision.models.efficientnet_b0(pretrained=True)
+        model = classify.load_model_from_job('inet_nn_train')
+        discrete_model = model[0][1][0].block[1:2].eval().cuda()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
 
-        coords = util.meshgrid_coords(h,w)
         t = time()
         out_inr = InrNet(inr)
         out_inr.toggle_grid_mode()
+        coords = out_inr.generate_sample_points(dims=(h,w))
+        # coords = out_inr.generate_sample_points(sample_size=h*w)
         out = out_inr.eval()(coords)
         print(f"produced INR in {np.round(time()-t, decimals=3)}s")
 
         if output_shape is not None:
-            # split = w // output_shape[-1]
-            # coords = util.first_split_meshgrid(h,w, split=split)
-            # out = util.realign_values(out, coords_gt=coords, inr=out_inr)
             out = out.reshape(*output_shape,-1).permute(2,0,1).unsqueeze(0)
         
         torch.cuda.empty_cache()
-        img = inr.produce_image(h,w)#, split=2)
-        x = torch.tensor(img).permute(2,0,1).unsqueeze(0).cuda()
+        x = inr.produce_images(h,w)
         y = discrete_model(x)
 
     if y.shape != out.shape:
@@ -49,35 +51,45 @@ def test_equivalence():
         print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max().item())
         print((y-out).abs().mean().item(), y.abs().mean().item(), out.abs().mean().item())
         pdb.set_trace()
+    print("success")
+    pdb.set_trace()
 
+test_equivalence()
+print("success")
+
+
+import inrnet.inn.nets.convnext
+import inrnet.models.convnext
+
+inrnet.models.convnext.mini_convnext()
+inrnet.inn.nets.convnext.translate_convnext_model((128,128))
 
 def test_equivalence_dummy():
-    C = 3
+    C = 1
     img_shape = h,w = 16,16
     zz = torch.zeros(h*w, C)
-    zz[0,0] = 1
-    zz[-4,0] = 1
-    zz[-2,0] = 2
-    zz[2,0] = 2
+    zz[0,:] = 1
+    zz[-4,:] = 1
+    zz[-2,:] = 2
+    zz[2,:] = 2
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
     inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
     with torch.no_grad():
         x = inr.produce_images(h,w)
-        conv = nn.Conv2d(1,1,3,1,padding=1,bias=False)
+        conv = nn.Conv2d(1,2,3,1,padding=1,bias=False)
         # conv.weight.data.fill_(0.)
-        # conv.weight.data[0,0,1,1].fill_(1.)
-        # conv.bias.data.fill_(1.)
+        # conv.weight.data[:,:,1,1].fill_(1.)
+        norm = nn.BatchNorm2d(2)
 
-        # discrete_model = nn.Sequential(conv).cuda()
+        discrete_model = nn.Sequential(conv, norm, nn.LeakyReLU(inplace=True)).cuda().eval()
         # discrete_model = nn.Sequential(nn.Upsample(scale_factor=2, mode='bilinear'),
         #     nn.MaxPool2d(2,stride=2)).cuda()
-        # InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
-        # y = conv(x)
+        InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
+        y = discrete_model(x)
 
         coords = util.meshgrid_coords(h,w)
-        InrNet = convnext.translate_convnext_model(img_shape)
         out_inr = InrNet.cuda()(inr)
         out_inr.toggle_grid_mode(True)
         out = out_inr.eval()(coords)
@@ -86,17 +98,13 @@ def test_equivalence_dummy():
             out = util.realign_values(out, inr=out_inr)
             out = out.reshape(1,*output_shape,-1).permute(0,3,1,2)
         
-    # if y.shape != out.shape:
-    #     print('shape mismatch')
-    #     pdb.set_trace()
-    # if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
-    #     print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max())
-    #     pdb.set_trace()
+    if y.shape != out.shape:
+        print('shape mismatch')
+        pdb.set_trace()
+    if not torch.allclose(y, out, rtol=1e-5, atol=1e-3):
+        print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max())
+        pdb.set_trace()
     pdb.set_trace()
-
-test_equivalence_dummy()
-print("success")
-
 
 
 def test_backprop():

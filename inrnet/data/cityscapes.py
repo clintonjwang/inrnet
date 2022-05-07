@@ -46,6 +46,7 @@ def get_inr_loader_for_cityscapes(bsz, subset, size):
                 yield siren.to_black_box(inrs).cuda(), shrink(segs)
             if not loop:
                 break
+    
     return random_loader(loop=loop)
 
 

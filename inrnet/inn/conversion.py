@@ -97,3 +97,25 @@ def translate_strided_layer(layer, input_shape, extrema, **kwargs):
 
     else:
         raise NotImplementedError(layer.__class__)
+
+def replace_conv_kernels(network, k_type='mlp'):
+    length = len(network)
+    for i in range(length):
+        m = network[i]
+        if isinstance(m, nn.Sequential):
+            replace_conv_kernels(m)
+        elif hasattr(m, 'sequential'):
+            replace_conv_kernels(m.sequential)
+        elif isinstance(m, inn.SplineConv):
+            network[i] = replace_conv_kernel(m)
+
+
+def replace_conv_kernel(layer, k_type='mlp'):
+    #if k_type
+    if isinstance(layer, inn.SplineConv):
+        conv = inn.MLPConv(layer.in_channels, layer.out_channels, layer.kernel_size, stride=layer.stride, groups=layer.groups)
+        conv.padded_extrema = layer.padded_extrema
+        conv.bias = layer.bias
+        return conv
+    raise NotImplementedError
+

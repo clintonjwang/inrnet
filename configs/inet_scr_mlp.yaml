@@ -1,0 +1,6 @@
+parent: inet_train
+network:
+  type: inr-effnet-mlp
+optimizer:
+  learning rate: 2e-4
+  max steps: 16000

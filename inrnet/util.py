@@ -22,10 +22,47 @@ def meshgrid(*tensors, indexing='ij'):
     except TypeError:
         return torch.meshgrid(*tensors)
 
-def meshgrid_coords(*dims, domain=(-1,1), dtype=torch.float, device="cuda"):
-    tensors = [torch.linspace(*domain, steps=d) for d in dims]
+# def linspace(domain, steps, c2f=False):
+#     standard_order = torch.linspace(*domain, steps=steps)
+#     if c2f:
+#         indices = [0]
+#         factor = 2
+#         cur_step = steps//2
+#         while cur_step > 0:
+#             indices += list(cur_step * np.arange(1,factor,2))
+#             cur_step = cur_step//2
+#             factor *= 2
+#         return standard_order[torch.tensor(indices)]
+#     else:
+#         return standard_order
+
+import itertools
+def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="cuda"):
+    tensors = [torch.linspace(*domain, steps=d, dtype=dtype, device=device) for d in dims]
     mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
-    return mgrid.reshape(-1, len(dims)).to(dtype=dtype, device=device)
+
+    if c2f:
+        x_indices = [0]
+        factor = 2
+        cur_step = dims[0]//2
+        while cur_step > 0:
+            x_indices += list(cur_step * np.arange(1,factor,2))
+            cur_step = cur_step//2
+            factor *= 2
+        y_indices = [0]
+        factor = 2
+        cur_step = dims[1]//2
+        while cur_step > 0:
+            y_indices += list(cur_step * np.arange(1,factor,2))
+            cur_step = cur_step//2
+            factor *= 2
+        flat_grid = mgrid.reshape(-1, len(dims))
+        indices = torch.tensor(list(itertools.product(x_indices, y_indices)), device=device)
+        indices = indices[:,0]*dims[1] + indices[:,1]
+        return flat_grid[indices]
+
+    else:
+        return mgrid.reshape(-1, len(dims))
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:
@@ -187,7 +224,7 @@ class MetricTracker:
 
     def plot_running_average(self, path, phase='val'):
         _,axis = plt.subplots()
-        N = 10
+        N = 20
         x = self.epoch_history[phase]
         if len(x) == 0:
             x = self.minibatch_values[phase]

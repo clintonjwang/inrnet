@@ -34,7 +34,7 @@ class ChannelNorm(nn.Module):
             self.register_buffer('running_var', torch.ones(channels, **factory_kwargs))
 
     def __repr__(self):
-        return f"ChannelNorm(affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
+        return f"ChannelNorm(batch={self.batchnorm}, affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
 
     def forward(self, inr):
         new_inr = inr.create_derived_inr()

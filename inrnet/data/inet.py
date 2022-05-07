@@ -62,38 +62,55 @@ def get_inr_loader_for_inet12(bsz, subset):
     if subset == 'train':
         N = 800
         loop = True
-    else:
+    elif subset == 'test':
         N = 200
         loop = False
+    else:
+        raise NotImplementedError(f'bad subset {subset}')
     for p in paths:
-        assert len(p)==N, 'incomplete subset'
+        assert len(p)==N, f'incomplete subset ({len(p)}/{N})'
 
     keys = siren.get_siren_keys()
-    assert bsz % 12 == 0, 'expect batch size to be a multiple of the number of classes'
-    n_per_cls = bsz // 12
-    if N % bsz != 0:
-        print('warning: dropping last minibatch')
-        N = (N // bsz) * bsz
-    def random_loader(loop=True):
-        while True:
-            for p in paths:
-                np.random.shuffle(p)
-            for path_ix in range(0,N, n_per_cls):
-                inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
-                for i in range(n_per_cls):
-                    for cl in range(12):
-                        param_dict = torch.load(paths[cl][path_ix+i])
-                        try:
-                            inrs[i*12+cl].load_state_dict(param_dict)
-                        except RuntimeError:
-                            param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
-                            param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
-                            inrs[i*12+cl].load_state_dict(param_dict)
-                labels = torch.arange(12).tile(n_per_cls)
-                yield siren.to_black_box(inrs).cuda(), labels.cuda()
-            if not loop:
-                break
-    return random_loader(loop=loop)
+    if bsz % 12 == 0:
+        n_per_cls = bsz // 12
+        if N % bsz != 0:
+            print('warning: dropping last minibatch')
+            N = (N // bsz) * bsz
+        def random_loader(loop=True):
+            while True:
+                for p in paths:
+                    np.random.shuffle(p)
+                for path_ix in range(0,N, n_per_cls):
+                    inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
+                    for i in range(n_per_cls):
+                        for cl in range(12):
+                            param_dict = torch.load(paths[cl][path_ix+i])
+                            try:
+                                inrs[i*12+cl].load_state_dict(param_dict)
+                            except RuntimeError:
+                                param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
+                                param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
+                                inrs[i*12+cl].load_state_dict(param_dict)
+                    labels = torch.arange(12).tile(n_per_cls)
+                    yield siren.to_black_box(inrs).cuda(), labels.cuda()
+                if not loop:
+                    break
+        return random_loader(loop=loop)
+    elif bsz == 1:
+        print('analysis mode only')
+        for path_ix in range(N):
+            inr = siren.Siren(out_channels=3)
+            for cl in range(12):
+                param_dict = torch.load(paths[cl][path_ix])
+                try:
+                    inr.load_state_dict(param_dict)
+                except RuntimeError:
+                    param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
+                    param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
+                    inr.load_state_dict(param_dict)
+                yield siren.to_black_box([inr]).cuda(), torch.tensor([cl]).cuda()
+    else:
+        raise ValueError('expect batch size to be a multiple of the number of classes')
 
 
 # def generate_inet12(n_train=800, n_val=200):

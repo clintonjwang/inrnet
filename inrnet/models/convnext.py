@@ -21,15 +21,16 @@ def get_convnext_block(state_dict):
     norm.bias.data = state_dict['norm.bias']
     
     pointwise_conv1 = nn.Conv2d(in_, mid, 1, bias=True)
-    pointwise_conv1.weight.data[:,:] = state_dict['pointwise_conv1.weight']
+    pointwise_conv1.weight.data = state_dict['pointwise_conv1.weight'].view(mid, in_, 1, 1)
     pointwise_conv1.bias.data = state_dict['pointwise_conv1.bias']
 
     pointwise_conv2 = nn.Conv2d(mid, in_, 1, bias=True)
-    pointwise_conv2.weight.data[:,:] = state_dict['pointwise_conv2.weight']
+    pointwise_conv2.weight.data = state_dict['pointwise_conv2.weight'].view(in_, mid, 1, 1)
     pointwise_conv2.bias.data = state_dict['pointwise_conv2.bias']
 
     layers = nn.Sequential(depthwise_conv, norm, pointwise_conv1, nn.GELU(), pointwise_conv2)
     return CNBlock(layers, state_dict['gamma'])
+
 
 def mini_convnext(n_stages=2):
     sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
@@ -212,7 +213,7 @@ class CNBlock(nn.Module):
     def __init__(self, layers, gamma):
         super().__init__()
         self.layers = layers
-        self.gamma = nn.Parameter(gamma)
+        self.gamma = nn.Parameter(gamma.reshape(-1,1,1))
         #self.drop_path_rate = 0
     def forward(self, x):
         return x + self.layers(x)*self.gamma

@@ -36,11 +36,11 @@ class SqueezeExcitation(nn.Module):
         self.scale_activation = scale_activation()
 
     def integrator(self, values, inr=None):
-        scale = values.mean(0, keepdim=True)#.float()
+        scale = values.mean(1)#.float()
         scale = self.fc1(scale)
         scale = self.activation(scale)
         scale = self.fc2(scale)
-        return values * self.scale_activation(scale)#.double()
+        return values * self.scale_activation(scale).unsqueeze(1)#.double()
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(self.integrator, 'SqueezeExcitation')
@@ -54,6 +54,7 @@ class Fire(nn.Module):
         self.expand3x3 = expand3x3
     def integrator(self, values, inr=None):
         values = self.squeeze_activation(self.squeeze(values))
+        pdb.set_trace()
         return torch.cat(
             [self.expand1x1_activation(self.expand1x1(values)), self.expand3x3_activation(self.expand3x3(values))], dim=1
         )

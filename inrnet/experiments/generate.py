@@ -35,34 +35,19 @@ def load_model_from_job(origin):
     model.load_state_dict(torch.load(path))
     return model
 
-def mean_iou(pred_seg, gt_seg):
-    # pred_seg [B*N], gt_seg [B*N,C]
-    iou_per_channel = (pred_seg & gt_seg).sum(0) / (pred_seg | gt_seg).sum(0)
-    return iou_per_channel.mean()
-
-def pixel_acc(pred_seg, gt_seg):
-    return (pred_seg & gt_seg).sum() / pred_seg.size(0)
-
-def train_segmenter(args):
+def train_generator(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
     global_step = 0
-    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())#nn.BCEWithLogitsLoss())
-    iou_tracker = util.MetricTracker("mean IoU", function=mean_iou)
-    acc_tracker = util.MetricTracker("pixel accuracy", function=pixel_acc)
+    loss_tracker = util.MetricTracker("loss", function=nn.BCEWithLogitsLoss())
+    fid_tracker = util.MetricTracker("FID", function=fid)
     bsz = dl_args['batch size']
 
     def backprop(network):
-        # loss = loss_tracker(logits, segs.float()) #BCE
+        loss = loss_tracker(logits, segs.float())
+        #loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         maxes, gt_labels = segs.max(-1)
-        loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
-        if torch.isnan(loss):
-            print('nan loss')
-            for m in network.parameters():
-                if torch.any(torch.isnan(m)):
-                    print(m.shape)
-            pdb.set_trace()
         pred_seg = logits.max(-1).indices
         pred_seg = F.one_hot(pred_seg, num_classes=segs.size(-1)).bool()
         iou = iou_tracker(pred_seg[maxes != 0], segs[maxes != 0]).item()
@@ -113,7 +98,7 @@ def train_segmenter(args):
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
 
-def test_inr_segmenter(args):
+def test_inr_generator(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
@@ -148,8 +133,8 @@ def save_figure():
     with torch.no_grad():
         h,w = H//4, W//4
         tensors = [torch.linspace(-1, 1, steps=h), torch.linspace(-1, 1, steps=w)]
-        mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij', device='cuda'), dim=-1)
-        xy_grid = mgrid.reshape(-1, 2).half()
+        mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+        xy_grid = mgrid.reshape(-1, 2).half().cuda()
         InrNet.eval()
         z_pred = Seg_inr(xy_grid)
         z_pred = rescale_float(z_pred.reshape(h,w).cpu().float().numpy())

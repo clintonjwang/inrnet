@@ -11,6 +11,6 @@ data loading:
   - 32
   - 32
 optimizer:
-  learning rate: 1e-4
-  max steps: 8000
+  learning rate: 2e-5
+  max steps: 16000
 #N=9600 / bsz * 40 epochs
