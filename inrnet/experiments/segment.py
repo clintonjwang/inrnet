@@ -26,13 +26,16 @@ def load_pretrained_model(args):
         elif net_args["type"] == "inr-convnext":
             if pretrained is False:
                 print('from scratch not implemented yet')
-            return inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
         elif net_args["type"] == "inr-mlpconv":
             InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
-            inn.conversion.replace_conv_kernels(InrNet, k_type='mlp')
-            return InrNet
+            inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
         else:
             raise NotImplementedError
+            
+    if net_args['frozen'] is True:
+        inn.inrnet.freeze_layer_types(InrNet)
+    return InrNet
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
@@ -82,6 +85,11 @@ def train_segmenter(args):
             print(np.round(loss.item(), decimals=3), "; iou:", np.round(iou, decimals=3),
                 "; acc:", np.round(acc*100, decimals=2),
                 flush=True)
+        if global_step % 20 == 0:
+            rgb = img_inr.produce_images(*dl_args['image shape'])
+            path = paths["job output dir"]+f"/imgs/{global_step}.png"
+            save_example_segs(path, rgb, pred_seg, gt_labels)
+
         if global_step % 100 == 0:
             torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
             loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
@@ -90,9 +98,13 @@ def train_segmenter(args):
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
-    if args["network"]['type'].startswith('inr'):
-        for img_inr, segs in data_loader:
-            global_step += 1
+    for img_inr, segs in data_loader:
+        global_step += 1
+        
+        if args["network"]['type'].startswith('inr'):
+            if global_step == args["optimizer"]["max steps"]//2:
+                inrnet.inn.nets.convnext.enable_cn_blocks(model)
+
             seg_inr = model(img_inr)
             if dl_args['sample type'] == 'grid':
                 segs = segs.reshape(*segs.shape[:2], -1).transpose(2,1)
@@ -104,20 +116,14 @@ def train_segmenter(args):
             logits = seg_inr.cuda()(coords)
             if dl_args['sample type'] == 'grid':
                 logits = util.realign_values(logits, coords=coords)
-            backprop(model)
-            if global_step == args["optimizer"]["max steps"]//2:
-                inrnet.inn.nets.convnext.enable_cn_blocks(model)
-            if global_step >= args["optimizer"]["max steps"]:
-                break
 
-    else:
-        for img_inr, segs in data_loader:
-            global_step += 1
+        else:
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img)
-            backprop(model)
-            if global_step >= args["optimizer"]["max steps"]:
-                break
+
+        backprop(model)
+        if global_step >= args["optimizer"]["max steps"]:
+            break
 
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
@@ -153,6 +159,41 @@ def test_inr_segmenter(args):
 
     torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
 
+import imgviz
+def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'building', 'traffic', 'nature', 'sky', 'human', 'vehicle')):
+    label_names = [
+        "{}:{}".format(i, n) for i, n in enumerate(class_names)
+    ]
+    labelviz_pred = imgviz.label2rgb(
+        pred_seg, label_names=label_names, font_size=25, loc="rb"
+    )
+    labelviz_gt = imgviz.label2rgb(
+        gt_seg, label_names=label_names, font_size=25, loc="rb"
+    )
+    img = imgviz.color.rgb2gray(rgb)
+    labelviz_withimg = imgviz.label2rgb(label=label, image=img)
+
+    plt.figure(dpi=200)
+
+    plt.subplot(131)
+    plt.title("rgb")
+    plt.imshow(rgb)
+    plt.axis("off")
+
+    plt.subplot(132)
+    plt.title("pred")
+    plt.imshow(labelviz_pred)
+    plt.axis("off")
+
+    plt.subplot(133)
+    plt.title("gt")
+    plt.imshow(labelviz_gt)
+    plt.axis("off")
+
+    img = imgviz.io.pyplot_to_numpy()
+    plt.imsave(path, img)
+    plt.close()
+
 def save_figure():
     with torch.no_grad():
         h,w = H//4, W//4
@@ -173,5 +214,6 @@ def save_figure():
         torch.cuda.empty_cache()
         InrNet.train()
         
+
 def get_seg_at_coords():
     return

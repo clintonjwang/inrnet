@@ -31,21 +31,25 @@ def load_pretrained_model(args):
 
         elif net_args["type"] == "inr-effnet-s3":
             m = torchvision.models.efficientnet_b0(pretrained=pretrained)
-            base = nn.Sequential(m.features[:3],
+            base = nn.Sequential(
+                m.features[:3],
                 nn.AdaptiveAvgPool2d(output_size=1), out)
 
         elif net_args["type"] == "inr-effnet-mlp":
             m = torchvision.models.efficientnet_b0(pretrained=pretrained)
-            base = nn.Sequential(m.features[:3],
+            base = nn.Sequential(
+                m.features[:3],
                 nn.AdaptiveAvgPool2d(output_size=1), out)
             InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
-            inn.conversion.replace_conv_kernels(InrNet, k_type='mlp',
+            inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp',
                 k_ratio=net_args["kernel expansion ratio"])
 
         else:
             raise NotImplementedError
-        
+
     InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
+    if net_args['frozen'] is True:
+        inn.inrnet.freeze_layer_types(InrNet)
     return InrNet
 
 def load_model_from_job(origin):

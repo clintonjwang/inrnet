@@ -26,15 +26,46 @@ class INet12(torchvision.datasets.VisionDataset):
         big12path = f"{DS_DIR}/inrnet/big_12_labels.pkl"
         split_paths_by_cls, _, _ = pickle.load(open(big12path, 'rb'))
         self.subpaths = split_paths_by_cls[subset][cls]
+        if subset == 'train':
+            big12path = f"{DS_DIR}/inrnet/big_12_extra.pkl"
+            self.extra_subpaths = pickle.load(open(big12path, 'rb'))[cls]
 
     def __getitem__(self, ix):
-        img = Image.open(osp.join(self.root, self.subpaths[ix]))
+        if ix < 800:
+            img = Image.open(osp.join(self.root, self.subpaths[ix]))
+        else:
+            img = Image.open(osp.join(self.root, self.extra_subpaths[ix]))
         try:
             return self.transform(img)
         except RuntimeError:
             return self.transform(img.convert('RGB'))
     def __len__(self):
+        if hasattr(self, 'extra_subpaths'):
+            return len(self.subpaths) + len(self.extra_subpaths)
         return len(self.subpaths)
+
+
+class INet12Extra(torchvision.datasets.VisionDataset):
+    def __init__(self, *args, **kwargs):
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Resize((256,256)),
+        ])
+        root = DS_DIR+"/imagenet_pytorch"
+        super().__init__(root, *args, transform=trans, **kwargs)
+        big12path = f"{DS_DIR}/inrnet/big_12_extra.pkl"
+        self.extra_subpaths = pickle.load(open(big12path, 'rb'))
+
+    def __getitem__(self, ix):
+        cls, ix = ix % 12, ix // 12
+        img = Image.open(osp.join(self.root, self.extra_subpaths[cls][ix]))
+        try:
+            return self.transform(img)
+        except RuntimeError:
+            return self.transform(img.convert('RGB'))
+    def __len__(self):
+        return len(self.extra_subpaths[0])*12
+
 
 
 class INetDS(torchvision.datasets.VisionDataset):
@@ -70,6 +101,10 @@ def get_inr_loader_for_inet12(bsz, subset):
     for p in paths:
         assert len(p)==N, f'incomplete subset ({len(p)}/{N})'
 
+    # def inet_normalize(values):
+    #     return (values - torch.tensor((0.485, 0.456, 0.406), device=values.device)) / torch.tensor(
+    #         (0.229, 0.224, 0.225), device=values.device)
+
     keys = siren.get_siren_keys()
     if bsz % 12 == 0:
         n_per_cls = bsz // 12
@@ -91,7 +126,9 @@ def get_inr_loader_for_inet12(bsz, subset):
                             param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
                             inrs[i*12+cl].load_state_dict(param_dict)
                 labels = torch.arange(12).tile(n_per_cls)
-                yield siren.to_black_box(inrs).cuda(), labels.cuda()
+                inrs = siren.to_black_box(inrs).cuda()
+                # inrs.add_modification(inet_normalize)
+                yield inrs, labels.cuda()
             if not loop:
                 return
 

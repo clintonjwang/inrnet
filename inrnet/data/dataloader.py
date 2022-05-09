@@ -21,9 +21,9 @@ class jpgDS(torchvision.datasets.VisionDataset):
         return len(self.paths)
 
 def get_img_dataset(args):
-    totorch_norm = transforms.Compose([
+    totorch_resize = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+        transforms.Resize((256,256)),
     ])
     dl_args = args["data loading"]
     if dl_args["dataset"] == "imagenet1k":
@@ -44,7 +44,7 @@ def get_img_dataset(args):
 
     elif dl_args["dataset"] == "places_std":
         dataset = torchvision.datasets.ImageFolder(
-            DS_DIR+"/places365_standard/val", transform=totorch_norm)
+            DS_DIR+"/places365_standard/val", transform=transforms.ToTensor())
 
     elif dl_args["dataset"] == "cifar10":
         return torchvision.datasets.CIFAR10(root=DS_DIR, train=dl_args['subset'] == 'train',
@@ -88,12 +88,14 @@ def get_inr_dataloader(dl_args):
             subset=dl_args['subset'], size=dl_args['image shape'])
     elif dl_args["dataset"] == "inet12":
         return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
+    elif dl_args["dataset"] == "flowers":
+        return get_inr_loader_for_imgds('flowers', bsz=dl_args['batch size'], subset=dl_args['subset'])
     else:
         raise NotImplementedError(dl_args["dataset"])
 
 def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
     inr = siren.Siren(out_channels=3)
-    paths = glob2(f"{DS_DIR}/inrnet/{ds_name}_{subset}/siren_*.pt")
+    paths = glob2(f"{DS_DIR}/inrnet/{ds_name}/{subset}_*.pt")
     keys = siren.get_siren_keys()
     def random_loader():
         while True:
@@ -111,17 +113,22 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
     return random_loader()
 
     
-def get_inr_loader_for_imgds(dataset):
-    inr = siren.Siren(out_channels=3)
-    paths = sorted(glob2(f"{DS_DIR}/inrnet/{dataset}/siren_*.pt"))
+def get_inr_loader_for_imgds(ds_name, bsz, subset):
+    paths = glob2(f"{DS_DIR}/inrnet/{ds_name}/{subset}_*.pt")
+    if len(paths) == 0:
+        raise ValueError('bad dataloader specs')
     keys = siren.get_siren_keys()
-    for path in paths:
-        data = torch.load(path)
-        for ix in range(len(data)):
-            param_dict = {k:data[k][ix] for k in keys}
-            try:
+    def random_loader():
+        inrs = []
+        while True:
+            np.random.shuffle(paths)
+            for path in paths:
+                inr = siren.Siren(out_channels=3)
+                param_dict = torch.load(path)
                 inr.load_state_dict(param_dict)
-            except RuntimeError:
-                continue
-            yield inr.cuda()
+                inrs.append(inr)
+                if len(inrs) == bsz:
+                    yield siren.to_black_box(inrs).cuda()
+                    inrs = []
+    return random_loader()
 

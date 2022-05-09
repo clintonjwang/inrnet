@@ -1,19 +1,19 @@
 network:
   task: generate
-  type: inr-convnext
+  type: inr-wgan
   pretrained: true
+  frozen: true
 data loading:
-  batch size: 5
+  batch size: 4
   subset: train
-  dataset: cityscapes
-  classes: 7
+  dataset: flowers
   sample type: grid
-  sample points: 2048
+  sample points: 1024
   image shape:
   - 32
-  - 64
+  - 32
 optimizer:
   type: AdamW
   learning rate: 1e-4
-  max steps: 5950
-#N=2975 / bsz * 10 epochs
+  max steps: 8000
+#N=? / bsz * 10 epochs

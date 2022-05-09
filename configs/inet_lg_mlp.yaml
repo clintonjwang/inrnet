@@ -1,4 +1,4 @@
 parent: inet_train
 network:
   type: inr-effnet-s3
-  quantize: True
+  sample points: 8192

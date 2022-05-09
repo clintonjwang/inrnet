@@ -17,7 +17,12 @@ class ResBlock(nn.Module):
         self.sequential = sequential
     def forward(self, inr):
         return inr + self.sequential(inr.create_derived_inr())
-        # return inn.ResINR(inr, self.sequential)
+    def __getitem__(self, ix):
+        return self.sequential[ix]
+    def __len__(self):
+        return len(self.sequential)
+    def __iter__(self):
+        return self.sequential.__iter__()
 
 # class ResTest(nn.Module):
 #     def __init__(self, C):

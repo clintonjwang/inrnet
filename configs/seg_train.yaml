@@ -2,6 +2,7 @@ network:
   task: segment
   type: inr-convnext
   pretrained: true
+  frozen: true
 data loading:
   batch size: 5
   subset: train

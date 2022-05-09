@@ -7,15 +7,15 @@ F = nn.functional
 from inrnet.inn import functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
-def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k1=3, k2=None):
+def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k=3):
     h,w = input_shape
-    if k2 is None:
-        k2 = k1
+    if isinstance(k, int):
+        k = (k,k)
     extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
     if h == 1 or w == 1:
         raise ValueError('input shape too small')
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
-    return torch.tensor((k1 * spacing[0], k2 * spacing[1]))
+    return k[0] * spacing[0], k[1] * spacing[1]
 
 def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bounds=False, smoothing=.05, **kwargs): #h,w
     # offset/grow so that the conv kernel goes a half pixel past the boundary

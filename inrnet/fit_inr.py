@@ -101,17 +101,20 @@ def train_inet12(args):
     dl_args = args["data loading"]
     keys = siren.get_siren_keys()
     start_ix = int(args["start_ix"])
-    cls, start_ix = start_ix // 1000, start_ix % 1000
-    if start_ix < 800:
-        subset='train'
-    else:
-        subset='test'
-        start_ix -= 800
+    # cls, start_ix = start_ix // 1000, start_ix % 1000
+    # if start_ix < 800:
+    #     subset='train'
+    # else:
+    #     subset='test'
+    #     start_ix -= 800
+
+    cls, start_ix = start_ix % 12, start_ix // 12 + 800
     end_ix = start_ix+100
+    subset='train'
     total_steps = args["optimizer"]["max steps"]
 
-    os.makedirs(DATA_DIR+f"/inet12_nonorm/{cls}", exist_ok=True)
-    while osp.exists(DATA_DIR+f"/inet12_nonorm/{cls}/{subset}_{start_ix}.pt"):
+    os.makedirs(DATA_DIR+f"/inet12/{cls}", exist_ok=True)
+    while osp.exists(DATA_DIR+f"/inet12/{cls}/{subset}_{start_ix}.pt"):
         start_ix += 1
     print("Starting", flush=True)
 
@@ -123,9 +126,9 @@ def train_inet12(args):
         for k,v in inr.state_dict().items():
             param_dict[k] = v.cpu()
 
-        path = DATA_DIR+f"/inet12_nonorm/{cls}/{subset}_{ix}.pt"
+        path = DATA_DIR+f"/inet12/{cls}/{subset}_{ix}.pt"
         torch.save(param_dict, path)
-        loss_path = DATA_DIR+f"/inet12_nonorm/{cls}/loss_{subset}_{ix}.txt"
+        loss_path = DATA_DIR+f"/inet12/{cls}/loss_{subset}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 
 

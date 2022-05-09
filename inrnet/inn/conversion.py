@@ -26,6 +26,7 @@ def translate_sequential_layer(layers, current_shape, extrema):
     z = 0
     for layer_num,layer in enumerate(layers):
         if isinstance(layer, nn.modules.pooling._AdaptiveAvgPoolNd):
+            output_size = layer.output_size
             # cont_layer, current_shape, extrema = inn.GlobalAvgPool(), None, None
             break
 
@@ -64,7 +65,11 @@ def translate_sequential_layer(layers, current_shape, extrema):
     for ix in range(layer_num+1+z, len(layers)):
         remaining_layers.append(layers[ix])
     if len(remaining_layers) > 0:
-        cont_layers.append(inn.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
+        if output_size in (1,(1,1)):
+            cont_layers.append(inn.layers.reshape.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
+        else:
+            cont_layers.append(inn.layers.reshape.AdaptiveAvgPoolSequence(
+                output_size, nn.Sequential(*remaining_layers)))
         current_shape, extrema = None, None
 
     cont_sequence = nn.Sequential(*cont_layers)
@@ -97,26 +102,3 @@ def translate_strided_layer(layer, input_shape, extrema, **kwargs):
 
     else:
         raise NotImplementedError(layer.__class__)
-
-def replace_conv_kernels(network, k_type='mlp', k_ratio=1.):
-    length = len(network)
-    for i in range(length):
-        m = network[i]
-        if hasattr(m, '__getitem__'):
-            replace_conv_kernels(m, k_ratio=k_ratio)
-        elif hasattr(m, 'sequential'):
-            replace_conv_kernels(m.sequential, k_ratio=k_ratio)
-        elif isinstance(m, inn.SplineConv):
-            network[i] = replace_conv_kernel(m, k_ratio=k_ratio)
-
-
-def replace_conv_kernel(layer, k_type='mlp', k_ratio=1.):
-    #if k_type
-    if isinstance(layer, inn.SplineConv):
-        conv = inn.MLPConv(layer.in_channels, layer.out_channels, [k*k_ratio for k in layer.kernel_size],
-            stride=layer.stride, groups=layer.groups)
-        # conv.padded_extrema = layer.padded_extrema
-        conv.bias = layer.bias
-        return conv
-    raise NotImplementedError
-

@@ -91,11 +91,6 @@ def load_checkpoint(model, paths):
 
         model.load_state_dict(checkpoint_sd, strict=False)
 
-def cycle(iterator):
-    while True:
-        for data in iterator:
-            yield data
-
 def parse_int_or_list(x):
     # converts string to an int or list of ints
     if not isinstance(x, str):
@@ -139,6 +134,15 @@ def format_float(x, n_decimals):
             return ('%d'%x)
         else:
             return ('{:.%df}'%n_decimals).format(x)
+
+
+def cycle(iterator):
+    while True:
+        for data in iterator:
+            yield data
+
+
+
 
 def latex_mean_std(X=None, mean=None, stdev=None, n_decimals=1, percent=False, behaviour_if_singleton=None):
     if X is not None and len(X) == 1:
@@ -288,80 +292,3 @@ def save_metric_histograms(trackers, epoch, root):
         for phase in ["train", "val"]:
             path = osp.join(root, f"{epoch}_{tracker.name}_{phase}.png")
             tracker.histogram(path=path, phase=phase, epoch=epoch)
-
-
-def save_examples(prefix, root, *imgs):
-    imgs = list(imgs)
-    if isinstance(imgs[0], torch.Tensor):
-        for ix in range(len(imgs)):
-            imgs[ix] = imgs[ix].detach().cpu().squeeze(1).numpy()
-        if transforms is not None:
-            transforms = transforms.detach().cpu().numpy()
-
-    os.makedirs(root, exist_ok=True)
-    for ix in range(imgs[0].shape[0]):
-        cat = np.concatenate([img[ix] for img in imgs], axis=1)
-        cat = rescale_clip(cat)
-        plt.imsave(f"{root}/{prefix}_{ix}.png", cat, cmap="gray")
-    plt.close("all")
-
-def to_rgb(img):
-    if isinstance(img, torch.Tensor):
-        if len(img.shape)!=2:
-            raise NotImplementedError
-        img = img.tile(3,1,1)
-    else:
-        img = np.stack([img, img, img], -1)
-    return img
-
-def save_example(path, img, gt_seg, pred_logit):
-    img, gt_seg, pred_logit = [i.squeeze().detach().cpu() for i in (img, gt_seg, pred_logit)]
-    x = gt_seg.sum((1,2)).argmax().item()
-    y = gt_seg.sum((0,2)).argmax().item()
-    z = gt_seg.sum((0,1)).argmax().item()
-    img = rescale_clip(img.float())
-    pred_seg = pred_logit > 0
-    pred_logit = rescale_noclip(pred_logit.float())
-    w = max(img.shape[-2:])
-    pad = mtr.SpatialPad((-1,w))
-    padd = lambda q: pad(q.unsqueeze(0)).squeeze(0)
-    I,G,PL,PS = [(padd(i[x]), padd(i[:,y]), padd(i[:,:,z])) for i in (img, gt_seg, pred_logit, pred_seg)]
-    overlays = [torch.tensor(arr) for arr in (
-        draw_segs_as_contours(I[0], G[0], PS[0]),
-        draw_segs_as_contours(I[1], G[1], PS[1]),
-        draw_segs_as_contours(I[2], G[2], PS[2]))]
-    col1 = torch.cat(overlays, dim=0)
-    col2 = to_rgb(torch.cat(I, dim=0)).permute(1,2,0)
-    col3 = to_rgb(torch.cat(PL, dim=0)).permute(1,2,0)
-    img = torch.cat((col1, col2, col3), dim=1)
-
-    os.makedirs(osp.dirname(path), exist_ok=True)
-    try:
-        plt.imsave(path, img.numpy())
-        plt.close()
-    except ValueError:
-        pass #encountered empty seg
-
-def save_example_slices(img, gt_seg, pred_seg, root):
-    if isinstance(img, torch.Tensor):
-        img = img.detach().cpu().squeeze().numpy()
-        gt_seg = gt_seg.detach().cpu().squeeze().numpy()
-        pred_seg = pred_seg.detach().cpu().squeeze().numpy()
-
-    rescale = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
-    # rescale = mtr.ScaleIntensity(minv=0, maxv=255, dtype=np.uint8)
-    img = rescale(img)
-
-    os.makedirs(root, exist_ok=True)
-
-    for z in range(5,76,5):
-        img_slice = img[:,:,z]
-        gt_seg_slice = gt_seg[:,:,z].round()
-        pred_seg_slice = pred_seg[:,:,z] > 0
-        plt.imsave(f"{root}/gt_{z}.png", gt_seg_slice)
-        plt.imsave(f"{root}/pred_{z}.png", pred_seg_slice)
-
-        img_slice = draw_segs_as_contours(img_slice, gt_seg_slice, pred_seg_slice)
-        plt.imsave(f"{root}/{z}.png", img_slice)
-    plt.close("all")
-

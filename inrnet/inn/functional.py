@@ -188,10 +188,18 @@ def avg_pool(values, inr, layer, query_coords=None):
         else:
             query_coords = coords
 
+    if inr.grid_mode and hasattr(layer, 'shift'):
+        query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    mask = layer.norm(Diffs) < layer.radius 
-    Y = values[:,torch.where(mask)[1]]
-    return torch.stack([y.mean(1) for y in Y.split(tuple(mask.sum(1)), dim=1)])
+    # if hasattr(layer, 'norm'):
+    #     mask = layer.norm(Diffs) < layer.radius 
+    # elif hasattr(layer, 'kernel_size'):
+    #     mask = (Diffs[...,0].abs() < layer.kernel_size[0]) & (Diffs[...,1].abs() < layer.kernel_size[1])
+    #     Y = values[:,torch.where(mask)[1]]
+    #     return torch.stack([y.mean(1) for y in Y.split(tuple(mask.sum(1)), dim=1)])
+    # else:
+    mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
+    return values[:,mask].mean(dim=2)
 
 
 def max_pool(values, inr, layer, query_coords=None):
@@ -206,7 +214,7 @@ def max_pool(values, inr, layer, query_coords=None):
         query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-    return values[:,mask].max(dim=2).values
+    return values[:,mask].amax(dim=2)
 
 
 

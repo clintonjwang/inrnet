@@ -2,8 +2,8 @@ random seed: 0
 paths:
   slurm output dir: ~/code/diffcoord/results
   temp dir: ~/code/diffcoord/temp
+network:
+  frozen: false
 optimizer:
-  epochs: 1000
-  type: Adam
-  learning rate: 1e-3
+  type: AdamW
   weight decay: 1e-5

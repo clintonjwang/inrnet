@@ -37,10 +37,7 @@ def max_pool_kernel(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            if inr.grid_mode:
-                inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            else:
-                inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
@@ -120,41 +117,3 @@ class MaxPoolBall(nn.Module):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(max_pool_kernel, 'MaxPoolBall', layer=self)
         return new_inr
-
-class GlobalAvgPoolSequence(nn.Module):
-    def __init__(self, layers):
-        super().__init__()
-        self.layers = layers
-    def forward(self, inr):
-        vvf = inr.create_derived_inr()
-        vvf.integrator = inrF.Integrator(GAPseq, 'GlobalPoolSeq', layer=self, inr=inr)
-        return vvf
-
-def GAPseq(values, layer, inr):
-    if inr.training:
-        layer.train()
-    else:
-        layer.eval()
-    return layer.layers(values.mean(1).float())
-# class GlobalAvgPool(nn.Module):
-#     def __init__(self, sampling="input"):
-#         super().__init__()
-#         self.sampling = sampling
-#     def forward(self, inr, coords=None):
-#         if coords is None:
-#             if self.sampling == "qmc":
-#                 coords = inr.generate_sample_points()
-#                 return inrF.global_avg_pool(inr(coords))
-#             elif self.sampling == "input":
-#                 return inrF.global_avg_pool(inr(coords))
-
-class AdaptiveAvgPool(nn.Module):
-    def __init__(self, output_size, p_norm="inf"):
-        super().__init__()
-        self.output_size = output_size
-        if p_norm == "inf":
-            p_norm = torch.inf
-        self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
-    def forward(self, inr):
-        coords = inr.generate_sample_points()
-        return inrF.adaptive_avg_pool(inr(coords))
