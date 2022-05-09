@@ -4,7 +4,7 @@ import numpy as np
 import args as args_module
 from experiments.diffusion import train_diffusion_model
 from experiments.depth import train_depth_model
-from experiments.classify import finetune_classifier
+from experiments.classify import train_classifier
 from experiments.segment import train_segmenter
 from experiments.generate import train_generator
 
@@ -19,7 +19,7 @@ def main(args):
     if args["network"]["task"] == "diffusion":
         train_diffusion_model(args)
     elif args["network"]["task"] == "classify":
-        finetune_classifier(args)
+        train_classifier(args)
     elif args["network"]["task"] == "depth":
         train_depth_model(args)
     elif args["network"]["task"] == "cyclegan":

@@ -76,26 +76,25 @@ def get_inr_loader_for_inet12(bsz, subset):
         if N % bsz != 0:
             print('warning: dropping last minibatch')
             N = (N // bsz) * bsz
-        def random_loader(loop=True):
-            while True:
-                for p in paths:
-                    np.random.shuffle(p)
-                for path_ix in range(0,N, n_per_cls):
-                    inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
-                    for i in range(n_per_cls):
-                        for cl in range(12):
-                            param_dict = torch.load(paths[cl][path_ix+i])
-                            try:
-                                inrs[i*12+cl].load_state_dict(param_dict)
-                            except RuntimeError:
-                                param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
-                                param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
-                                inrs[i*12+cl].load_state_dict(param_dict)
-                    labels = torch.arange(12).tile(n_per_cls)
-                    yield siren.to_black_box(inrs).cuda(), labels.cuda()
-                if not loop:
-                    break
-        return random_loader(loop=loop)
+        while True:
+            for p in paths:
+                np.random.shuffle(p)
+            for path_ix in range(0, N, n_per_cls):
+                inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
+                for i in range(n_per_cls):
+                    for cl in range(12):
+                        param_dict = torch.load(paths[cl][path_ix+i])
+                        try:
+                            inrs[i*12+cl].load_state_dict(param_dict)
+                        except RuntimeError:
+                            param_dict['net.4.weight'] = param_dict['net.4.weight'].tile(3,1)
+                            param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
+                            inrs[i*12+cl].load_state_dict(param_dict)
+                labels = torch.arange(12).tile(n_per_cls)
+                yield siren.to_black_box(inrs).cuda(), labels.cuda()
+            if not loop:
+                return
+
     elif bsz == 1:
         print('analysis mode only')
         for path_ix in range(N):
@@ -112,6 +111,11 @@ def get_inr_loader_for_inet12(bsz, subset):
     else:
         raise ValueError('expect batch size to be a multiple of the number of classes')
 
+
+
+def analyze_inr_error():
+    INet12('train')
+    return
 
 # def generate_inet12(n_train=800, n_val=200):
 #     cls_map_path = f"{DS_DIR}/inrnet/big_12.pkl"

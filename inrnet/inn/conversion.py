@@ -37,7 +37,7 @@ def translate_sequential_layer(layers, current_shape, extrema):
             cont_layer, current_shape, extrema = inn.upsample.translate_upsample(
                 layer, current_shape, extrema)
 
-        elif isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd):
+        elif isinstance(layer, nn.modules.conv._ConvNd) or isinstance(layer, nn.modules.pooling._MaxPoolNd) or isinstance(layer, nn.modules.pooling._AvgPoolNd):
             cont_layer, current_shape, extrema = translate_strided_layer(
                 layer, current_shape, extrema)
 
@@ -92,29 +92,30 @@ def translate_strided_layer(layer, input_shape, extrema, **kwargs):
         else:
             return inn.translate_conv2d(layer, input_shape=input_shape, extrema=extrema, **kwargs)
 
-    elif isinstance(layer, nn.MaxPool2d):
+    elif isinstance(layer, nn.MaxPool2d) or isinstance(layer, nn.AvgPool2d):
         return inn.translate_pool(layer, input_shape=input_shape, extrema=extrema, **kwargs)
 
     else:
         raise NotImplementedError(layer.__class__)
 
-def replace_conv_kernels(network, k_type='mlp'):
+def replace_conv_kernels(network, k_type='mlp', k_ratio=1.):
     length = len(network)
     for i in range(length):
         m = network[i]
-        if isinstance(m, nn.Sequential):
-            replace_conv_kernels(m)
+        if hasattr(m, '__getitem__'):
+            replace_conv_kernels(m, k_ratio=k_ratio)
         elif hasattr(m, 'sequential'):
-            replace_conv_kernels(m.sequential)
+            replace_conv_kernels(m.sequential, k_ratio=k_ratio)
         elif isinstance(m, inn.SplineConv):
-            network[i] = replace_conv_kernel(m)
+            network[i] = replace_conv_kernel(m, k_ratio=k_ratio)
 
 
-def replace_conv_kernel(layer, k_type='mlp'):
+def replace_conv_kernel(layer, k_type='mlp', k_ratio=1.):
     #if k_type
     if isinstance(layer, inn.SplineConv):
-        conv = inn.MLPConv(layer.in_channels, layer.out_channels, layer.kernel_size, stride=layer.stride, groups=layer.groups)
-        conv.padded_extrema = layer.padded_extrema
+        conv = inn.MLPConv(layer.in_channels, layer.out_channels, [k*k_ratio for k in layer.kernel_size],
+            stride=layer.stride, groups=layer.groups)
+        # conv.padded_extrema = layer.padded_extrema
         conv.bias = layer.bias
         return conv
     raise NotImplementedError

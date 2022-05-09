@@ -1,6 +1,7 @@
 parent: inet_train
 network:
   type: inr-effnet-mlp
+  kernel expansion ratio: 2
 optimizer:
-  learning rate: 2e-4
+  learning rate: 1e-4
   max steps: 16000

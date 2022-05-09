@@ -41,11 +41,13 @@ def conv(values: torch.Tensor, # [B,N,c_in]
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = layer.norm(Diffs) < layer.radius
     else:
-        # if inr.grid_mode:
-        query_coords = query_coords + layer.shift
+        if inr.grid_mode and hasattr(layer, 'shift'):
+            query_coords = query_coords + layer.shift
         Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
         mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
         padding_ratio = layer.kernel_intersection_ratio(query_coords)
+        if hasattr(layer, 'mask_tracker'):
+            layer.mask_tracker = mask.sum(1).detach().cpu()
         # scaling factor
 
     # if layer.dropout > 0 and (inr.training and layer.training):
@@ -58,7 +60,7 @@ def conv(values: torch.Tensor, # [B,N,c_in]
     newVals = []
 
     if hasattr(layer, "interpolate_weights"):
-        if inr.grid_mode or layer.N_bins != 0:
+        if (inr.grid_mode or layer.N_bins != 0) and hasattr(layer, 'grid_points'):
             bin_ixs, bin_centers = cluster_diffs(Diffs, layer=layer, grid_mode=inr.grid_mode)
 
             if layer.groups != 1:
@@ -116,7 +118,8 @@ def conv(values: torch.Tensor, # [B,N,c_in]
                     newVals.append(y.unsqueeze(1).matmul(Wsplit[ix]).squeeze(1).mean(0))
                     
     newVals = torch.stack(newVals, dim=1) #[B,N,c_out]
-    newVals *= padding_ratio.unsqueeze(-1)
+    if padding_ratio is not None:
+        newVals *= padding_ratio.unsqueeze(-1)
 
     if layer.bias is not None:
         newVals = newVals + layer.bias
@@ -181,9 +184,6 @@ def avg_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            # if inr.grid_mode:
-            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            # else:
             inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
@@ -198,15 +198,12 @@ def max_pool(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
-            # if inr.grid_mode:
-            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride)
-            # else:
             inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
         else:
             query_coords = coords
 
-    # if inr.grid_mode:
-    query_coords = query_coords + layer.shift
+    if inr.grid_mode and hasattr(layer, 'shift'):
+        query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
     return values[:,mask].max(dim=2).values

@@ -15,5 +15,5 @@ data loading:
 optimizer:
   type: AdamW
   learning rate: 1e-5
-  max steps: 5950
+  max steps: 119000
 #N=2975 / bsz * 10 epochs

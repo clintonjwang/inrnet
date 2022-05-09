@@ -1,7 +1,7 @@
 #https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/helpers/labels.py
+import torch, torchvision, pdb
 from collections import namedtuple
 from torchvision import transforms
-import torch, pdb
 from glob import glob
 import numpy as np
 
@@ -10,12 +10,13 @@ from inrnet.models.inrs import siren
 nearest = transforms.InterpolationMode('nearest')
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
+
 def get_inr_loader_for_cityscapes(bsz, subset, size):
     paths = glob(f"{DS_DIR}/inrnet/cityscapes/{subset}_*.pt")
     if subset == 'train':
         N = 2975
         loop = True
-    else:
+    elif subset == 'val':
         N = 500
         loop = False
     assert len(paths) == N, 'incomplete subset'
@@ -48,6 +49,25 @@ def get_inr_loader_for_cityscapes(bsz, subset, size):
                 break
     
     return random_loader(loop=loop)
+
+
+def replace_segs(subset):
+    if subset == 'train':
+        N = 2975
+    elif subset == 'val':
+        N = 500
+
+    ds = torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
+            split=subset, mode='fine', target_type='semantic',
+            target_transform=seg_transform)
+
+    for i in range(N):
+        path = f"{DS_DIR}/inrnet/cityscapes/{subset}_{i}.pt"
+        Fseg = ds[i][1].squeeze(0)
+        param_dict, Cseg = torch.load(path)
+        #if (Fseg & Cseg).sum() / (Fseg | Cseg).sum() > .3:
+        torch.save((param_dict, Fseg), path)
+
 
 
 #--------------------------------------------------------------------------------
@@ -155,3 +175,4 @@ def seg_transform(seg):
             (seg > 22.5) * (seg < 23.5),
             (seg > 23.5) * (seg < 25.5),
             (seg > 25.5)), dim=1)
+

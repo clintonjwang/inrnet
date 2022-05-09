@@ -157,6 +157,19 @@ class ConvNeXt(nn.Module):
         out1 = self.norms[1](x)
         new_inr = self.decoder(out0, out1)
         return new_inr
+    def __len__(self):
+        return 3
+    def __getitem__(self, ix):
+        if ix == 0:
+            return self.stages
+        elif ix == 1:
+            return self.norms
+        elif ix == 2:
+            return self.decoder
+    def __iter__(self):
+        yield self.stages
+        yield self.norms
+        yield self.decoder
 
 class Decoder(nn.Module):
     def __init__(self, lateral_convs, fpn_convs, fpn_bottleneck, seg_cls, num_classes, ups):
@@ -168,6 +181,7 @@ class Decoder(nn.Module):
         self.num_classes = num_classes
         self.seg_cls = seg_cls
         self.ups = nn.ModuleList(ups)
+        self.main_modules = [self.lateral_convs, self.fpn_convs, self.fpn_bottleneck, self.seg_cls]
     def forward(self, out0, out1):
         l1 = self.lateral_convs[1](out1)
         l0 = self.lateral_convs[0](out0) + self.ups[1](l1)
@@ -176,6 +190,13 @@ class Decoder(nn.Module):
         fpns = f0.cat(self.ups[1](f1))
         top = self.fpn_bottleneck(self.ups[0](fpns))
         return self.seg_cls(top)
+    def __len__(self):
+        return len(self.main_modules)
+    def __getitem__(self, ix):
+        return self.main_modules[ix]
+    def __iter__(self):
+        for m in self.main_modules:
+            yield m
 
 
 def translate_convnext_block(state_dict, current_shape, extrema):
@@ -201,12 +222,22 @@ def translate_convnext_block(state_dict, current_shape, extrema):
     layers = nn.Sequential(depthwise_conv, norm, pointwise_conv1, inn.GELU(), pointwise_conv2)
     return CNBlock(layers, state_dict['gamma'])
 
+def enable_cn_blocks(network):
+    for m in network:
+        if hasattr(m, '__iter__'):
+            enable_cn_blocks(m)
+        elif isinstance(m, CNBlock):
+            m.drop = False
+
 
 class CNBlock(nn.Module):
     def __init__(self, layers, gamma):
         super().__init__()
         self.layers = layers
-        self.gamma = nn.Parameter(gamma)
-        #self.drop_path_rate = 0
+        self.gamma = nn.Parameter(gamma*.5)
+        self.drop = True
     def forward(self, inr):
-        return inr + self.layers(inr.create_derived_inr())*self.gamma
+        if self.drop:
+            return inr
+        else:
+            return inr + self.layers(inr.create_derived_inr())*self.gamma

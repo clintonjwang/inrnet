@@ -7,6 +7,16 @@ F = nn.functional
 from inrnet.inn import functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
+def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k1=3, k2=None):
+    h,w = input_shape
+    if k2 is None:
+        k2 = k1
+    extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
+    if h == 1 or w == 1:
+        raise ValueError('input shape too small')
+    spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
+    return torch.tensor((k1 * spacing[0], k2 * spacing[1]))
+
 def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bounds=False, smoothing=.05, **kwargs): #h,w
     # offset/grow so that the conv kernel goes a half pixel past the boundary
     h,w = input_shape # shape of input features/image
@@ -50,7 +60,7 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
         # scale up weights since we divide by the number of grid points
         groups=conv2d.groups, shift=shift,
         padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
-        #N_bins=0,
+        # N_bins=0,
         N_bins=2**math.ceil(math.log2(k1*k2)+4),
         kernel_size=K, stride=stride, bias=bias, **kwargs)
     if bias:
@@ -76,7 +86,7 @@ class Conv(nn.Module):
 
     def kernel_intersection_ratio(self, query_coords):
         if not hasattr(self, 'padded_extrema'):
-            return 1
+            return
         dist_to_boundary = (query_coords.unsqueeze(1) - self.padded_extrema.T.unsqueeze(0)).abs().amin(dim=1)
         k = self.kernel_size[0]/2, self.kernel_size[1]/2
         padding_ratio = (self.kernel_size[0] - F.relu(k[0] - dist_to_boundary[:,0])) * (
@@ -203,11 +213,11 @@ class SplineConv(Conv):
 
 class MLPConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), separable=False, stride=0.,
-            input_dims=2, N_bins=0, groups=1, padded_extrema=None, bias=False,
+            input_dims=2, groups=1, padded_extrema=None, bias=False,
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             stride=stride, bias=bias, groups=groups, dtype=dtype)
-        self.N_bins = N_bins
+        self.N_bins = 0
         self.kernel_size = K = kernel_size
         self.in_groups = self.in_channels // self.groups
         if padded_extrema is not None:

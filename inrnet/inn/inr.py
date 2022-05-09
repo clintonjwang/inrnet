@@ -112,6 +112,8 @@ class INRBatch(nn.Module):
         if sample_size is None:
             sample_size = self.sample_size
         if method == "grid" or self.grid_mode:
+            if dims is None:
+                raise ValueError("declare dims or turn off grid mode")
             return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
         elif method in ("qmc", 'rqmc'):
             return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,

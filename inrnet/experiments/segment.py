@@ -24,7 +24,13 @@ def load_pretrained_model(args):
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
         elif net_args["type"] == "inr-convnext":
+            if pretrained is False:
+                print('from scratch not implemented yet')
             return inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
+        elif net_args["type"] == "inr-mlpconv":
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
+            inn.conversion.replace_conv_kernels(InrNet, k_type='mlp')
+            return InrNet
         else:
             raise NotImplementedError
 
@@ -58,11 +64,11 @@ def train_segmenter(args):
         maxes, gt_labels = segs.max(-1)
         loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         if torch.isnan(loss):
-            print('nan loss')
-            for m in network.parameters():
-                if torch.any(torch.isnan(m)):
-                    print(m.shape)
-            pdb.set_trace()
+            raise ValueError('nan loss')
+            # for m in network.parameters():
+            #     if torch.any(torch.isnan(m)):
+            #         print(m.shape)
+            # pdb.set_trace()
         pred_seg = logits.max(-1).indices
         pred_seg = F.one_hot(pred_seg, num_classes=segs.size(-1)).bool()
         iou = iou_tracker(pred_seg[maxes != 0], segs[maxes != 0]).item()
@@ -85,19 +91,22 @@ def train_segmenter(args):
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
     if args["network"]['type'].startswith('inr'):
-        N = dl_args["sample points"]
         for img_inr, segs in data_loader:
             global_step += 1
             seg_inr = model(img_inr)
-            if dl_args['sample type'] == 'qmc':
-                coords = seg_inr.generate_sample_points(sample_size=N, method='qmc')
-                segs = get_seg_at_coords(coords)
-            else:
+            if dl_args['sample type'] == 'grid':
                 segs = segs.reshape(*segs.shape[:2], -1).transpose(2,1)
                 seg_inr.toggle_grid_mode(True)
                 coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+            else:
+                segs = get_seg_at_coords(coords)
+                coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
             logits = seg_inr.cuda()(coords)
+            if dl_args['sample type'] == 'grid':
+                logits = util.realign_values(logits, coords=coords)
             backprop(model)
+            if global_step == args["optimizer"]["max steps"]//2:
+                inrnet.inn.nets.convnext.enable_cn_blocks(model)
             if global_step >= args["optimizer"]["max steps"]:
                 break
 

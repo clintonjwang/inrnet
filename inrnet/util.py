@@ -38,6 +38,7 @@ def meshgrid(*tensors, indexing='ij'):
 
 import itertools
 def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="cuda"):
+    # c2f: coarse-to-fine ordering, puts points along coarser grid-points first
     tensors = [torch.linspace(*domain, steps=d, dtype=dtype, device=device) for d in dims]
     mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
 
