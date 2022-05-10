@@ -11,7 +11,8 @@ def get_siren_keys():
         'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
 
 def to_black_box(siren_list, **kwargs):
-    return inn.BlackBoxINR(siren_list, channels=siren_list[0].out_channels,
+    evaluator = nn.ModuleList(siren_list)
+    return inn.BlackBoxINR(evaluator, channels=siren_list[0].out_channels,
         input_dims=2, domain=(-1,1), **kwargs)
 
 class Siren(nn.Module):

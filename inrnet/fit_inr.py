@@ -108,25 +108,29 @@ def train_inet12(args):
     #     subset='test'
     #     start_ix -= 800
 
-    cls, start_ix = start_ix % 12, start_ix // 12 + 800
     end_ix = start_ix+100
     subset='train'
     total_steps = args["optimizer"]["max steps"]
 
-    os.makedirs(DATA_DIR+f"/inet12/{cls}", exist_ok=True)
-    while osp.exists(DATA_DIR+f"/inet12/{cls}/{subset}_{start_ix}.pt"):
-        start_ix += 1
+    # os.makedirs(DATA_DIR+f"/inet12/{cls}", exist_ok=True)
+    # while osp.exists(DATA_DIR+f"/inet12/{cls}/{subset}_{start_ix}.pt"):
+    #     start_ix += 1
     print("Starting", flush=True)
 
-    dataset = inet.INet12(subset=subset, cls=cls)
+    dataset = inet.INet12Extra()
+    # dataset = inet.INet12(subset=subset, cls=cls)
     param_dict = {}
-    for ix in range(start_ix,end_ix):
-        img = dataset[ix]
+    for j in range(start_ix,end_ix):
+        cls, ix = j % 12, j // 12 + 800
+        path = DATA_DIR+f"/inet12/{cls}/{subset}_{ix}.pt"
+        while osp.exists(path):
+            continue
+
+        img = dataset[j]
         inr,loss = fit_img_to_siren(img, total_steps)
         for k,v in inr.state_dict().items():
             param_dict[k] = v.cpu()
 
-        path = DATA_DIR+f"/inet12/{cls}/{subset}_{ix}.pt"
         torch.save(param_dict, path)
         loss_path = DATA_DIR+f"/inet12/{cls}/loss_{subset}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
@@ -143,6 +147,7 @@ def train_flowers(args):
         args["data loading"]['subset']='test'
         args["start_ix"] -= 2040
     return train_siren(args)
+
 
 def train_cityscapes(args):
     dl_args = args["data loading"]

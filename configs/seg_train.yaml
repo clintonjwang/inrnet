@@ -2,7 +2,7 @@ network:
   task: segment
   type: inr-convnext
   pretrained: true
-  frozen: true
+  frozen: false
 data loading:
   batch size: 5
   subset: train
@@ -16,5 +16,5 @@ data loading:
 optimizer:
   type: AdamW
   learning rate: 1e-5
-  max steps: 119000
+  max steps: 29750
 #N=2975 / bsz * 10 epochs

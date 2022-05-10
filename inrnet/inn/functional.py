@@ -64,33 +64,50 @@ def conv(values: torch.Tensor, # [B,N,c_in]
             bin_ixs, bin_centers = cluster_diffs(Diffs, layer=layer, grid_mode=inr.grid_mode)
 
             if layer.groups != 1:
-                w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
-                Wsplit = w_o.index_select(dim=0, index=bin_ixs).split(lens)
-                for ix,y in enumerate(Ysplit):
-                    newVals.append(torch.einsum('bni,ni->bi',y,Wsplit[ix])/y.size(1))
+                if layer.groups == layer.out_channels and layer.groups == layer.in_channels:
+                    w_o = layer.interpolate_weights(-bin_centers).squeeze(-1)
+                    Wsplit = w_o.index_select(dim=0, index=bin_ixs).split(lens)
+                    for ix,y in enumerate(Ysplit):
+                        newVals.append(torch.einsum('bni,ni->bi',y,Wsplit[ix])/y.size(1))
+                else:
+                    raise NotImplementedError('groups')
+                    # if g is num groups, each i/g channels produces o/g channels, then concat
+                    w_og = layer.interpolate_weights(-bin_centers)
+                    n,o,i_g = w_og.shape
+                    o_g, g = o//g, layer.num_groups
+                    Wsplit = w_og.view(n, o_g,g, i_g).index_select(dim=0, index=bin_ixs).split(lens)
+                    for ix,y in enumerate(Ysplit):
+                        newVals.append(torch.einsum('bnig,nogi->bog', y.reshape(-1, n, i_g, g),
+                            Wsplit[ix]).flatten(1)/n)
             else:
                 w_oi = layer.interpolate_weights(-bin_centers)
                 Wsplit = w_oi.index_select(dim=0, index=bin_ixs).split(lens)
-                # if layer.separable:
-                #     out_, in_ = 
-                #     for ix,y in enumerate(Ysplit):
-                #         newVals.append(torch.einsum('bni,ni,no->bo',y,Wsplit[ix])/y.size(1))
-                # else:
                 for ix,y in enumerate(Ysplit):
                     newVals.append(torch.einsum('bni,noi->bo',y,Wsplit[ix])/y.size(1))
                 
         else:
             Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
             if layer.groups != 1:
-                for ix,y in enumerate(Ysplit):
-                    w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
-                    newVals.append(torch.einsum('bni,ni->bi',y,w_o)/y.size(1))
+                if layer.groups == layer.out_channels and layer.groups == layer.in_channels:
+                    for ix,y in enumerate(Ysplit):
+                        w_o = layer.interpolate_weights(-Dsplit[ix]).squeeze(-1)
+                        newVals.append(torch.einsum('bni,ni->bi',y,w_o)/y.size(1))
+                else:
+                    # if g is num groups, each i/g channels produces o/g channels, then concat
+                    g = layer.groups
+                    for ix,y in enumerate(Ysplit):
+                        w_og = layer.interpolate_weights(-Dsplit[ix])
+                        n,o,i_g = w_og.shape
+                        o_g = o//g
+                        newVals.append(torch.einsum('bnig,nogi->bog', y.reshape(y.size(0), n, i_g, g), w_og.view(n, o_g, g, i_g)).flatten(1)/n)
             else:
                 for ix,y in enumerate(Ysplit):
                     w_oi = layer.interpolate_weights(-Dsplit[ix])
                     newVals.append(torch.einsum('bni,noi->bo',y,w_oi)/y.size(1))
         
     else:
+        if layer.groups != 1:
+            raise NotImplementedError('convball')
         if layer.N_bins == 0:
             #Wsplit = layer.K(Diffs).split(lens)
             Dsplit = Diffs.split(lens) # list of diffs of neighborhood points
@@ -181,28 +198,11 @@ def interpolate_weights_single_channel(xy, tx,ty,c, order=2):
 
 
 def avg_pool(values, inr, layer, query_coords=None):
-    coords = inr.sampled_coords
-    if query_coords is None:
-        if layer.stride != 0:
-            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
-        else:
-            query_coords = coords
-
-    if inr.grid_mode and hasattr(layer, 'shift'):
-        query_coords = query_coords + layer.shift
-    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    # if hasattr(layer, 'norm'):
-    #     mask = layer.norm(Diffs) < layer.radius 
-    # elif hasattr(layer, 'kernel_size'):
-    #     mask = (Diffs[...,0].abs() < layer.kernel_size[0]) & (Diffs[...,1].abs() < layer.kernel_size[1])
-    #     Y = values[:,torch.where(mask)[1]]
-    #     return torch.stack([y.mean(1) for y in Y.split(tuple(mask.sum(1)), dim=1)])
-    # else:
-    mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-    return values[:,mask].mean(dim=2)
-
-
+    return pool('mean', values, inr, layer, query_coords=query_coords)
 def max_pool(values, inr, layer, query_coords=None):
+    return pool('amax', values, inr, layer, query_coords=query_coords)
+
+def pool(pool_fxn, values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
         if layer.stride != 0:
@@ -213,8 +213,42 @@ def max_pool(values, inr, layer, query_coords=None):
     if inr.grid_mode and hasattr(layer, 'shift'):
         query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-    return values[:,mask].amax(dim=2)
+    if hasattr(layer, 'kernel_size'):
+        mask = (Diffs[...,0].abs() < layer.kernel_size[0]) & (Diffs[...,1].abs() < layer.kernel_size[1])
+    elif hasattr(layer, 'norm'):
+        mask = layer.norm(Diffs) < layer.radius 
+    else:
+        mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
+        return getattr(values[:,mask], pool_fxn)(dim=2)
+
+    Y = values[:,torch.where(mask)[1]]
+    return torch.stack([getattr(y, pool_fxn)(dim=2) for y in Y.split(tuple(mask.sum(1)), dim=1)])
+    
+
+    
+
+def max_pool_kernel(values, inr, layer, query_coords=None):
+    coords = inr.sampled_coords
+    if query_coords is None:
+        if layer.stride != 0:
+            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+        else:
+            query_coords = coords
+
+    if hasattr(layer, "norm"):
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = layer.norm(Diffs) < layer.radius
+    else:
+        if torch.amax(layer.shift) > 0:
+            query_coords = query_coords + layer.shift
+        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
+        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
+    lens = tuple(mask.sum(1))
+    Y = values[torch.where(mask)[1]]
+    Ysplit = Y.split(lens)
+    return torch.stack([y.max(0).values for y in Ysplit], dim=0)
+
+#((Diffs[:,-1,0].abs() <= layer.kernel_size[0]) * (Diffs[:,-1,1].abs() <= layer.kernel_size[1])).sum()
 
 
 

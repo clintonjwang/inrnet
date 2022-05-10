@@ -68,14 +68,10 @@ def train_segmenter(args):
         loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         if torch.isnan(loss):
             raise ValueError('nan loss')
-            # for m in network.parameters():
-            #     if torch.any(torch.isnan(m)):
-            #         print(m.shape)
-            # pdb.set_trace()
         pred_seg = logits.max(-1).indices
-        pred_seg = F.one_hot(pred_seg, num_classes=segs.size(-1)).bool()
-        iou = iou_tracker(pred_seg[maxes != 0], segs[maxes != 0]).item()
-        acc = acc_tracker(pred_seg[maxes != 0], segs[maxes != 0]).item()
+        pred_1hot = F.one_hot(pred_seg, num_classes=segs.size(-1)).bool()
+        iou = iou_tracker(pred_1hot[maxes != 0], segs[maxes != 0]).item()
+        acc = acc_tracker(pred_1hot[maxes != 0], segs[maxes != 0]).item()
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -85,16 +81,16 @@ def train_segmenter(args):
             print(np.round(loss.item(), decimals=3), "; iou:", np.round(iou, decimals=3),
                 "; acc:", np.round(acc*100, decimals=2),
                 flush=True)
-        if global_step % 20 == 0:
-            rgb = img_inr.produce_images(*dl_args['image shape'])
-            path = paths["job output dir"]+f"/imgs/{global_step}.png"
-            save_example_segs(path, rgb, pred_seg, gt_labels)
 
         if global_step % 100 == 0:
             torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
             loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
             iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
             acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
+
+            rgb = img_inr.produce_images(*dl_args['image shape'])[0]
+            path = paths["job output dir"]+f"/imgs/{global_step}.png"
+            save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
@@ -107,7 +103,7 @@ def train_segmenter(args):
 
             seg_inr = model(img_inr)
             if dl_args['sample type'] == 'grid':
-                segs = segs.reshape(*segs.shape[:2], -1).transpose(2,1)
+                segs = segs.flatten(start_dim=2).transpose(2,1)
                 seg_inr.toggle_grid_mode(True)
                 coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
             else:
@@ -119,7 +115,8 @@ def train_segmenter(args):
 
         else:
             img = img_inr.produce_images(*dl_args['image shape'])
-            logits = model(img)
+            logits = model(img).flatten(start_dim=2).transpose(2,1)
+            segs = segs.flatten(start_dim=2).transpose(2,1)
 
         backprop(model)
         if global_step >= args["optimizer"]["max steps"]:
@@ -164,27 +161,20 @@ def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'build
     label_names = [
         "{}:{}".format(i, n) for i, n in enumerate(class_names)
     ]
-    labelviz_pred = imgviz.label2rgb(
-        pred_seg, label_names=label_names, font_size=25, loc="rb"
-    )
-    labelviz_gt = imgviz.label2rgb(
-        gt_seg, label_names=label_names, font_size=25, loc="rb"
-    )
-    img = imgviz.color.rgb2gray(rgb)
-    labelviz_withimg = imgviz.label2rgb(label=label, image=img)
+    labelviz_pred = imgviz.label2rgb(pred_seg.cpu())#, label_names=label_names, font_size=6, loc="rb")
+    labelviz_gt = imgviz.label2rgb(gt_seg.cpu())#, label_names=label_names, font_size=6, loc="rb")
+    rgb = rescale_float(rgb.cpu().permute(1,2,0))
 
-    plt.figure(dpi=200)
+    plt.figure(dpi=400)
 
     plt.subplot(131)
     plt.title("rgb")
     plt.imshow(rgb)
     plt.axis("off")
-
     plt.subplot(132)
     plt.title("pred")
     plt.imshow(labelviz_pred)
     plt.axis("off")
-
     plt.subplot(133)
     plt.title("gt")
     plt.imshow(labelviz_gt)

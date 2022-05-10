@@ -7,7 +7,7 @@ F = nn.functional
 from inrnet import inn
 from inrnet.inn import functional as inrF
 
-def translate_convnext_model(input_shape, n_stages=2):
+def translate_convnext_model(input_shape, n_stages=2, mlp=128):
     extrema = ((-1,1),(-1,1))
     current_shape = input_shape
     sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
@@ -27,9 +27,12 @@ def translate_convnext_model(input_shape, n_stages=2):
     out_, in_ = fpn_bot_sd['conv.weight'].shape[:2]
     in_ = 256
     out_ = 128
-    cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
-    cv.weight.data = fpn_bot_sd['conv.weight'][:out_, :in_]
-    cv = inn.conversion.translate_strided_layer(cv, input_shape, extrema)[0]
+    if in_ >= mlp:
+        cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema), groups=32)
+    else:
+        cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
+        cv.weight.data = fpn_bot_sd['conv.weight'][:out_, :in_]
+        cv = inn.conversion.translate_strided_layer(cv, current_shape, extrema)[0]
     norm = nn.BatchNorm2d(out_)
     norm.weight.data = fpn_bot_sd['bn.weight'][:out_]
     norm.bias.data = fpn_bot_sd['bn.bias'][:out_]
@@ -80,9 +83,12 @@ def translate_convnext_model(input_shape, n_stages=2):
         out_, in_ = dec_fpn_sd[f'{i}.conv.weight'].shape[:2]
         in_ //= 2
         out_ //= 4
-        cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
-        cv.weight.data = dec_fpn_sd[f'{i}.conv.weight'][:out_, :in_]
-        cv = inn.conversion.translate_strided_layer(cv, current_shape, extrema)[0]
+        if in_ >= mlp:
+            cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema), groups=32)
+        else:
+            cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
+            cv.weight.data = dec_fpn_sd[f'{i}.conv.weight'][:out_, :in_]
+            cv = inn.conversion.translate_strided_layer(cv, current_shape, extrema)[0]
         norm = nn.BatchNorm2d(out_)
         norm.weight.data = dec_fpn_sd[f'{i}.bn.weight'][:out_]
         norm.bias.data = dec_fpn_sd[f'{i}.bn.bias'][:out_]
@@ -126,7 +132,7 @@ def translate_convnext_model(input_shape, n_stages=2):
         norms.append(inn.conversion.translate_simple_layer(norm))
 
 
-    num_classes=7
+    num_classes = 7
     seg_cls = inn.ChannelMixer(128, num_classes, bias=True)
     nn.init.kaiming_uniform_(seg_cls.weight, mode='fan_in')
     seg_cls.bias.data.zero_()

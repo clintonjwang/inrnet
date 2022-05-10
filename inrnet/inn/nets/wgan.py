@@ -6,10 +6,9 @@ F = nn.functional
 
 from inrnet import inn
 from inrnet.inn import functional as inrF
-from inrnet.inn.layers.reshape import produce_inr
 
 #G_layers=16, D_layers=14
-def translate_wgan_model(G_layers=16, D_layers=14, mlp=128, mlp_ratio=1.):
+def translate_wgan_model(G_layers=10, D_layers=8, mlp=128, mlp_ratio=1.):
     sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/wgan.pth')['state_dict']
     root = 'generator.'
     G_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
@@ -62,9 +61,9 @@ def translate_wgan_model(G_layers=16, D_layers=14, mlp=128, mlp_ratio=1.):
     root = 'to_rgb.'
     rgb_sd = {k[len(root):]:v for k,v in G_sd.items() if k.startswith(root)}
     out_, in_ = rgb_sd['conv.weight'].shape[:2]
-    in_//=2
+    in_ *= 2
     conv1x1 = inn.ChannelMixer(in_, out_, bias=True)
-    conv1x1.weight.data = rgb_sd['conv.weight'][:,:in_]
+    conv1x1.weight.data[:,:in_//2] = rgb_sd['conv.weight'].squeeze()#[:,:in_//2]
     conv1x1.bias.data = rgb_sd['conv.bias']
     to_rgb = nn.Sequential(conv1x1, inn.Tanh())
 
@@ -75,7 +74,7 @@ def translate_wgan_model(G_layers=16, D_layers=14, mlp=128, mlp_ratio=1.):
     rgb_sd = {k[len(root):]:v for k,v in D_sd.items() if k.startswith(root)}
     out_, in_ = rgb_sd['conv.weight'].shape[:2]
     conv1x1 = inn.ChannelMixer(in_, out_, bias=True)
-    conv1x1.weight.data = rgb_sd['conv.weight']
+    conv1x1.weight.data = rgb_sd['conv.weight'].squeeze()
     conv1x1.bias.data = rgb_sd['conv.bias']
     from_rgb = nn.Sequential(conv1x1, inn.LeakyReLU(0.2))
     layers = []
@@ -102,6 +101,8 @@ def translate_wgan_model(G_layers=16, D_layers=14, mlp=128, mlp_ratio=1.):
 
     root = 'decision.'
     dec_sd = {k[len(root):]:v for k,v in D_sd.items() if k.startswith(root)}
+    out_, in_ = dec_sd['conv.conv.weight'].shape[:2]
+    in_ //= 2
     cv = inn.MLPConv(in_, out_, [k*mlp_ratio for k in inn.get_kernel_size(current_shape, extrema, k=4)])
     # out_, in_ = dec_sd['conv.conv.weight'].shape[:2]
     # cv = nn.Conv2d(in_, out_, 4, padding=1, bias=True)
@@ -117,7 +118,7 @@ def translate_wgan_model(G_layers=16, D_layers=14, mlp=128, mlp_ratio=1.):
     fc = nn.Linear(in_, out_, bias=True)
     fc.weight.data = dec_sd['linear.weight']
     fc.bias.data = dec_sd['linear.bias']
-    pool = inn.layers.reshape.AdaptiveAvgPoolSequence((2,2), fc, extrema=extrema)
+    pool = inn.AdaptiveAvgPoolSequence((2,2), fc, extrema=extrema)
     decision = nn.Sequential(cv, norm, act, pool)
 
     D = Discriminator(from_rgb=from_rgb, layers=nn.Sequential(*layers), decision=decision)
@@ -187,6 +188,6 @@ class NoiseToINR(nn.Module):
     def forward(self, x):
         assert x.ndim == 2
         x = torch.reshape(self.linear(x), (x.size(0), -1, 4, 4))
-        inrs = produce_inr(x)
+        inrs = inn.produce_inr(x)
         inrs += self.bias
         return self.norm(self.act(inrs))

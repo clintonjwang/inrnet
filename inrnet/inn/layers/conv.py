@@ -78,6 +78,7 @@ class Conv(nn.Module):
         self.input_dims = input_dims
         self.stride = stride
         self.groups = groups
+        self.group_size = self.in_channels // self.groups
         self.dtype = dtype
         if bias:
             self.bias = nn.Parameter(torch.zeros(out_channels, dtype=dtype))
@@ -118,14 +119,9 @@ class SplineConv(Conv):
             stride=stride, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
         self.kernel_size = K = kernel_size
-        self.in_groups = self.in_channels // self.groups
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         self.register_buffer('shift', torch.tensor(shift, dtype=dtype))
-        if groups == 1 or (groups == in_channels and groups == out_channels):
-            pass
-        else:
-            raise NotImplementedError("groups")
 
         # fit pretrained kernel with b-spline
         h,w = init_weights.shape[2:]
@@ -140,7 +136,7 @@ class SplineConv(Conv):
 
         self.order = order
         C = []
-        for i in range(self.in_groups):
+        for i in range(self.group_size):
             C.append([])
             for o in range(out_channels):
                 bs = Spline2D(x,y, init_weights[o,i], bbox=bbox, kx=order,ky=order, s=smoothing)
@@ -184,7 +180,7 @@ class SplineConv(Conv):
         kx[values] = self.Tx.size(-1)-px-2
         ky[values] = self.Ty.size(-1)-py-2
 
-        in_, out_ = self.in_groups, self.out_channels
+        in_, out_ = self.group_size, self.out_channels
         Dim = in_*out_
         Ctrl = self.C.view(Dim, *self.C.shape[-2:])
         for z in range(X.size(0)):
@@ -208,36 +204,26 @@ class SplineConv(Conv):
             
             w_oi.append(D[:,px,py])
 
-        return torch.stack(w_oi).view(xy.size(0), self.out_channels, self.in_groups)
+        return torch.stack(w_oi).view(xy.size(0), self.out_channels, self.group_size)
 
 
 class MLPConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), separable=False, stride=0.,
+    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), stride=0.,
             input_dims=2, groups=1, padded_extrema=None, bias=False,
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             stride=stride, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = 0
         self.kernel_size = K = kernel_size
-        self.in_groups = self.in_channels // self.groups
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
-        if not (groups == 1 or (groups == in_channels and groups == out_channels)):
-            raise NotImplementedError("groups")
         if isinstance(mid_ch, int):
             mid_ch = [mid_ch]
 
         layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
         for ix in range(1,len(mid_ch)):
             layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
-        if self.in_groups == 1:
-            separable = False
-        if separable:
-            raise NotImplementedError
-            self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels + self.in_groups))
-        else:
-            self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.in_groups))
-        self.separable = separable
+        self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
 
         for k in range(0,len(self.kernel),2):
             nn.init.kaiming_uniform_(self.kernel[k].weight)
@@ -254,10 +240,7 @@ class MLPConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        if self.separable:
-            return self.kernel(xy)
-        else:
-            return self.kernel(xy).reshape(xy.size(0), self.out_channels, self.in_groups)
+        return self.kernel(xy).reshape(xy.size(0), self.out_channels, self.group_size)
 
 
 

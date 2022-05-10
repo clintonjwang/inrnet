@@ -31,17 +31,12 @@ class INet12(torchvision.datasets.VisionDataset):
             self.extra_subpaths = pickle.load(open(big12path, 'rb'))[cls]
 
     def __getitem__(self, ix):
-        if ix < 800:
-            img = Image.open(osp.join(self.root, self.subpaths[ix]))
-        else:
-            img = Image.open(osp.join(self.root, self.extra_subpaths[ix]))
+        img = Image.open(osp.join(self.root, self.subpaths[ix]))
         try:
             return self.transform(img)
         except RuntimeError:
             return self.transform(img.convert('RGB'))
     def __len__(self):
-        if hasattr(self, 'extra_subpaths'):
-            return len(self.subpaths) + len(self.extra_subpaths)
         return len(self.subpaths)
 
 
@@ -91,20 +86,19 @@ class INetDS(torchvision.datasets.VisionDataset):
 def get_inr_loader_for_inet12(bsz, subset):
     paths = [glob2(f"{DS_DIR}/inrnet/inet12/{c}/{subset}_*.pt") for c in range(12)]
     if subset == 'train':
-        N = 800
+        N = min([len(p) for p in paths]) #1800
         loop = True
     elif subset == 'test':
         N = 200
         loop = False
     else:
         raise NotImplementedError(f'bad subset {subset}')
-    for p in paths:
-        assert len(p)==N, f'incomplete subset ({len(p)}/{N})'
+    # for p in paths:
+    #     assert len(p)==N, f'incomplete subset ({len(p)}/{N})'
 
     # def inet_normalize(values):
     #     return (values - torch.tensor((0.485, 0.456, 0.406), device=values.device)) / torch.tensor(
     #         (0.229, 0.224, 0.225), device=values.device)
-
     keys = siren.get_siren_keys()
     if bsz % 12 == 0:
         n_per_cls = bsz // 12
@@ -183,5 +177,3 @@ def analyze_inr_error():
 #                 data_by_cls[cl] = None
 #                 break
     
-
-

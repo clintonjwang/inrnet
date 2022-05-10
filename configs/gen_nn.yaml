@@ -1,0 +1,3 @@
+parent: gen_train
+network:
+  type: wgan

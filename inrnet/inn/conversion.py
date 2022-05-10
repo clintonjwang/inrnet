@@ -66,9 +66,9 @@ def translate_sequential_layer(layers, current_shape, extrema):
         remaining_layers.append(layers[ix])
     if len(remaining_layers) > 0:
         if output_size in (1,(1,1)):
-            cont_layers.append(inn.layers.reshape.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
+            cont_layers.append(inn.GlobalAvgPoolSequence(nn.Sequential(*remaining_layers)))
         else:
-            cont_layers.append(inn.layers.reshape.AdaptiveAvgPoolSequence(
+            cont_layers.append(inn.AdaptiveAvgPoolSequence(
                 output_size, nn.Sequential(*remaining_layers)))
         current_shape, extrema = None, None
 

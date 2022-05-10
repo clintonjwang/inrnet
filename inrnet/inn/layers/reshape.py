@@ -74,23 +74,24 @@ class AdaptiveAvgPoolSequence(nn.Module):
         vvf.integrator = inrF.Integrator(AAPseq, 'AdaptivePoolSeq', layer=self, inr=inr)
         return vvf
 
-def AAPseq(values, layer, inr):
+def AAPseq(values, layer, inr, eps=1e-6):
     coords = inr.sampled_coords
     if inr.training:
         layer.train()
     else:
         layer.eval()
     h,w = layer.output_size
-    Tx = torch.linspace(*layer.extrema[0], steps=h+1, device=coords.device)
-    Ty = torch.linspace(*layer.extrema[1], steps=w+1, device=coords.device)
+
+    Tx = torch.linspace(layer.extrema[0][0]-eps, layer.extrema[0][1]+eps, steps=h+1, device=coords.device)
+    Ty = torch.linspace(layer.extrema[1][0]-eps, layer.extrema[1][1]+eps, steps=w+1, device=coords.device)
 
     X = coords[:,0].unsqueeze(1)
     Y = coords[:,1].unsqueeze(1)
 
-    values, kx = (Tx<=X).min(dim=-1)
-    assert values.max() == False
-    values, ky = (Ty<=Y).min(dim=-1)
-    assert values.max() == False
+    v, kx = (Tx<=X).min(dim=-1)
+    assert v.max() == False
+    v, ky = (Ty<=Y).min(dim=-1)
+    assert v.max() == False
     bins = kx-1 + (ky-1)*h
-    return torch.cat([values[bins==b].mean(0) for b in range(h*w)])
+    return torch.cat([values[:,bins==b].mean(1) for b in range(h*w)])
     

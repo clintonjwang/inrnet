@@ -203,6 +203,8 @@ class INRBatch(nn.Module):
 
     def forward(self, coords):
         if self.detached:
+            if hasattr(self, "cached_outputs"):
+                return self.cached_outputs.detach()
             with torch.no_grad():
                 return self._forward(coords)
         else:
@@ -241,11 +243,9 @@ class INRBatch(nn.Module):
 
 class BlackBoxINR(INRBatch):
     """wrapper for arbitrary INR architectures (SIREN, NeRF, etc.)"""
-    def __init__(self, inr_list, channels, device="cuda", dtype=torch.float, **kwargs):
+    def __init__(self, evaluator, channels, **kwargs):
         super().__init__(channels=channels, **kwargs)
-        if isinstance(inr_list, nn.Module):
-            inr_list = [inr_list]
-        self.evaluator = nn.ModuleList(inr_list).to(device=device, dtype=dtype)
+        self.evaluator = evaluator
 
     def __repr__(self):
         return f"""BlackBoxINR(batch_size={len(self.evaluator)}, channels={self.channels}, modifiers={self.modifiers})"""
@@ -289,6 +289,8 @@ class CondINR(INRBatch):
         return new_inr
     def forward(self, coords, condition):
         if self.detached:
+            if hasattr(self, "cached_outputs"):
+                return self.cached_outputs.detach()
             with torch.no_grad():
                 return self._forward(coords, condition)
         else:
@@ -402,14 +404,14 @@ class CatINR(MergeINR):
             merge_function=lambda x,y:torch.cat((x,y),dim=-1))
 
 
-class SplitINR(INRBatch):
-    # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
-    def __init__(self, inr, split_channel, merge_function):
-        super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
-        self.inr1 = inr1
-        self.channels1 = split_channel
-        self.channels2 = inr1.channels - split_channel
-        raise NotImplementedError('splitinr')
+# class SplitINR(INRBatch):
+#     # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
+#     def __init__(self, inr, split_channel, merge_function):
+#         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
+#         self.inr1 = inr1
+#         self.channels1 = split_channel
+#         self.channels2 = inr1.channels - split_channel
+#         raise NotImplementedError('splitinr')
 
-    def forward(self, coords):
-        return torch.split(self.inr1(coords))
+#     def _forward(self, coords):
+#         return torch.split(self.inr1(coords))

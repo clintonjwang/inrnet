@@ -9,7 +9,7 @@ def translate_pool(layer, input_shape, extrema):
     h,w = input_shape
     extrema_dists = extrema[0][1] - extrema[0][0], extrema[1][1] - extrema[1][0]
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
-    # k = layer.kernel_size * spacing[0], layer.kernel_size * spacing[1]
+    k = layer.kernel_size * spacing[0], layer.kernel_size * spacing[1]
     s = layer.stride * spacing[0], layer.stride * spacing[1]
     if layer.kernel_size % 2 == 0:
         shift = spacing[0]/2, spacing[1]/2
@@ -25,41 +25,28 @@ def translate_pool(layer, input_shape, extrema):
         k = layer.kernel_size[0] * layer.kernel_size[1]
 
     if isinstance(layer, nn.MaxPool2d):
-        return MaxPool(k=k, stride=s, shift=shift), out_shape, new_extrema
+        return MaxPool(kernel_size=k, stride=s, shift=shift), out_shape, new_extrema
         # return MaxPoolKernel(kernel_size=k, stride=s, shift=shift), out_shape, new_extrema
     elif isinstance(layer, nn.AvgPool2d):
-        return AvgPool(k=k, stride=s, shift=shift), out_shape, new_extrema
+        return AvgPool(kernel_size=k, stride=s, shift=shift), out_shape, new_extrema
     else:
         raise NotImplementedError
-
-
-def max_pool_kernel(values, inr, layer, query_coords=None):
-    coords = inr.sampled_coords
-    if query_coords is None:
-        if layer.stride != 0:
-            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
-        else:
-            query_coords = coords
-
-    if hasattr(layer, "norm"):
-        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-        mask = layer.norm(Diffs) < layer.radius
-    else:
-        if torch.amax(layer.shift) > 0:
-            query_coords = query_coords + layer.shift
-        Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) * (Diffs[...,1].abs() < layer.kernel_size[1]/2)
-    lens = tuple(mask.sum(1))
-    Y = values[torch.where(mask)[1]]
-    Ysplit = Y.split(lens)
-    return torch.stack([y.max(0).values for y in Ysplit], dim=0)
-
-#((Diffs[:,-1,0].abs() <= layer.kernel_size[0]) * (Diffs[:,-1,1].abs() <= layer.kernel_size[1])).sum()
 
 
 
 
 class AvgPool(nn.Module):
+    def __init__(self, kernel_size, stride=0., shift=(0,0)):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.register_buffer('shift', torch.tensor(shift))
+    def forward(self, inr):
+        new_inr = inr.create_derived_inr()
+        new_inr.set_integrator(inrF.avg_pool, 'MaxPool', layer=self)
+        return new_inr
+
+class AvgPoolNeighbor(nn.Module):
     def __init__(self, k, stride=0., shift=(0,0)):
         super().__init__()
         self.k = k
@@ -84,17 +71,6 @@ class AvgPoolBall(nn.Module):
         return new_inr
 
 class MaxPool(nn.Module):
-    def __init__(self, k, stride=0., shift=(0,0)):
-        super().__init__()
-        self.k = k
-        self.stride = stride
-        self.register_buffer('shift', torch.tensor(shift))
-    def forward(self, inr):
-        new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.max_pool, 'MaxPool', layer=self)
-        return new_inr
-
-class MaxPoolKernel(nn.Module):
     def __init__(self, kernel_size, stride=0., shift=(0,0)):
         super().__init__()
         self.kernel_size = kernel_size
@@ -102,7 +78,18 @@ class MaxPoolKernel(nn.Module):
         self.register_buffer('shift', torch.tensor(shift))
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(max_pool_kernel, 'MaxPoolKernel', layer=self)
+        new_inr.set_integrator(inrF.max_pool, 'MaxPool', layer=self)
+        return new_inr
+
+class MaxPoolNeighbor(nn.Module):
+    def __init__(self, k, stride=0., shift=(0,0)):
+        super().__init__()
+        self.k = k
+        self.stride = stride
+        self.register_buffer('shift', torch.tensor(shift))
+    def forward(self, inr):
+        new_inr = inr.create_derived_inr()
+        new_inr.set_integrator(inrF.max_pool, 'MaxPoolkNN', layer=self)
         return new_inr
 
 class MaxPoolBall(nn.Module):
@@ -115,5 +102,5 @@ class MaxPoolBall(nn.Module):
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(max_pool_kernel, 'MaxPoolBall', layer=self)
+        new_inr.set_integrator(inrF.max_pool, 'MaxPoolBall', layer=self)
         return new_inr
