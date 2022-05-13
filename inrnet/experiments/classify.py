@@ -8,6 +8,7 @@ import torchvision.models
 
 from inrnet.data import dataloader, inet
 from inrnet import inn, util, losses, jobs as job_mgmt
+from inrnet.models.common import Conv2, Conv5
 
 def load_pretrained_model(args):
     net_args = args["network"]
@@ -16,18 +17,47 @@ def load_pretrained_model(args):
     if isinstance(pretrained, str):
         base = load_model_from_job(pretrained)
     else:
-        # if net_args["type"] == "inr-effnet-b0":
-        #     base = torchvision.models.efficientnet_b0(pretrained=pretrained)
-        # elif net_args["type"] == "effnet-b0":
-        #     return torchvision.models.efficientnet_b0(pretrained=pretrained)
         out = nn.Linear(24, args["data loading"]['classes'])
         nn.init.kaiming_uniform_(out.weight, mode='fan_in')
         out.bias.data.zero_()
         if net_args["type"] == "effnet-s3":
-            m = torchvision.models.efficientnet_b0(pretrained=pretrained)
+            m = torchvision.models.efficientnet_b0(pretrained=False)
             return nn.Sequential(m.features[:3],
                 nn.AdaptiveAvgPool2d(output_size=1),
                 nn.Flatten(1), out)
+
+        elif net_args["type"] == "cnn-2":
+            return Conv2(in_channels=3, out_dims=12)
+
+        elif net_args["type"] == "cnn-5":
+            return Conv5(in_channels=3, out_dims=12)
+
+        elif net_args["type"] == "inr-2":
+            base = Conv2(in_channels=3, out_dims=12)
+            InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
+            inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
+            return InrNet
+            # from inrnet.inn.nets.effnet import SimpleConv
+            # return SimpleConv(in_channels=3, out_dims=12)
+
+        elif net_args["type"] == "inr-5":
+            base = Conv5(in_channels=3, out_dims=12)
+            InrNet, _ = inn.conversion.translate_discrete_model(base, img_shape)
+            inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
+            return InrNet
+
+        elif net_args["type"] == "inr-sc2":
+            from inrnet.inn.nets.effnet import SimpleConv2
+            return SimpleConv2(in_channels=3, out_dims=12)
+
+        elif net_args["type"] == "resnet":
+            out = nn.Linear(256, args["data loading"]['classes'])
+            nn.init.kaiming_uniform_(out.weight, mode='fan_in')
+            out.bias.data.zero_()
+            m = torchvision.models.resnet18(pretrained=False)
+            return nn.Sequential(
+                m.conv1, m.bn1, m.relu, m.maxpool, m.layer1, m.layer2, m.layer3,
+                nn.AdaptiveAvgPool2d(output_size=1), nn.Flatten(1), out)
 
         elif net_args["type"] == "inr-effnet-s3":
             m = torchvision.models.efficientnet_b0(pretrained=pretrained)
@@ -96,7 +126,8 @@ def train_classifier(args):
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
-    if args["network"]['type'].startswith('inr'):
+    if 'masking' in args["data loading"]:
+        raise NotImplementedError()
         N = dl_args["sample points"]
         for img_inr, labels in data_loader:
             global_step += 1
@@ -108,13 +139,25 @@ def train_classifier(args):
                 break
 
     else:
-        for img_inr, labels in data_loader:
-            global_step += 1
-            img = img_inr.produce_images(*dl_args['image shape'])
-            logits = model(img)
-            backprop(model)
-            if global_step >= args["optimizer"]["max steps"]:
-                break
+        if args["network"]['type'].startswith('inr'):
+            N = dl_args["sample points"]
+            for img_inr, labels in data_loader:
+                global_step += 1
+                logit_fxn = model(img_inr)
+                coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
+                logits = logit_fxn(coords)
+                backprop(model)
+                if global_step >= args["optimizer"]["max steps"]:
+                    break
+
+        else:
+            for img_inr, labels in data_loader:
+                global_step += 1
+                img = img_inr.produce_images(*dl_args['image shape'])
+                logits = model(img)
+                backprop(model)
+                if global_step >= args["optimizer"]["max steps"]:
+                    break
 
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 

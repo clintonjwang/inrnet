@@ -1,69 +1,70 @@
-import torch
+import torch, pdb
 nn=torch.nn
-import numpy as np
-import cv2
 
-class GaussianFourierFeatureTransform(torch.nn.Module):
-    """
-    An implementation of Gaussian Fourier feature mapping.
+from inrnet import util, inn
 
-    "Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains":
-       https://arxiv.org/abs/2006.10739
-       https://people.eecs.berkeley.edu/~bmild/fourfeat/index.html
+def to_black_box(rff_list, **kwargs):
+    evaluator = nn.ModuleList(rff_list).eval()
+    return inn.BlackBoxINR(evaluator, channels=3, input_dims=2, domain=(-1,1), **kwargs)
 
-    Given an input of size [batches, num_input_channels, width, height],
-     returns a tensor of size [batches, mapping_size*2, width, height].
-    """
+"""
+An implementation of Gaussian Fourier feature mapping.
 
-    def __init__(self, num_input_channels, mapping_size=256, scale=10):
+"Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains":
+   https://arxiv.org/abs/2006.10739
+   https://people.eecs.berkeley.edu/~bmild/fourfeat/index.html
+"""
+class RFFNet(nn.Module):
+    def __init__(self, input_dims=2, num_feats=256, scale=30, eps=0.): #eps=1/256
         super().__init__()
-        self._num_input_channels = num_input_channels
-        self._mapping_size = mapping_size
-        self._B = torch.randn((num_input_channels, mapping_size)) * scale
+        self.register_buffer('_B', torch.randn((input_dims, num_feats//2)) * scale)
+        # self._B = nn.Parameter(torch.randn((input_dims, num_feats//2)) * scale)
+        self.layers = nn.Sequential(
+            nn.Conv1d(num_feats, num_feats, kernel_size=1, padding=0, bias=False),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(num_feats),
+            nn.Conv1d(num_feats, num_feats, kernel_size=1, padding=0, bias=False),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(num_feats),
+            nn.Conv1d(num_feats, num_feats, kernel_size=1, padding=0, bias=False),
+            nn.ReLU(inplace=True),
+            nn.BatchNorm1d(num_feats),
+            nn.Conv1d(num_feats, 3, kernel_size=1, padding=0, bias=False),
+            nn.Sigmoid(),
+        )
+        self.eps = eps
 
-    def forward(self, x):
-        assert x.dim() == 4, 'Expected 4D input (got {}D input)'.format(x.dim())
+    def coord_transform(self, coords): #x - [N,2]
+        if self.training and hasattr(self, 'features'):
+            return self.features
 
-        batches, channels, width, height = x.shape
+        coords = (coords.unsqueeze(0)+1)*(1-self.eps)/2
+        x = coords @ self._B
+        x = torch.cat([torch.sin(x), torch.cos(x)], dim=-1).transpose(1,2)
 
-        assert channels == self._num_input_channels,\
-            "Expected input to have {} channels (got {} channels)".format(self._num_input_channels, channels)
+        if self.training:
+            self.features = x
+        return x
 
-        # Make shape compatible for matmul with _B.
-        # From [B, C, W, H] to [(B*W*H), C].
-        x = x.permute(0, 2, 3, 1).reshape(batches * width * height, channels)
-        x = x @ self._B.to(x.device)
-        # From [(B*W*H), C] to [B, W, H, C]
-        x = x.view(batches, width, height, self._mapping_size)
-        # From [B, W, H, C] to [B, C, W, H]
-        x = x.permute(0, 3, 1, 2)
-        x = 2 * np.pi * x
-        return torch.cat([torch.sin(x), torch.cos(x)], dim=1)
+    def forward(self, coords):
+        return self.layers(self.coord_transform(coords)).transpose(1,2).squeeze() #[N,3]
 
-def fit_rff():
-    target = torch.tensor(get_image(), device='cuda').unsqueeze(0).permute(0, 3, 1, 2)
-    coords = np.linspace(0, 1, target.shape[2], endpoint=False)
-    xy_grid = np.stack(np.meshgrid(coords, coords), -1)
-    xy_grid = torch.tensor(xy_grid, device='cuda').unsqueeze(0).permute(0, 3, 1, 2).float().contiguous()
-    model = nn.Sequential(
-                nn.Conv2d(256, 256, kernel_size=1, padding=0),
-                nn.ReLU(),
-                nn.BatchNorm2d(256),
-                nn.Conv2d(256, 256, kernel_size=1, padding=0),
-                nn.ReLU(),
-                nn.BatchNorm2d(256),
-                nn.Conv2d(256, 256, kernel_size=1, padding=0),
-                nn.ReLU(),
-                nn.BatchNorm2d(256),
-                nn.Conv2d(256, 3, kernel_size=1, padding=0),
-                nn.Sigmoid(),
-            ).cuda()
+def get_rff_keys():
+    return NotImplemented
 
-    x = GaussianFourierFeatureTransform(2, 128, 10)(xy_grid)
-    optimizer = torch.optim.Adam(list(model.parameters()), lr=1e-4)
-    for epoch in range(400):
+def fit_rff_to_img(target, total_steps):
+    h,w = target.shape[1:]
+    target = target.flatten(1).T.cuda()
+    xy_grid = util.meshgrid_coords(h,w, c2f=False)
+    model = RFFNet().cuda()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    for epoch in range(total_steps):
         optimizer.zero_grad()
-        generated = model(x)
-        loss = torch.nn.functional.l1_loss(target, generated)
+        generated = model(xy_grid)
+        loss = nn.functional.l1_loss(generated, target)
         loss.backward()
         optimizer.step()
+        # if epoch % 200 == 199:
+    print("Loss %0.4f" % (loss.item()), flush=True)
+
+    return model, loss

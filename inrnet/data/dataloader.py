@@ -57,8 +57,12 @@ def get_img_dataset(args):
             transforms.Resize(size),
             # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
+        if dl_args['subset'] == 'train_extra':
+            mode = 'coarse'
+        else:
+            mode = 'fine'
         return torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
-            split=dl_args['subset'], mode='fine', target_type='semantic',
+            split=dl_args['subset'], mode=mode, target_type='semantic',
             transform=trans, target_transform=cityscapes.seg_transform)
 
     elif dl_args["dataset"] == "flowers":
@@ -89,7 +93,8 @@ def get_inr_dataloader(dl_args):
     elif dl_args["dataset"] == "inet12":
         return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
     elif dl_args["dataset"] == "flowers":
-        return get_inr_loader_for_imgds('flowers', bsz=dl_args['batch size'], subset=dl_args['subset'])
+        # return get_inr_loader_for_imgds('flowers', bsz=dl_args['batch size'], subset=dl_args['subset'])
+        return get_inr_loader_for_flowers(bsz=dl_args['batch size'])
     else:
         raise NotImplementedError(dl_args["dataset"])
 
@@ -112,7 +117,24 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
                 yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
     return random_loader()
 
-    
+def get_inr_loader_for_flowers(bsz):
+    paths = glob2(f"{DS_DIR}/inrnet/flowers/*.pt")
+    keys = siren.get_siren_keys()
+    def random_loader():
+        inrs = []
+        while True:
+            np.random.shuffle(paths)
+            for path in paths:
+                inr = siren.Siren(out_channels=3)
+                param_dict = torch.load(path)
+                inr.load_state_dict(param_dict)
+                inrs.append(inr)
+                if len(inrs) == bsz:
+                    yield siren.to_black_box(inrs).cuda()
+                    inrs = []
+    return random_loader()
+
+
 def get_inr_loader_for_imgds(ds_name, bsz, subset):
     paths = glob2(f"{DS_DIR}/inrnet/{ds_name}/{subset}_*.pt")
     if len(paths) == 0:

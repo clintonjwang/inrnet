@@ -1,0 +1,5 @@
+parent: seg_train
+data loading:
+  sample type: valid
+network:
+  type: inr-5

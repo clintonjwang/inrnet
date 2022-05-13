@@ -1,14 +1,12 @@
 import torch, pdb, math
 import numpy as np
-from functools import partial
 nn = torch.nn
-F = nn.functional
 
 from inrnet import inn
 from inrnet.inn import functional as inrF
 
 #G_layers=16, D_layers=14
-def translate_wgan_model(G_layers=10, D_layers=8, mlp=128, mlp_ratio=1.):
+def translate_wgan_model(G_layers=10, D_layers=8, mlp=128):
     sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/wgan.pth')['state_dict']
     root = 'generator.'
     G_sd = {k[len(root):]:v for k,v in sd.items() if k.startswith(root)}
@@ -37,10 +35,10 @@ def translate_wgan_model(G_layers=10, D_layers=8, mlp=128, mlp_ratio=1.):
         root = f'conv_blocks.{i}'
         try:
             out_, in_ = G_sd[f'{root}.conv.weight'].shape[:2]
-            out_//=2
-            in_//=2
+            out_ //= 2
+            in_ //= 2
             if in_ >= mlp:
-                cv = inn.MLPConv(in_, out_, [k*mlp_ratio for k in inn.get_kernel_size(current_shape, extrema)])
+                cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5))
             else:
                 cv = nn.Conv2d(in_, out_, 3, padding=1)
                 cv.weight.data = G_sd[f'{root}.conv.weight'][:out_, :in_]
@@ -83,7 +81,7 @@ def translate_wgan_model(G_layers=10, D_layers=8, mlp=128, mlp_ratio=1.):
         try:
             out_, in_ = D_sd[f'{root}.conv.weight'].shape[:2]
             if in_ >= mlp:
-                cv = inn.MLPConv(in_, out_, [k*mlp_ratio for k in inn.get_kernel_size(current_shape, extrema)])
+                cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5))
             else:
                 cv = nn.Conv2d(in_, out_, 3, padding=1)
                 cv.weight.data = D_sd[f'{root}.conv.weight'][:out_, :in_]
@@ -103,7 +101,7 @@ def translate_wgan_model(G_layers=10, D_layers=8, mlp=128, mlp_ratio=1.):
     dec_sd = {k[len(root):]:v for k,v in D_sd.items() if k.startswith(root)}
     out_, in_ = dec_sd['conv.conv.weight'].shape[:2]
     in_ //= 2
-    cv = inn.MLPConv(in_, out_, [k*mlp_ratio for k in inn.get_kernel_size(current_shape, extrema, k=4)])
+    cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5))
     # out_, in_ = dec_sd['conv.conv.weight'].shape[:2]
     # cv = nn.Conv2d(in_, out_, 4, padding=1, bias=True)
     # cv.weight.data = D_sd['conv.conv.weight']

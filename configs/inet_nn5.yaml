@@ -1,0 +1,5 @@
+parent: inet_train
+network:
+  type: cnn-5
+optimizer:
+  learning rate: 1e-4

@@ -29,11 +29,8 @@ def conv(values: torch.Tensor, # [B,N,c_in]
     dtype = layer.dtype
     coords = inr.sampled_coords.to(dtype=dtype) #[N,d]
     if query_coords is None:
-        if layer.stride != 0:
-            # if inr.grid_mode:
-            #     inr.sampled_coords = query_coords = subsample_points_by_grid(coords, spacing=layer.stride).to(dtype=dtype)
-            # else:
-            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+        if layer.down_ratio != 0:
+            inr.sampled_coords = query_coords = coords[:round(coords.size(0)*layer.down_ratio)]
         else:
             query_coords = coords
 
@@ -52,8 +49,7 @@ def conv(values: torch.Tensor, # [B,N,c_in]
 
     # if layer.dropout > 0 and (inr.training and layer.training):
     #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
-
-    Y = values[:,torch.where(mask)[1]].to(dtype=dtype) # flattened list of values of neighborhood points
+    Y = values[:,torch.where(mask)[1]] # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
     Ysplit = Y.split(lens, dim=1) # list of values at neighborhood points
@@ -198,15 +194,22 @@ def interpolate_weights_single_channel(xy, tx,ty,c, order=2):
 
 
 def avg_pool(values, inr, layer, query_coords=None):
-    return pool('mean', values, inr, layer, query_coords=query_coords)
+    pool_fxn = lambda x: x.mean(dim=2)
+    return pool(pool_fxn, values, inr, layer, query_coords=query_coords)
 def max_pool(values, inr, layer, query_coords=None):
-    return pool('amax', values, inr, layer, query_coords=query_coords)
+    def pool_fxn(x):
+        n = x.size(1)
+        m = x.amax(1)
+        if n == 1:
+            return m
+        return torch.where(m<0, m, m * (n+1)/(n-1) * 3/5)
+    return pool(pool_fxn, values, inr, layer, query_coords=query_coords)
 
 def pool(pool_fxn, values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
-        if layer.stride != 0:
-            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+        if layer.down_ratio != 0:
+            inr.sampled_coords = query_coords = coords[:round(coords.size(0)*layer.down_ratio)]
         else:
             query_coords = coords
 
@@ -214,24 +217,23 @@ def pool(pool_fxn, values, inr, layer, query_coords=None):
         query_coords = query_coords + layer.shift
     Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
     if hasattr(layer, 'kernel_size'):
-        mask = (Diffs[...,0].abs() < layer.kernel_size[0]) & (Diffs[...,1].abs() < layer.kernel_size[1])
+        mask = (Diffs[...,0].abs() < layer.kernel_size[0]/2) & (Diffs[...,1].abs() < layer.kernel_size[1]/2)
     elif hasattr(layer, 'norm'):
         mask = layer.norm(Diffs) < layer.radius 
     else:
         mask = Diffs.norm(dim=-1).topk(k=layer.k, dim=1, largest=False).indices
-        return getattr(values[:,mask], pool_fxn)(dim=2)
+        return pool_fxn(values[:,mask])
 
     Y = values[:,torch.where(mask)[1]]
-    return torch.stack([getattr(y, pool_fxn)(dim=2) for y in Y.split(tuple(mask.sum(1)), dim=1)])
-    
+    return torch.stack([pool_fxn(y) for y in Y.split(tuple(mask.sum(1)), dim=1)], dim=1)
 
     
 
 def max_pool_kernel(values, inr, layer, query_coords=None):
     coords = inr.sampled_coords
     if query_coords is None:
-        if layer.stride != 0:
-            inr.sampled_coords = query_coords = coords[:coords.size(0)//4]
+        if layer.down_ratio != 0:
+            inr.sampled_coords = query_coords = coords[:round(coords.size(0)*layer.down_ratio)]
         else:
             query_coords = coords
 
@@ -319,6 +321,19 @@ def batch_normalize(values, inr, layer):
 
 
 ### Misc
+
+def generate_valid_sample_points(mask, sample_size, eps=1/32):
+    #mask - (1,H,W)
+    mask = mask.squeeze()
+    H,W = mask.shape
+    fraction = (mask.sum()/torch.numel(mask)).item()
+    coords = generate_quasirandom_sequence(d=2, n=int(sample_size/fraction * 1.2), bbox=(eps,H-eps,eps,W-eps), scramble=True)
+    coo = torch.floor(coords).long()
+    bools = mask[coo[:,0], coo[:,1]]
+    coord_subset = coords[bools]
+    if coord_subset.size(0) < sample_size:
+        return generate_valid_sample_points(mask, int(sample_size*1.5))
+    return coord_subset[:sample_size]
 
 
 def generate_quasirandom_sequence(d=2, n=128, bbox=(-1,1,-1,1), scramble=False,

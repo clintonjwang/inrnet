@@ -44,15 +44,15 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
     padded_extrema=((extrema[0][0]-spacing[0]/2, extrema[0][1]+spacing[0]/2),
             (extrema[1][0]-spacing[1]/2, extrema[1][1]+spacing[1]/2))
     if conv2d.stride in [1,(1,1)]:
-        stride = 0.
+        down_ratio = 1.
         out_shape = input_shape
-    elif conv2d.stride in [2,(2,2)]:
-        stride = conv2d.stride[0] * spacing[0], conv2d.stride[1] * spacing[1]
+    elif conv2d.stride == (2,2):
+        down_ratio = 1/(conv2d.stride[0]*conv2d.stride[1])
         out_shape = (input_shape[0]//2, input_shape[1]//2)
         extrema = ((extrema[0][0], extrema[0][1]-spacing[0]),
             (extrema[1][0], extrema[1][1]-spacing[1]))
     else:
-        raise NotImplementedError("stride")
+        raise NotImplementedError("down_ratio")
 
     bias = conv2d.bias is not None
     layer = SplineConv(in_*conv2d.groups, out_, order=order, smoothing=smoothing,
@@ -62,7 +62,7 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
         padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
         # N_bins=0,
         N_bins=2**math.ceil(math.log2(k1*k2)+4),
-        kernel_size=K, stride=stride, bias=bias, **kwargs)
+        kernel_size=K, down_ratio=down_ratio, bias=bias, **kwargs)
     if bias:
         layer.bias.data = conv2d.bias.data
 
@@ -71,12 +71,12 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
 
 
 class Conv(nn.Module):
-    def __init__(self, in_channels, out_channels, input_dims=2, stride=0., groups=1, bias=False, dtype=torch.float):
+    def __init__(self, in_channels, out_channels, input_dims=2, down_ratio=1., groups=1, bias=False, dtype=torch.float):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.input_dims = input_dims
-        self.stride = stride
+        self.down_ratio = down_ratio
         self.groups = groups
         self.group_size = self.in_channels // self.groups
         self.dtype = dtype
@@ -111,13 +111,15 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
 
 
 class SplineConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, stride=0.,
+    def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, down_ratio=1.,
             input_dims=2, N_bins=0, groups=1, zero_at_bounds=False,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
-            stride=stride, bias=bias, groups=groups, dtype=dtype)
+            down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
+        if not hasattr(kernel_size, '__iter__'):
+            kernel_size = (kernel_size, kernel_size)
         self.kernel_size = K = kernel_size
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
@@ -208,21 +210,35 @@ class SplineConv(Conv):
 
 
 class MLPConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), stride=0.,
-            input_dims=2, groups=1, padded_extrema=None, bias=False,
+    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), down_ratio=1.,
+            input_dims=2, groups=1, padded_extrema=None, bias=False, scale=None,
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
-            stride=stride, bias=bias, groups=groups, dtype=dtype)
+            down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = 0
+        if not hasattr(kernel_size, '__iter__'):
+            kernel_size = (kernel_size, kernel_size)
         self.kernel_size = K = kernel_size
+        if scale is None:
+            # scale = (10/K[0], 10/K[1])
+            scale = (1/K[0], 1/K[1])
+        self.register_buffer("scale", torch.as_tensor(scale, dtype=dtype))
+        
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         if isinstance(mid_ch, int):
             mid_ch = [mid_ch]
 
-        layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
+        # layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
+        # for ix in range(1,len(mid_ch)):
+        #     layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
+        # self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
+
+        self.first = nn.Linear(input_dims, mid_ch[0])
+        self.first.weight.data.uniform_(-1/input_dims, 1/input_dims)
+        layers = []
         for ix in range(1,len(mid_ch)):
-            layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
+            layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.ReLU(inplace=True)]
         self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
 
         for k in range(0,len(self.kernel),2):
@@ -240,18 +256,18 @@ class MLPConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        return self.kernel(xy).reshape(xy.size(0), self.out_channels, self.group_size)
-
+        # return self.kernel(xy * self.scale).reshape(xy.size(0), self.out_channels, self.group_size)
+        return self.kernel(torch.sin(self.first(xy*self.scale) * 10)).reshape(xy.size(0), self.out_channels, self.group_size)
 
 
 
 class BallConv(Conv):
-    def __init__(self, in_channels, out_channels, radius, stride=0., p_norm="inf",
+    def __init__(self, in_channels, out_channels, radius, down_ratio=1., p_norm="inf",
             input_dims=2, N_bins=16, groups=1, bias=False,
             parameterization="polynomial", padding_mode="cutoff",
             order=3, dropout=0.):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
-            stride=stride, bias=bias, groups=groups)
+            down_ratio=down_ratio, bias=bias, groups=groups)
         self.radius = radius
         self.dropout = dropout
         self.N_bins = N_bins

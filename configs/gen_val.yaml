@@ -1,0 +1,12 @@
+network:
+  task: generate
+data loading:
+  batch size: 32
+  subset: test
+  dataset: cityscapes
+  classes: 7
+  sample type: grid
+  sample points: 8192
+  image shape:
+  - 64
+  - 64

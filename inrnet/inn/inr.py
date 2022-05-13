@@ -242,10 +242,12 @@ class INRBatch(nn.Module):
 
 
 class BlackBoxINR(INRBatch):
-    """wrapper for arbitrary INR architectures (SIREN, NeRF, etc.)"""
+    """Wrapper for arbitrary INR architectures (SIREN, NeRF, etc.).
+    Not for batched INRs - this generates each INR one at a time
+    """
     def __init__(self, evaluator, channels, **kwargs):
         super().__init__(channels=channels, **kwargs)
-        self.evaluator = evaluator
+        self.evaluator = nn.ModuleList(evaluator).eval()
 
     def __repr__(self):
         return f"""BlackBoxINR(batch_size={len(self.evaluator)}, channels={self.channels}, modifiers={self.modifiers})"""

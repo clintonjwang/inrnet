@@ -32,7 +32,7 @@ def replace_conv_kernel(layer, k_type='mlp', k_ratio=1.):
     #if k_type
     if isinstance(layer, inn.SplineConv):
         conv = inn.MLPConv(layer.in_channels, layer.out_channels, [k*k_ratio for k in layer.kernel_size],
-            stride=layer.stride, groups=layer.groups)
+            down_ratio=layer.down_ratio, groups=layer.groups)
         # conv.padded_extrema = layer.padded_extrema
         conv.bias = layer.bias
         return conv

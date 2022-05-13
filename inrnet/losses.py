@@ -52,14 +52,11 @@ def adv_loss_fxns(loss_settings):
     else:
         raise NotImplementedError
 
-def gradient_penalty(real_img, generated_img, D=None, DR=None):
+def gradient_penalty(real_img, generated_img, D):
     B = real_img.size()[0]
     alpha = torch.rand(B, 1, 1, 1).expand_as(real_img).cuda()
     interp_img = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach()).cuda()
-    if DR is None:
-        interp_logit = D(interp_img)
-    else:
-        interp_logit,_ = DR(interp_img)
+    interp_logit = D(interp_img)
 
     grads = torch.autograd.grad(outputs=interp_logit, inputs=interp_img,
                grad_outputs=torch.ones(interp_logit.size()).cuda(),

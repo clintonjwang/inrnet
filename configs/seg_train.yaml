@@ -4,17 +4,17 @@ network:
   pretrained: true
   frozen: false
 data loading:
-  batch size: 5
+  batch size: 1
   subset: train
   dataset: cityscapes
   classes: 7
-  sample type: grid
-  sample points: 2048
+  sample type: valid
+  sample points: 4608
   image shape:
-  - 32
-  - 64
+  - 48
+  - 96
 optimizer:
   type: AdamW
-  learning rate: 1e-5
-  max steps: 29750
+  learning rate: 1e-3
+  max steps: 59500
 #N=2975 / bsz * 10 epochs

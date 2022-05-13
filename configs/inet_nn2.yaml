@@ -1,0 +1,5 @@
+parent: inet_train
+network:
+  type: nn-sc1
+optimizer:
+  learning rate: 1e-4

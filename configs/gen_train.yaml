@@ -4,7 +4,7 @@ network:
   pretrained: true
   frozen: true
 data loading:
-  batch size: 1
+  batch size: 64
   subset: train
   dataset: flowers
   sample type: grid
@@ -18,8 +18,8 @@ data loading:
   - 32
 optimizer:
   type: AdamW
-  learning rate: 1e-6
-  max steps: 10000
+  learning rate: 1e-4
+  max steps: 40000
 loss settings:
   adversarial loss type: WGAN
 #N=? / bsz * 10 epochs

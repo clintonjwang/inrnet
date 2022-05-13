@@ -10,6 +10,13 @@ import seaborn as sns
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
+def imshow(img):
+    if isinstance(img, torch.Tensor):
+        plt.imshow(rescale_noclip(img.detach().cpu().squeeze().permute(1,2,0).numpy()));
+    else:
+        plt.imshow(img)
+    plt.axis('off');
+
 def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, split=None):
     if coords is None:
         coords = inr.sampled_coords

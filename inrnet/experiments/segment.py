@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
 from inrnet import inn, util, losses, jobs as job_mgmt
+from inrnet.inn import functional as inrF
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
+import inn.nets.inr2inr
 
-rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=5, upper=95, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_float = mtr.ScaleIntensity()
+DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
 def load_pretrained_model(args):
     net_args = args["network"]
@@ -23,6 +25,16 @@ def load_pretrained_model(args):
     else:
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
+        elif net_args["type"] == "inr-3":
+            return inn.nets.inr2inr.ISeg3(in_channels=3, out_channels=7)
+        elif net_args["type"] == "inr-5":
+            return inn.nets.inr2inr.ISeg4(in_channels=3, out_channels=7)
+        elif net_args["type"] == "cnn-3":
+            return 
+        elif net_args["type"] == "cnn-5":
+            return 
+        elif net_args["type"] == "inr-simpleskip":
+            return inn.nets.inr2inr.SimpleSkip(in_channels=3, out_channels=7)
         elif net_args["type"] == "inr-convnext":
             if pretrained is False:
                 print('from scratch not implemented yet')
@@ -39,7 +51,7 @@ def load_pretrained_model(args):
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
-    path = osp.expanduser(f"~/code/diffcoord/results/{origin}/weights/best.pth")
+    path = osp.expanduser(f"~/code/diffcoord/results/{origin}/weights/model.pth")
     model = load_pretrained_model(orig_args)
     model.load_state_dict(torch.load(path))
     return model
@@ -52,45 +64,22 @@ def mean_iou(pred_seg, gt_seg):
 def pixel_acc(pred_seg, gt_seg):
     return (pred_seg & gt_seg).sum() / pred_seg.size(0)
 
+def get_seg_at_coords(seg, coords):
+    coo = torch.floor(coords).long()
+    return seg[...,coo[:,0], coo[:,1]].transpose(1,2)
+
 def train_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
-    data_loader = dataloader.get_inr_dataloader(dl_args)
     global_step = 0
-    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())#nn.BCEWithLogitsLoss())
+    trainsegdist = torch.load(DS_DIR+'/inrnet/cityscapes/trainsegdist.pt')
+    weight = trainsegdist.sum() / trainsegdist
+    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss(weight=weight.cuda()))#nn.BCEWithLogitsLoss())
     iou_tracker = util.MetricTracker("mean IoU", function=mean_iou)
     acc_tracker = util.MetricTracker("pixel accuracy", function=pixel_acc)
-    bsz = dl_args['batch size']
-
-    def backprop(network):
-        # loss = loss_tracker(logits, segs.float()) #BCE
-        maxes, gt_labels = segs.max(-1)
-        loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
-        if torch.isnan(loss):
-            raise ValueError('nan loss')
-        pred_seg = logits.max(-1).indices
-        pred_1hot = F.one_hot(pred_seg, num_classes=segs.size(-1)).bool()
-        iou = iou_tracker(pred_1hot[maxes != 0], segs[maxes != 0]).item()
-        acc = acc_tracker(pred_1hot[maxes != 0], segs[maxes != 0]).item()
-
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-
-        if global_step % 20 == 0:
-            print(np.round(loss.item(), decimals=3), "; iou:", np.round(iou, decimals=3),
-                "; acc:", np.round(acc*100, decimals=2),
-                flush=True)
-
-        if global_step % 100 == 0:
-            torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-            loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
-            acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
-
-            rgb = img_inr.produce_images(*dl_args['image shape'])[0]
-            path = paths["job output dir"]+f"/imgs/{global_step}.png"
-            save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
+    if dl_args['sample type'] == 'valid':
+        dl_args['batch size'] = 1 #cannot handle different masks per datapoint
+    data_loader = dataloader.get_inr_dataloader(dl_args)
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
@@ -102,12 +91,18 @@ def train_segmenter(args):
                 inrnet.inn.nets.convnext.enable_cn_blocks(model)
 
             seg_inr = model(img_inr)
-            if dl_args['sample type'] == 'grid':
-                segs = segs.flatten(start_dim=2).transpose(2,1)
+            if dl_args['sample type'] == 'valid':
+                coords = inrF.generate_valid_sample_points(mask=(segs.amax(1) == True),
+                    sample_size=dl_args["sample points"])
+                seg_gt = get_seg_at_coords(segs, coords)
+
+            elif dl_args['sample type'] == 'grid':
+                seg_gt = segs.flatten(start_dim=2).transpose(2,1)
                 seg_inr.toggle_grid_mode(True)
                 coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+            
             else:
-                segs = get_seg_at_coords(coords)
+                seg_gt = get_seg_at_coords(segs, coords)
                 coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
             logits = seg_inr.cuda()(coords)
             if dl_args['sample type'] == 'grid':
@@ -116,13 +111,64 @@ def train_segmenter(args):
         else:
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img).flatten(start_dim=2).transpose(2,1)
-            segs = segs.flatten(start_dim=2).transpose(2,1)
+            seg_gt = segs.flatten(start_dim=2).transpose(2,1)
 
-        backprop(model)
+        # loss = loss_tracker(logits, seg_gt.float()) #BCE
+        maxes, gt_labels = seg_gt.max(-1)
+        loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
+        if torch.isnan(loss):
+            raise ValueError('nan loss')
+        pred_seg = logits.max(-1).indices
+        pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
+        iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+        acc = acc_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+
+        if global_step % 20 == 0:
+            print(np.round(loss.item(), decimals=3), "; iou:", np.round(iou, decimals=3),
+                "; acc:", np.round(acc*100, decimals=2),
+                flush=True)
+
+        if global_step % 2 == 0:
+            torch.save(model.state_dict(), osp.join(paths["weights dir"], "model.pth"))
+            loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
+            iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
+            acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
+
+            with torch.no_grad():
+                rgb = img_inr.produce_images(*dl_args['image shape'])[0]
+                if args["network"]['type'].startswith('inr'):
+                    if dl_args['sample type'] == 'valid':
+                        pdb.set_trace()
+                        coords = inrF.generate_valid_sample_points(mask=(segs.amax(1) == True),
+                            sample_size=dl_args["sample points"])
+                        seg_gt = get_seg_at_coords(segs, coords)
+                        grid_coords = seg_inr.generate_sample_points(
+                            dims=dl_args['image shape'], mode='grid')
+
+                    # elif dl_args['sample type'] != 'grid':
+                    #     seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+                    #     maxes, gt_labels = seg_gt.max(-1)
+                    #     seg_inr = model(img_inr)
+                    #     seg_inr.toggle_grid_mode(True)
+                    #     coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+                    #     logits = seg_inr.cuda()(coords)
+                    #     logits = util.realign_values(logits, coords=coords)
+                    #     pred_seg = logits.max(-1).indices
+                gt_labels += 1
+                gt_labels[maxes == 0] = 0
+                pred_seg += 1
+                pred_seg[maxes == 0] = 0
+            path = paths["job output dir"]+f"/imgs/{global_step}.png"
+            save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
+
         if global_step >= args["optimizer"]["max steps"]:
             break
 
-    torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
+    torch.save(model.state_dict(), osp.join(paths["weights dir"], "model.pth"))
 
 
 def test_inr_segmenter(args):
@@ -204,6 +250,3 @@ def save_figure():
         torch.cuda.empty_cache()
         InrNet.train()
         
-
-def get_seg_at_coords():
-    return

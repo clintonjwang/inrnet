@@ -58,7 +58,7 @@ def replace_segs(subset):
         N = 500
 
     ds = torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
-            split=subset, mode='fine', target_type='semantic',
+            split=subset, mode='coarse', target_type='semantic',
             target_transform=seg_transform)
 
     for i in range(N):
@@ -68,7 +68,25 @@ def replace_segs(subset):
         #if (Fseg & Cseg).sum() / (Fseg | Cseg).sum() > .3:
         torch.save((param_dict, Fseg), path)
 
+def add_val_segs(subset='val', N=500):
+    ds = torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
+            split=subset, mode='fine', target_type='semantic',
+            target_transform=seg_transform)
+    for i in range(N):
+        path = f"{DS_DIR}/inrnet/cityscapes/{subset}_{i}.pt"
+        Fseg = ds[i][1].squeeze(0)
+        param_dict, _ = torch.load(path)
+        new_path = f"{DS_DIR}/inrnet/cityscapes/fine_{subset}_{i}.pt"
+        torch.save((param_dict, Fseg), new_path)
 
+def get_seg_frequencies():
+    ds = torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
+            split='train', mode='coarse', target_type='semantic',
+            target_transform=seg_transform)
+    totals = torch.zeros(7, dtype=torch.long)
+    for _,seg in ds:
+        totals += seg.sum(dim=(0,2,3))
+    torch.save(totals, DS_DIR+'/inrnet/cityscapes/trainsegdist.pt')
 
 #--------------------------------------------------------------------------------
 # Definitions

@@ -1,4 +1,0 @@
-parent: inet_train
-network:
-  type: inr-effnet-s3
-  sample points: 8192

@@ -11,8 +11,7 @@ def get_siren_keys():
         'net.3.linear.bias', 'net.4.weight', 'net.4.bias']
 
 def to_black_box(siren_list, **kwargs):
-    evaluator = nn.ModuleList(siren_list)
-    return inn.BlackBoxINR(evaluator, channels=siren_list[0].out_channels,
+    return inn.BlackBoxINR(siren_list, channels=siren_list[0].out_channels,
         input_dims=2, domain=(-1,1), **kwargs)
 
 class Siren(nn.Module):
@@ -41,15 +40,15 @@ class Siren(nn.Module):
         #coords = coords.clone().detach().requires_grad_(True) # allows to take derivative w.r.t. input
         return self.net(coords)
 
-    def produce_image(self):
-        with torch.no_grad():
-            if self.H is None:
-                raise ValueError("missing img_shape")
-            tensors = [torch.linspace(-1, 1, steps=self.H), torch.linspace(-1, 1, steps=self.W)]
-            mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
-            coords = mgrid.reshape(-1, 2).cuda()
-            rgb = self.forward(coords)
-            return rgb.reshape(self.H,self.W, self.out_channels)
+    # def produce_image(self):
+    #     with torch.no_grad():
+    #         if self.H is None:
+    #             raise ValueError("missing img_shape")
+    #         tensors = [torch.linspace(-1, 1, steps=self.H), torch.linspace(-1, 1, steps=self.W)]
+    #         mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij'), dim=-1)
+    #         coords = mgrid.reshape(-1, 2).cuda()
+    #         rgb = self.forward(coords)
+    #         return rgb.reshape(self.H,self.W, self.out_channels)
 
 
 class SineLayer(nn.Module):
@@ -94,7 +93,6 @@ class ImageFitting(Dataset):
         #img = Image.fromarray(img)
         C = img.size(1)
         transform = Compose([
-            #ToTensor(),
             Normalize(torch.Tensor([0.5]), torch.Tensor([0.5]))
         ])
         img = transform(img)

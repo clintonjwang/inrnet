@@ -5,7 +5,7 @@ from torchvision import transforms
 from PIL import Image
 import numpy as np
 
-from inrnet.models.inrs import siren
+from inrnet.models.inrs import siren, rff
 from inrnet.util import glob2
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
@@ -15,7 +15,7 @@ def get_imagenet_classes():
     return [c[:c.find(',')] for c in classes]
 
 class INet12(torchvision.datasets.VisionDataset):
-    def __init__(self, subset, cls, *args, **kwargs):
+    def __init__(self, subset, *args, **kwargs):
         trans = transforms.Compose([
             transforms.ToTensor(),
             transforms.Resize((256,256)),
@@ -25,13 +25,11 @@ class INet12(torchvision.datasets.VisionDataset):
         super().__init__(root, *args, transform=trans, **kwargs)
         big12path = f"{DS_DIR}/inrnet/big_12_labels.pkl"
         split_paths_by_cls, _, _ = pickle.load(open(big12path, 'rb'))
-        self.subpaths = split_paths_by_cls[subset][cls]
-        if subset == 'train':
-            big12path = f"{DS_DIR}/inrnet/big_12_extra.pkl"
-            self.extra_subpaths = pickle.load(open(big12path, 'rb'))[cls]
+        self.subpaths = split_paths_by_cls[subset]
 
     def __getitem__(self, ix):
-        img = Image.open(osp.join(self.root, self.subpaths[ix]))
+        cls, ix = ix % 12, ix // 12
+        img = Image.open(osp.join(self.root, self.subpaths[cls][ix]))
         try:
             return self.transform(img)
         except RuntimeError:
@@ -99,7 +97,14 @@ def get_inr_loader_for_inet12(bsz, subset):
     # def inet_normalize(values):
     #     return (values - torch.tensor((0.485, 0.456, 0.406), device=values.device)) / torch.tensor(
     #         (0.229, 0.224, 0.225), device=values.device)
-    keys = siren.get_siren_keys()
+    if subset in ('train', 'val'): #SIREN
+        model = siren.Siren
+        inet_rescale = None
+    else:
+        def inet_rescale(values):
+            return (values - torch.tensor((.5), device=values.device)) / torch.tensor(
+                (.5), device=values.device)
+        model = rff.RFFNet
     if bsz % 12 == 0:
         n_per_cls = bsz // 12
         if N % bsz != 0:
@@ -109,7 +114,7 @@ def get_inr_loader_for_inet12(bsz, subset):
             for p in paths:
                 np.random.shuffle(p)
             for path_ix in range(0, N, n_per_cls):
-                inrs = [siren.Siren(out_channels=3) for _ in range(bsz)]
+                inrs = [model() for _ in range(bsz)]
                 for i in range(n_per_cls):
                     for cl in range(12):
                         param_dict = torch.load(paths[cl][path_ix+i])
@@ -120,8 +125,12 @@ def get_inr_loader_for_inet12(bsz, subset):
                             param_dict['net.4.bias'] = param_dict['net.4.bias'].tile(3)
                             inrs[i*12+cl].load_state_dict(param_dict)
                 labels = torch.arange(12).tile(n_per_cls)
-                inrs = siren.to_black_box(inrs).cuda()
-                # inrs.add_modification(inet_normalize)
+                if model == rff.RFFNet:
+                    inrs = rff.to_black_box(inrs).cuda()
+                else:
+                    inrs = siren.to_black_box(inrs).cuda()
+                if inet_rescale is not None:
+                    inrs.add_modification(inet_rescale)
                 yield inrs, labels.cuda()
             if not loop:
                 return
@@ -129,7 +138,7 @@ def get_inr_loader_for_inet12(bsz, subset):
     elif bsz == 1:
         print('analysis mode only')
         for path_ix in range(N):
-            inr = siren.Siren(out_channels=3)
+            inr = model()
             for cl in range(12):
                 param_dict = torch.load(paths[cl][path_ix])
                 try:

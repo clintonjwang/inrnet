@@ -1,7 +1,7 @@
 network:
-  type: SIREN
+  type: RFF
 data loading:
   end_ix: 100
   dataset: inet12
 optimizer:
-  max steps: 2000
+  max steps: 4000
