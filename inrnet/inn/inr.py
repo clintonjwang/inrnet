@@ -278,6 +278,10 @@ class BlackBoxINR(INRBatch):
             for inr in self.evaluator:
                 out.append(inr(coords))
             out = torch.stack(out, dim=0)
+            if len(out.shape) == 4:
+                out.squeeze_(0)
+                if len(out.shape) == 4:
+                    raise ValueError('bad BBINR evaluator')
             for tx in self.intensity_transforms:
                 out = tx(out)
         for m in self.modifiers:

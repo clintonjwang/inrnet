@@ -30,6 +30,7 @@ def conv(values: torch.Tensor, # [B,N,c_in]
 
     # if layer.dropout > 0 and (inr.training and layer.training):
     #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
+    pdb.set_trace()
     Y = values[:,torch.where(mask)[1]] # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
