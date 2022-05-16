@@ -1,5 +1,6 @@
 parent: classify
 data loading:
+  N: 200
   batch size: 96
   subset: test
   dataset: inet12

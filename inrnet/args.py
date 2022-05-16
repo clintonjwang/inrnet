@@ -53,7 +53,24 @@ def args_from_file(path, cmd_args=None):
     if osp.exists(path):
         args = yaml.safe_load(open(path, 'r'))
     else:
-        raise ValueError(f"bad config_name {cmd_args.config_name}")
+        if cmd_args.config_name.endswith('1k'):
+            path = path.replace('1k.yaml', '.yaml')
+            if osp.exists(path):
+                args = yaml.safe_load(open(path, 'r'))
+                if 'data loading' in args: raise NotImplementedError
+                args['data loading'] = {'N': 1000}
+            else:
+                raise ValueError(f"bad config_name {cmd_args.config_name}")
+        elif cmd_args.config_name.endswith('200'):
+            path = path.replace('200.yaml', '.yaml')
+            if osp.exists(path):
+                args = yaml.safe_load(open(path, 'r'))
+                if 'data loading' in args: raise NotImplementedError
+                args['data loading'] = {'N': 200}
+            else:
+                raise ValueError(f"bad config_name {cmd_args.config_name}")
+        else:
+            raise ValueError(f"bad config_name {cmd_args.config_name}")
 
     if cmd_args is not None:
         for param in ["job_id", "config_name", "start_ix", 'target_job']:

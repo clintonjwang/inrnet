@@ -4,15 +4,37 @@ nn = torch.nn
 
 from inrnet import inn
 from inrnet.inn import functional as inrF
-from inrnet.inn.nets.effnet import InrCls2
+from inrnet.inn.nets.effnet import InrCls2, InrClsWide2
 
-def Gan4():
-    G = G4(in_dims=64, out_channels=1)
-    D = InrCls2(in_channels=1, out_dims=1, C=16)
+def Gan4(reshape):
+    G = G4(in_dims=64, out_channels=1, reshape=reshape)
+    D = D4(in_channels=1, C=32)
     return G,D
 
+class D4(nn.Module):
+    def __init__(self, in_channels, out_dims=1, C=64, **kwargs):
+        super().__init__()
+        out_layers = nn.Sequential(nn.Linear(C*2, 64), nn.ReLU(inplace=True), nn.Linear(64, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+        self.layers = [
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.25,.25), down_ratio=.5,
+                activation='leakyrelu', **kwargs),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.5,.5), down_ratio=.5,
+                activation='leakyrelu', **kwargs),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.5,.5), down_ratio=.5,
+                activation='leakyrelu', **kwargs),
+            inn.GlobalAvgPoolSequence(out_layers),
+        ]
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, inr):
+        return self.layers(inr)
+
 class G4(nn.Module):
-    def __init__(self, in_dims, out_channels, C=8):
+    def __init__(self, in_dims, out_channels, C=8, reshape=(7,7)):
         super().__init__()
         self.first = nn.Sequential(
             nn.Linear(in_dims, C*8, bias=True),
@@ -21,25 +43,31 @@ class G4(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(C*4, C*49, bias=True),
         )
-        for l in self.first:
+        cm = inn.ChannelMixer(C, out_channels, bias=True)
+        for l in [*self.first, cm]:
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
             if hasattr(l, 'bias'):
                 nn.init.zeros_(l.bias)
+        self.reshape = reshape
 
+        #kwargs = dict() #i4b
+        kwargs = dict(mid_ch=(8,8), N_bins=32, scale2=10) #i4c
+        #activation='relu') #mid_ch=(16,16)
         layers = [
             # inn.blocks.conv_norm_act(C, C*2, kernel_size=(.5,.5)), #
-            inn.Upsample(4),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(1.,1.)), #14x14
-            inn.Upsample(4),
-            inn.PositionalEncoding(N=C//2),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.5,.5)), #28x28
-            inn.ChannelMixer(C*2, out_channels), inn.Tanh()
+            inn.Upsample(4, spacing=(1/6,1/6)),
+            # inn.blocks.conv_norm_act(C, C*2, kernel_size=(.85,.85), **kwargs), #5x5 kernel, 14x14 (-1,1.167)
+            # inn.PositionalEncoding(N=C),
+            inn.blocks.conv_norm_act(C, C, kernel_size=(.5,.5), **kwargs), #3x3 kernel, 14x14
+            inn.Upsample(4, spacing=((2+1/6)/13/2,(2+1/6)/13/2)),
+            inn.blocks.conv_norm_act(C, C, kernel_size=(.25,.25), **kwargs), #28x28, (-1,1.25)
+            cm, inn.Tanh(),
         ]
         self.layers = nn.Sequential(*layers)
                 
     def forward(self, x):
-        x = torch.reshape(self.first(x), (x.size(0), -1, 7, 7))
+        x = torch.reshape(self.first(x), (x.size(0), -1, *self.reshape))
         inrs = inn.produce_inr(x)
         return self.layers(inrs)
 

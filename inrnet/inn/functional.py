@@ -30,7 +30,6 @@ def conv(values: torch.Tensor, # [B,N,c_in]
 
     # if layer.dropout > 0 and (inr.training and layer.training):
     #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
-    pdb.set_trace()
     Y = values[:,torch.where(mask)[1]] # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
@@ -78,7 +77,8 @@ def conv(values: torch.Tensor, # [B,N,c_in]
                         w_og = layer.interpolate_weights(-Dsplit[ix])
                         n,o,i_g = w_og.shape
                         o_g = o//g
-                        newVals.append(torch.einsum('bnig,nogi->bog', y.reshape(y.size(0), n, i_g, g), w_og.view(n, o_g, g, i_g)).flatten(1)/n)
+                        newVals.append(torch.einsum('bnig,nogi->bog',
+                            y.reshape(y.size(0), n, i_g, g), w_og.view(n, o_g, g, i_g)).flatten(1)/n)
             else:
                 for ix,y in enumerate(Ysplit):
                     w_oi = layer.interpolate_weights(-Dsplit[ix])
@@ -221,7 +221,7 @@ def _get_query_coords(inr, layer):
         if layer.down_ratio > 1: 
             layer.down_ratio = 1/layer.down_ratio
         N = round(coords.size(0)*layer.down_ratio)
-        if inr.sample_mode not in ('qmc', 'grid'):
+        if inr.sample_mode != 'qmc':
             if not hasattr(inr, 'dropped_coords'):
                 inr.dropped_coords = coords[N:]
             else:

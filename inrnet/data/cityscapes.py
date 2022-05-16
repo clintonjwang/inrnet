@@ -11,8 +11,11 @@ nearest = transforms.InterpolationMode('nearest')
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
-def get_inr_loader_for_cityscapes(bsz, subset, size):
-    paths = glob(f"{DS_DIR}/inrnet/cityscapes/{subset}_*.pt")
+def get_inr_loader_for_cityscapes(bsz, subset, size, mode):
+    if mode == 'coarse':
+        paths = glob(f"{DS_DIR}/inrnet/cityscapes/{subset}_*.pt")
+    else:
+        paths = glob(f"{DS_DIR}/inrnet/cityscapes/fine_{subset}_*.pt")
     if subset == 'train':
         N = 2975
         loop = True
@@ -68,7 +71,7 @@ def replace_segs(subset):
         #if (Fseg & Cseg).sum() / (Fseg | Cseg).sum() > .3:
         torch.save((param_dict, Fseg), path)
 
-def add_val_segs(subset='val', N=500):
+def add_fine_segs(subset='train', N=2975):
     ds = torchvision.datasets.Cityscapes(DS_DIR+'/cityscapes',
             split=subset, mode='fine', target_type='semantic',
             target_transform=seg_transform)

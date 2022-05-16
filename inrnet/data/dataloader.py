@@ -93,9 +93,10 @@ def get_inr_dataloader(dl_args):
             bsz=dl_args['batch size'], subset=dl_args['subset'])
     elif dl_args["dataset"] == "cityscapes":
         return cityscapes.get_inr_loader_for_cityscapes(bsz=dl_args['batch size'],
-            subset=dl_args['subset'], size=dl_args['image shape'])
+            subset=dl_args['subset'], size=dl_args['image shape'], mode=dl_args['seg type'])
     elif dl_args["dataset"] == "inet12":
-        return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
+        return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'],
+            N=dl_args['N'])
     elif dl_args["dataset"] == "fmnist":
         return get_inr_loader_for_fmnist(bsz=dl_args['batch size'])
     elif dl_args["dataset"] == "flowers":
@@ -123,8 +124,10 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
                 yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
     return random_loader()
 
-def get_inr_loader_for_fmnist(bsz):
-    paths = glob2(f"{DS_DIR}/inrnet/fmnist/*.pt")
+def get_inr_loader_for_fmnist(bsz, N=10000):
+    ix_to_cls = torch.load(f"{DS_DIR}/inrnet/fmnist/ix_to_cls.pt")
+    paths = [f"{DS_DIR}/inrnet/fmnist/train_{ix}.pt" for ix in range(60000) if ix_to_cls[ix] in [5,7,9]]
+    paths = [p for p in paths if osp.exists(p)][:N]
     keys = siren.get_siren_keys()
     def random_loader():
         inrs = []
@@ -132,7 +135,7 @@ def get_inr_loader_for_fmnist(bsz):
             np.random.shuffle(paths)
             for path in paths:
                 inr = siren.Siren(out_channels=1, C=32, first_omega_0=30, hidden_omega_0=30)
-                param_dict,cls = torch.load(path)
+                param_dict,_ = torch.load(path)
                 inr.load_state_dict(param_dict)
                 inrs.append(inr)
                 if len(inrs) == bsz:

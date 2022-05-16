@@ -69,11 +69,13 @@ def gradient_penalty_inr(coords, real_inr, generated_inr, D):
     generated_img = generated_inr.cached_outputs
     B = real_img.size(0)
     alpha = torch.rand(B, 1, 1, device='cuda')
-    interp_vals = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach())
     class dummy_inr(nn.Module):
         def forward(self, coords):
-            return interp_vals
+            return alpha*real_img + (1-alpha)*generated_img.detach()
     interp_img = inn.BlackBoxINR([dummy_inr()], channels=1, input_dims=2).cuda()
+    interp_img(coords)
+    interp_vals = interp_img.cached_outputs
+    interp_vals.requires_grad = True
     interp_logit = D(interp_img)(coords)
 
     grads = torch.autograd.grad(outputs=interp_logit, inputs=interp_vals,

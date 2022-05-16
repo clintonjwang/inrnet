@@ -19,6 +19,16 @@ DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
 def load_pretrained_model(args):
     net_args = args["network"]
+    kwargs = dict(in_channels=3, out_channels=7)
+    if net_args["type"] == "inr-3":
+        return inn.nets.inr2inr.ISeg3(**kwargs)
+    elif net_args["type"] == "inr-5":
+        return inn.nets.inr2inr.ISeg5(**kwargs)
+    elif net_args["type"] == "cnn-3":
+        return inrnet.models.common.Seg3(**kwargs)
+    elif net_args["type"] == "cnn-5":
+        return inrnet.models.common.Seg5(**kwargs)
+
     pretrained = net_args['pretrained']
     if isinstance(pretrained, str):
         raise NotImplementedError
@@ -26,14 +36,6 @@ def load_pretrained_model(args):
     else:
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
-        elif net_args["type"] == "inr-3":
-            return inn.nets.inr2inr.ISeg3(in_channels=3, out_channels=7)
-        elif net_args["type"] == "inr-5":
-            return inn.nets.inr2inr.ISeg5(in_channels=3, out_channels=7)
-        elif net_args["type"] == "cnn-3":
-            return inrnet.models.common.Seg3(in_channels=3, out_channels=7)
-        elif net_args["type"] == "cnn-5":
-            return inrnet.models.common.Seg5(in_channels=3, out_channels=7)
         elif net_args["type"] == "inr-convnext":
             InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
         elif net_args["type"] == "inr-mlpconv":
@@ -179,37 +181,48 @@ def test_inr_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     global_step = 0
-    ciou_tracker = util.MetricTracker("coarse IoU", function=mean_iou)
-    fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)
-    cacc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
-    facc_tracker = util.MetricTracker("fine pixel accuracy", function=pixel_acc)
+    iou_tracker = util.MetricTracker("coarse IoU", function=mean_iou)
+    acc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
+    # fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)
+    # facc_tracker = util.MetricTracker("fine pixel accuracy", function=pixel_acc)
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
     origin = args['target_job']
     model = load_model_from_job(origin).cuda().eval()
     orig_args = job_mgmt.get_job_args(origin)
+    ix = 0
+    for img_inr, segs in data_loader:
+        ix += 1
+        with torch.no_grad():
+            seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+            if orig_args["network"]['type'].startswith('inr'):
+                seg_inr = model(img_inr).eval()
+                seg_inr.change_sample_mode('grid')
+                coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+                logits = seg_inr(coords)
+                logits = util.realign_values(logits, coords=coords)
 
-    if orig_args["network"]['type'].startswith('inr'):
-        N = dl_args["sample points"]
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
-                logit_fxn = model(img_inr).cuda().eval()
-                coords = logit_fxn.generate_sample_points(sample_size=N)
-                logits = logit_fxn(coords)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
-
-    else:
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
+            else:
                 img = img_inr.produce_images(*dl_args['image shape'])
-                logits = model(img)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
+                logits = model(img).flatten(start_dim=2).transpose(2,1)
 
-    torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
+            maxes, gt_labels = seg_gt.max(-1)
+            pred_seg = logits.max(-1).indices
+            pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
+            iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            acc = acc_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+
+        rgb = img_inr.produce_images(*dl_args['image shape'])
+        gt_labels += 1
+        pred_seg += 1
+        gt_labels[maxes == 0] = 0
+        pred_seg[maxes == 0] = 0
+        for i in range(3):
+            path = paths["job output dir"]+f"/imgs/{ix}_{i}.png"
+            save_example_segs(path, rgb[i], pred_seg[i].reshape(*rgb.shape[-2:]), gt_labels[i].reshape(*rgb.shape[-2:]))
+
+    torch.save((iou_tracker.minibatch_values['val'], acc_tracker.minibatch_values['val']),
+        osp.join(paths["job output dir"], "stats.pt"))
 
 import imgviz
 def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'building', 'traffic', 'nature', 'sky', 'human', 'vehicle')):
@@ -220,20 +233,22 @@ def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'build
     labelviz_gt = imgviz.label2rgb(gt_seg.cpu())#, label_names=label_names, font_size=6, loc="rb")
     rgb = rescale_float(rgb.cpu().permute(1,2,0))
 
+    # kwargs = dict(bbox_inches='tight', transparent="True", pad_inches=0)
     plt.figure(dpi=400)
-
+    plt.tight_layout()
     plt.subplot(131)
-    plt.title("rgb")
+    # plt.title("rgb")
     plt.imshow(rgb)
     plt.axis("off")
     plt.subplot(132)
-    plt.title("pred")
+    # plt.title("pred")
     plt.imshow(labelviz_pred)
     plt.axis("off")
     plt.subplot(133)
-    plt.title("gt")
+    # plt.title("gt")
     plt.imshow(labelviz_gt)
     plt.axis("off")
+    plt.subplots_adjust(wspace=0, hspace=0)
 
     img = imgviz.io.pyplot_to_numpy()
     plt.imsave(path, img)

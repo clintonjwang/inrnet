@@ -26,7 +26,7 @@ def load_pretrained_model(args):
         elif net_args["type"] == "inr-wgan":
             G,D = inrnet.inn.nets.wgan.translate_wgan_model()
         elif net_args["type"] == "inr-4":
-            G,D = inrnet.inn.nets.wgan.Gan4()
+            G,D = inrnet.inn.nets.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
         elif net_args["type"] == "cnn-4":
             G,D = inrnet.models.wgan.Gan4()
         else:
@@ -56,15 +56,15 @@ def train_generator(args):
         GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty)
 
     bsz = dl_args['batch size']
-    D_step = 2
+    D_step = 1
+    # G_step = 1
 
     G,D = load_pretrained_model(args)
-    G_optim = torch.optim.AdamW(G.parameters(), lr=args["optimizer"]["learning rate"], betas=(.5,.999))
-    D_optim = torch.optim.AdamW(D.parameters(), lr=args["optimizer"]["learning rate"], betas=(.5,.999))
+    G_optim = torch.optim.AdamW(G.parameters(), lr=args["optimizer"]["G learning rate"], betas=(.5,.999))
+    D_optim = torch.optim.AdamW(D.parameters(), lr=args["optimizer"]["D learning rate"], betas=(.5,.999))
     for true_inr in data_loader:
         global_step += 1
         noise = torch.randn(dl_args["batch size"], 64, device='cuda')
-        noise = torch.where((noise>1) | (noise<-1), torch.randn_like(noise), noise)
         if global_step % D_step == 0:
             if args["network"]['type'].startswith('inr'):
                 gen_inr = G(noise)
@@ -104,6 +104,7 @@ def train_generator(args):
                 else:
                     gen_img = G(noise)
 
+        # if global_step % G_step == 0:
         if args["network"]['type'].startswith('inr'):
             fake_fxn = D(gen_inr.detach())
             true_fxn = D(true_inr)
@@ -134,20 +135,21 @@ def train_generator(args):
         if global_step % 20 == 0:
             print("G:", np.round(G_loss, decimals=3), "; D:", np.round(D_loss.item(), decimals=3), flush=True)
 
-        if global_step % 100 == 0:
+        if global_step % 50 == 0:
             torch.save(G.state_dict(), osp.join(paths["weights dir"], "G.pth"))
             torch.save(D.state_dict(), osp.join(paths["weights dir"], "D.pth"))
             G_loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/G.png")
             D_loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/D.png")
+            GP_tracker.plot_running_average(path=paths["job output dir"]+"/plots/gp.png")
 
             if args["network"]['type'].startswith('inr'):
                 true = true_inr.produce_images(*dl_args['image shape'])[0]
                 coords = true_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
                 gen_inr.change_sample_mode('grid')
                 fake = gen_inr(coords)[:1]
-                fake = util.realign_values(fake, inr=gen_inr)[0]
-                coll_img = torch.cat((rescale_float(true.permute(1,2,0)),
-                    rescale_float(fake.reshape(*dl_args['image shape'],n_ch))), dim=1)
+                fake = util.realign_values(fake, inr=gen_inr)
+                # fake = fake.clamp(min=-1,max=1)
+                coll_img = torch.cat((rescale_float(true.permute(1,2,0)), rescale_float(fake[0].reshape(*dl_args['image shape'],n_ch))), dim=1)
                 coll_img = F.interpolate(coll_img.unsqueeze(0).unsqueeze(0), size=(150,300,n_ch)).squeeze()
                 plt.imsave(paths["job output dir"]+f"/imgs/{global_step}.png", coll_img.detach().cpu().numpy(), cmap='gray')
             else:
@@ -170,27 +172,27 @@ def test_inr_generator(args):
     data_loader = dataloader.get_inr_dataloader(dl_args)
     top3, top1 = 0,0
     origin = args['target_job']
-    model = load_model_from_job(origin).cuda().eval()
+    G = load_model_from_job(origin)[0].cuda().eval()
     orig_args = job_mgmt.get_job_args(origin)
+    bsz = dl_args['batch size']
 
-    if orig_args["network"]['type'].startswith('inr'):
-        N = dl_args["sample points"]
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
-                logit_fxn = model(img_inr).cuda().eval()
-                coords = logit_fxn.generate_sample_points(sample_size=N)
-                logits = logit_fxn(coords)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
+    for ix in range(0, num_samples, bsz):
+        noise = torch.randn(bsz, 64, device='cuda')
+        noise = torch.where((noise>1) | (noise<-1), torch.randn_like(noise), noise)
+        if args["network"]['type'].startswith('inr'):
+            gen_inr = G(noise).eval()
+            gen_inr.change_sample_mode('grid')
+            coords = gen_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
+            gen_img = gen_inr(coords)
+            gen_img = util.realign_values(gen_img, inr=gen_inr)
+        else:
+            gen_img = G(noise)
 
-    else:
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
-                img = img_inr.produce_images(*dl_args['image shape'])
-                logits = model(img)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
-
-    torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
+        for i in range(bsz):
+            if args["network"]['type'].startswith('inr'):
+                gen_img = rescale_float(gen_img[i].reshape(*dl_args['image shape'],n_ch))
+            else:
+                gen_img = rescale_float(gen_img[i].permute(1,2,0))
+                
+        gen_img = F.interpolate(gen_img.unsqueeze(0).unsqueeze(0), size=(150,150,n_ch)).squeeze()
+        plt.imsave(paths["job output dir"]+f"/imgs/{ix+i}.png", gen_img.detach().cpu().numpy(), cmap='gray')

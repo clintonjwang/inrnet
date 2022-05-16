@@ -22,16 +22,7 @@ def translate_upsample(layer, input_shape, extrema):
 def get_new_coords(inr, layer):
     coords = inr.sampled_coords
     N_in = coords.size(0)
-    if inr.sample_mode == 'grid':
-        if layer.scale == 4:
-            new_coords = torch.cat((
-                torch.stack((coords[:,0], coords[:,1]+layer.spacing[1]), dim=1),
-                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]), dim=1),
-                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]+layer.spacing[1]), dim=1),
-            ), dim=0)
-        else:
-            raise NotImplementedError
-    elif hasattr(inr, 'dropped_coords'):
+    if hasattr(inr, 'dropped_coords'):
         N_new = round(N_in*(layer.scale-1))
         new_coords = inr.dropped_coords[:N_new]
         if inr.dropped_coords.size(0) == N_new:
@@ -40,6 +31,15 @@ def get_new_coords(inr, layer):
             raise ValueError('not enough dropped coords')
         else:
             inr.dropped_coords = inr.dropped_coords[N_new:]
+    elif inr.sample_mode == 'grid':
+        if layer.scale == 4:
+            new_coords = torch.cat((
+                torch.stack((coords[:,0], coords[:,1]+layer.spacing[1]), dim=1),
+                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]), dim=1),
+                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]+layer.spacing[1]), dim=1),
+            ), dim=0)
+        else:
+            raise NotImplementedError
     elif inr.sample_mode == 'masked':
         raise ValueError('could not find dropped coords')
     else:
@@ -101,9 +101,9 @@ class Upsample(nn.Module):
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         if self.mode == 'nearest':
-            new_inr.set_integrator(upsample_nn, 'AvgPool', layer=self)
+            new_inr.set_integrator(upsample_nn, 'Upsample', layer=self)
         elif self.mode == 'k-NN':
-            new_inr.set_integrator(upsample_nn, 'AvgPool', layer=self)
+            new_inr.set_integrator(upsample_nn, 'Upsample', layer=self)
         elif self.mode == 'bilinear':
-            new_inr.set_integrator(upsample_conv, 'AvgPool', layer=self)
+            new_inr.set_integrator(upsample_conv, 'Upsample', layer=self)
         return new_inr

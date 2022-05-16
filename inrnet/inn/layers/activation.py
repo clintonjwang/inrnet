@@ -22,7 +22,7 @@ def get_activation_layer(type):
     if type == "relu":
         return ReLU()
     elif type == "leakyrelu":
-        return LeakyReLU()
+        return LeakyReLU(.1)
     elif type == "gelu":
         return GELU()
     elif type == "swish":
@@ -39,7 +39,7 @@ class ReLU(nn.Module):
         inr.add_modification(nn.ReLU(inplace=True))
         return inr
 class LeakyReLU(nn.Module):
-    def __init__(self, negative_slope):
+    def __init__(self, negative_slope=.1):
         super().__init__()
         self.negative_slope = negative_slope
     def forward(self, inr):

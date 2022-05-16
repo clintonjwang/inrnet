@@ -82,9 +82,10 @@ class INetDS(torchvision.datasets.VisionDataset):
     def __len__(self):
         return len(self.subpaths)
 
-def get_inr_loader_for_inet12(bsz, subset):
+def get_inr_loader_for_inet12(bsz, subset, N=None):
     if subset == 'train':
-        N = 500
+        if N is None:
+            N = 500
         paths = [[f"{DS_DIR}/inrnet/inet12/{c}/{subset}_{ix}.pt" for ix in range(N)] \
             for c in range(12)]
         loop = True

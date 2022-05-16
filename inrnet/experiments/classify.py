@@ -205,6 +205,41 @@ def train_classifier(args):
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
 
+def benchmark_inr_classifier(args):
+    from time import time
+    paths = args["paths"]
+    dl_args = args["data loading"]
+    times = 20
+    dl_args['batch size'] = 48
+    data_loader = dataloader.get_inr_dataloader(dl_args)
+    origin = args['target_job']
+    model = load_model_from_job(origin).cuda().eval()
+    orig_args = job_mgmt.get_job_args(origin)
+    N = dl_args["sample points"]
+
+    #warmup
+    for img_inr, labels in data_loader:
+        with torch.no_grad():
+            logit_fxn = model(img_inr).eval()
+            coords = logit_fxn.generate_sample_points(sample_size=N)
+            logit_fxn(coords)
+        break
+
+    all_times = []
+    ix = 0
+    for img_inr, labels in data_loader:
+        print(ix)
+        ix += 1
+        with torch.no_grad():
+            t = time()
+            logit_fxn = model(img_inr).eval()
+            coords = logit_fxn.generate_sample_points(sample_size=N)
+            logit_fxn(coords)
+            all_times.append(time()-t)
+        if ix >= times:
+            print(np.mean(all_times), np.std(all_times))
+            return
+
 def test_inr_classifier(args):
     paths = args["paths"]
     dl_args = args["data loading"]
@@ -215,11 +250,10 @@ def test_inr_classifier(args):
     orig_args = job_mgmt.get_job_args(origin)
 
     if orig_args["network"]['type'].startswith('inr'):
-        N = dl_args["sample points"]
         for img_inr, labels in data_loader:
             with torch.no_grad():
                 logit_fxn = model(img_inr).cuda().eval()
-                coords = logit_fxn.generate_sample_points(sample_size=N)
+                coords = logit_fxn.generate_sample_points(sample_size=dl_args["sample points"], method='rqmc')
                 logits = logit_fxn(coords)
                 pred_cls = logits.topk(k=3).indices
                 top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
