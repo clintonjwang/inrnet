@@ -6,7 +6,7 @@ F=nn.functional
 from time import time
 
 from inrnet import util
-from inrnet.inn import functional as inrF
+from inrnet.inn import qmc, functional as inrF
 
 
 class INRBatch(nn.Module):
@@ -19,18 +19,11 @@ class INRBatch(nn.Module):
         self.integrator = None # operators requiring integration
         self.sample_size = sample_size
         self.detached = False
-        self.grid_mode = False
+        self.sample_mode = 'qmc'
         self.caching_enabled = True
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
-    @property
-    def volume(self):
-        if isinstance(self.domain, tuple):
-            return (self.domain[1] - self.domain[0])**self.input_dims
-        else:
-            return np.prod([d[1]-d[0] for d in self.domain])
-            
     def parent(self, n=1):
         ev = self
         for _ in range(n):
@@ -49,14 +42,12 @@ class INRBatch(nn.Module):
             else:
                 return
 
-    def toggle_grid_mode(self, mode=None):
-        if mode is None:
-            mode = not self.grid_mode
-        elif self.grid_mode == mode:
+    def change_sample_mode(self, mode='grid'):
+        if self.sample_mode == mode:
             return
-        self.grid_mode = mode
-        if hasattr(self.evaluator, 'toggle_grid_mode'):
-            self.evaluator.toggle_grid_mode(mode=mode)
+        self.sample_mode = mode
+        if hasattr(self.evaluator, 'change_sample_mode'):
+            self.evaluator.change_sample_mode(mode=mode)
 
     def __neg__(self):
         self.add_modification(lambda x: -x)
@@ -111,18 +102,18 @@ class INRBatch(nn.Module):
     def generate_sample_points(self, method="qmc", sample_size=None, dims=None, ordering='c2f'):
         if sample_size is None:
             sample_size = self.sample_size
-        if method == "grid" or self.grid_mode:
+        if method == "grid" or self.sample_mode == 'grid':
             if dims is None:
                 raise ValueError("declare dims or turn off grid mode")
             return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
         elif method in ("qmc", 'rqmc'):
-            return inrF.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
+            return qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
                 bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
         else:
             raise NotImplementedError("invalid method: "+method)
 
     def set_integrator(self, function, name, layer=None, **kwargs):
-        self.integrator = inrF.Integrator(function, name, inr=self, layer=layer, **kwargs)
+        self.integrator = qmc.Integrator(function, name, inr=self, layer=layer, **kwargs)
 
     def add_modification(self, modification):
         self.sampled_coords = torch.empty(0)
@@ -215,10 +206,12 @@ class INRBatch(nn.Module):
             return self.cached_outputs
 
         out = self.evaluator(coords)
-        try:
-            self.sampled_coords = self.evaluator.sampled_coords
-        except AttributeError:
-            self.sampled_coords = self.origin.sampled_coords
+        # try:
+        self.sampled_coords = self.evaluator.sampled_coords
+        if hasattr(self.evaluator, 'dropped_coords'):
+            self.dropped_coords = self.evaluator.dropped_coords
+        # except AttributeError:
+        #     self.sampled_coords = self.origin.sampled_coords
 
         if self.integrator is not None:
             out = self.integrator(out)
@@ -248,19 +241,45 @@ class BlackBoxINR(INRBatch):
     def __init__(self, evaluator, channels, **kwargs):
         super().__init__(channels=channels, **kwargs)
         self.evaluator = nn.ModuleList(evaluator).eval()
+        self.spatial_transforms = []
+        self.intensity_transforms = []
 
     def __repr__(self):
         return f"""BlackBoxINR(batch_size={len(self.evaluator)}, channels={self.channels}, modifiers={self.modifiers})"""
 
+    def produce_images(self, H,W, dtype=torch.float):
+        with torch.no_grad():
+            xy_grid = util.meshgrid_coords(H,W, c2f=False)
+            output = self.forward(xy_grid)
+            output = output.reshape(output.size(0),H,W,-1)
+        if dtype == 'numpy':
+            return output.squeeze(-1).cpu().float().numpy()
+        else:
+            return output.permute(0,3,1,2).to(dtype=dtype)
+
+    def add_transforms(self, spatial=None, intensity=None):
+        if spatial is not None:
+            if not hasattr(spatial, '__iter__'):
+                spatial = [spatial]
+            self.spatial_transforms += spatial
+        if intensity is not None:
+            if not hasattr(intensity, '__iter__'):
+                intensity = [intensity]
+            self.intensity_transforms += intensity
+
     def forward(self, coords):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
-        self.sampled_coords = coords
         with torch.no_grad():
+            for tx in self.spatial_transforms:
+                coords = tx(coords)
+            self.sampled_coords = coords
             out = []
             for inr in self.evaluator:
                 out.append(inr(coords))
             out = torch.stack(out, dim=0)
+            for tx in self.intensity_transforms:
+                out = tx(out)
         for m in self.modifiers:
             out = m(out)
         self.cached_outputs = out
@@ -304,10 +323,10 @@ class CondINR(INRBatch):
             out = self.evaluator(coords, condition)
         else:
             out = self.evaluator(coords)
-        try:
-            self.sampled_coords = self.evaluator.sampled_coords
-        except AttributeError:
-            self.sampled_coords = self.origin.sampled_coords
+        # try:
+        self.sampled_coords = self.evaluator.sampled_coords
+        # except AttributeError:
+        #     self.sampled_coords = self.origin.sampled_coords
         if self.integrator is not None:
             if self.cond_integrator:
                 out = self.integrator(out, condition)
@@ -334,7 +353,7 @@ class MergeINR(INRBatch):
         self.inr1 = inr1
         self.evaluator = self.inr2 = inr2
         self.merge_function = merge_function
-        self.interpolator = inrF.interpolate
+        self.interpolator = qmc.interpolate
 
     def merge_coords(self, values1, values2):
         x = self.inr1.sampled_coords
@@ -379,17 +398,17 @@ class MergeINR(INRBatch):
         out = self.merge_coords(out1, out2)
         if self.integrator is not None:
             out = self.integrator(out)
+        if hasattr(self.evaluator, 'dropped_coords'):
+            self.dropped_coords = self.evaluator.dropped_coords
         for m in self.modifiers:
             out = m(out)
         self.cached_outputs = out
         return out
 
-    def toggle_grid_mode(self, mode=None):
-        if mode is None:
-            mode = not self.grid_mode
-        self.grid_mode = mode
-        self.inr1.toggle_grid_mode(mode=mode)
-        self.inr2.toggle_grid_mode(mode=mode)
+    def change_sample_mode(self, mode='grid'):
+        self.sample_mode = mode
+        self.inr1.change_sample_mode(mode=mode)
+        self.inr2.change_sample_mode(mode=mode)
 
 class SumINR(MergeINR):
     def __init__(self, inr1, inr2):

@@ -1,3 +1,3 @@
-parent: inet_train
+parent: of_train
 network:
   type: inr-2

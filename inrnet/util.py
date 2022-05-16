@@ -48,7 +48,7 @@ def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="c
     # c2f: coarse-to-fine ordering, puts points along coarser grid-points first
     tensors = [torch.linspace(*domain, steps=d, dtype=dtype, device=device) for d in dims]
     mgrid = torch.stack(meshgrid(*tensors, indexing='ij'), dim=-1)
-
+        
     if c2f:
         x_indices = [0]
         y_indices = [0]
@@ -58,12 +58,21 @@ def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="c
         ind_iters = []
         while x_step > 0 or y_step > 0:
             if y_step > 0:
-                new_y_indices = list(y_step * np.arange(1,factor,2))
-                ind_iters += list(itertools.product(x_indices, new_y_indices))
+                if y_step > 1 and y_step % 2 == 1:
+                    new_y_indices = [y for y in range(1,dims[1]) if y not in y_indices]
+                    ind_iters += list(itertools.product(x_indices, new_y_indices))
+                else:
+                    new_y_indices = list(y_step * np.arange(1,factor,2))
+                    ind_iters += list(itertools.product(x_indices, new_y_indices))
 
             if x_step > 0:
-                new_x_indices = list(x_step * np.arange(1,factor,2))
-                ind_iters += list(itertools.product(new_x_indices, y_indices))
+                if x_step > 1 and x_step % 2 == 1:
+                    new_x_indices = [x for x in range(1,dims[0]) if x not in x_indices]
+                    ind_iters += list(itertools.product(new_x_indices, y_indices))
+                    x_step = 0
+                else:
+                    new_x_indices = list(x_step * np.arange(1,factor,2))
+                    ind_iters += list(itertools.product(new_x_indices, y_indices))
 
                 if y_step > 0:
                     ind_iters += list(itertools.product(new_x_indices, new_y_indices))
@@ -71,6 +80,8 @@ def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="c
                 x_step = x_step//2
                 
             if y_step > 0:
+                if y_step > 1 and y_step % 2 == 1:
+                    y_step = 0
                 y_indices += new_y_indices
                 y_step = y_step//2
 

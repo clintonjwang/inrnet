@@ -5,6 +5,7 @@ from torchvision import transforms
 from PIL import Image
 import numpy as np
 
+from inrnet.inn.transforms import coord_noise, rand_flip, intensity_noise
 from inrnet.models.inrs import siren, rff
 from inrnet.util import glob2
 
@@ -82,19 +83,25 @@ class INetDS(torchvision.datasets.VisionDataset):
         return len(self.subpaths)
 
 def get_inr_loader_for_inet12(bsz, subset):
-    paths = [glob2(f"{DS_DIR}/inrnet/inet12/{c}/{subset}_*.pt") for c in range(12)]
     if subset == 'train':
-        N = min([len(p) for p in paths]) #1800
+        N = 500
+        paths = [[f"{DS_DIR}/inrnet/inet12/{c}/{subset}_{ix}.pt" for ix in range(N)] \
+            for c in range(12)]
         loop = True
+
+        spatial_augs = [coord_noise, rand_flip]
+        intensity_augs = [intensity_noise]
     elif subset == 'test':
         N = 200
+        paths = [[f"{DS_DIR}/inrnet/inet12/{c}/{subset}_{ix}.pt" for ix in range(N)] \
+            for c in range(12)]
         loop = False
     else:
         raise NotImplementedError(f'bad subset {subset}')
     # for p in paths:
     #     assert len(p)==N, f'incomplete subset ({len(p)}/{N})'
 
-    # def inet_normalize(values):
+    # def aug_coords(values):
     #     return (values - torch.tensor((0.485, 0.456, 0.406), device=values.device)) / torch.tensor(
     #         (0.229, 0.224, 0.225), device=values.device)
     if subset in ('train', 'val'): #SIREN
@@ -105,6 +112,7 @@ def get_inr_loader_for_inet12(bsz, subset):
             return (values - torch.tensor((.5), device=values.device)) / torch.tensor(
                 (.5), device=values.device)
         model = rff.RFFNet
+
     if bsz % 12 == 0:
         n_per_cls = bsz // 12
         if N % bsz != 0:
@@ -130,7 +138,9 @@ def get_inr_loader_for_inet12(bsz, subset):
                 else:
                     inrs = siren.to_black_box(inrs).cuda()
                 if inet_rescale is not None:
-                    inrs.add_modification(inet_rescale)
+                    inrs.add_transforms(intensity=inet_rescale)
+                if subset == 'train':
+                    inrs.add_transforms(spatial=spatial_augs, intensity=intensity_augs)
                 yield inrs, labels.cuda()
             if not loop:
                 return

@@ -4,6 +4,11 @@ paths:
   temp dir: ~/code/diffcoord/temp
 network:
   frozen: false
+  conv:
+    scale2: 30
+    mid_ch:
+    - 64
+    - 32
 optimizer:
   type: AdamW
-  weight decay: 1e-5
+  weight decay: 1e-4

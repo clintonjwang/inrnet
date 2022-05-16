@@ -10,7 +10,8 @@ import torchvision.models
 from inrnet.data import dataloader, inet
 from inrnet import inn, util, losses, jobs as job_mgmt
 
-def load_pretrained_model(args):
+
+def get_model(args):
     net_args = args["network"]
     pretrained = net_args['pretrained']
     img_shape = args["data loading"]["image shape"]
@@ -53,12 +54,61 @@ def load_pretrained_model(args):
         inn.inrnet.freeze_layer_types(InrNet)
     return InrNet
 
-def load_model_from_job(origin):
-    orig_args = job_mgmt.get_job_args(origin)
-    path = osp.expanduser(f"~/code/diffcoord/results/{origin}/weights/best.pth")
-    model = load_pretrained_model(orig_args)
-    model.load_state_dict(torch.load(path))
-    return model
+
+class TargetNet(nn.Module):
+    def __init__(self, in_ch, out_ch, N, w=64, depth=3, seed=None):
+        self.layers = nn.Sequential(
+            nn.Flatten(1)
+            nn.Linear(N*in_ch, w), nn.ReLU(inplace=True),
+            *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
+            nn.Linear(w, N*out_ch),
+        )
+        self.N = N
+        self.out_ch = out_ch
+    @torch.no_grad()
+    def forward(self, values): #(B,N,Cin)
+        return self.layers(values).reshape(-1, self.N, self.out_ch)
+
+class RandINRdataset(nn.Module):
+    def __init__(self, dims, channels, w=64, depth=3, seed=None):
+        self.layers = nn.Sequential(
+            nn.Linear(dims, w), nn.ReLU(inplace=True),
+            *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
+            nn.Linear(w, channels),
+        )
+    @torch.no_grad()
+    def forward(self, coords): #(B,N,Cin)
+        return self.layers(values)
+
+class ApproxNet(nn.Module):
+    def __init__(self, dims, channels, w=64, depth=3, seed=None):
+        self.layers = nn.Sequential(
+            inn.MLPConv(in_ch, w, kernel_size=(.2,.2)), nn.ReLU(inplace=True),
+            *[inn.MLPConv(w, w, kernel_size=(.2,.2)), nn.ReLU(inplace=True) for _ in range()],
+            inn.MLPConv(w, out_ch, kernel_size=(.2,.2)),
+        )
+    def forward(self, coords): #(B,N,Cin)
+        return self.layers(coords)
+
+def rand_nerf(bsz=256, order=16):
+    target_fxn = TargetNet(dims=3, w=128, depth=5).cuda()
+    inr_dataset = RandINRdataset(dims=3, channels=5).cuda()
+    for _ in range(2):
+        coords = rqmc_nerf(bsz, n=20000)
+        target_fxn(minibatch(coords))
+
+# def rqmc_nerf(bsz):
+
+# def rand_nerf(bsz=256, order=16, seed=None):
+#     target_fxn = TargetNet(dims=3, w=128, depth=5, seed=seed).cuda()
+#     inr_dataset = RandINRdataset()
+#         coords = rqmc_nerf(bsz, n=20000)
+#         target_fxn(minibatch(coords))
+
+def worst_case_error():
+    return
+def average_case_error():
+    return
 
 def rand_inr_generator_circle(bsz, order=16):
     def circle_forward(coords, coeffs, bias):
@@ -73,10 +123,13 @@ def rand_inr_generator_circle(bsz, order=16):
         inrs = inn.BlackBoxINR(evaluator=partial(circle_forward, coeffs=fourier_coeffs, bias=bias))
         yield inrs
 
-# def rand_inr_generator_2d(bsz):
-#     while True:
-
-#     return
+def rand_inr_generator_radiance_field(bsz):
+    # coords - (B,N,1)
+    # coeffs - (B,2,O)
+    # bias - (B,1)
+    while True:
+        return
+    return
 
 def basic_mlp_net():
     inn.MLPConv(3,16,(.2,.2))

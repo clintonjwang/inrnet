@@ -6,7 +6,7 @@ data loading:
   dataset: cityscapes
   classes: 7
   sample type: grid
-  sample points: 8192
+  sample points: 4608
   image shape:
-  - 64
-  - 128
+  - 48
+  - 96

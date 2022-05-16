@@ -4,7 +4,7 @@ from functools import partial
 nn = torch.nn
 F = nn.functional
 
-from inrnet.inn import functional as inrF, polynomials
+from inrnet.inn import qmc, functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
 def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k=3):
@@ -152,7 +152,7 @@ class SplineConv(Conv):
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
         if N_bins > 0:
-            self.register_buffer("sample_points", inrF.generate_quasirandom_sequence(n=N_bins,
+            self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=N_bins,
                 d=input_dims, bbox=bbox, dtype=dtype))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
@@ -210,19 +210,28 @@ class SplineConv(Conv):
 
 
 class MLPConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(16,32), down_ratio=1.,
-            input_dims=2, groups=1, padded_extrema=None, bias=False, scale=None,
+    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(64,32), down_ratio=1.,
+            input_dims=2, groups=1, padded_extrema=None, bias=False, scale1=None, scale2=30,
             dtype=torch.float):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
-        self.N_bins = 0
         if not hasattr(kernel_size, '__iter__'):
             kernel_size = (kernel_size, kernel_size)
         self.kernel_size = K = kernel_size
-        if scale is None:
+        self.N_bins = 2**math.ceil(math.log2(1/K[0]*1/K[1])+4)
+        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
+                        diffs[...,1].abs() < self.kernel_size[1]/2)
+
+        bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
+        if self.N_bins > 0:
+            self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=self.N_bins,
+                d=input_dims, bbox=bbox, dtype=dtype))
+            
+        if scale1 is None:
             # scale = (10/K[0], 10/K[1])
-            scale = (1/K[0], 1/K[1])
-        self.register_buffer("scale", torch.as_tensor(scale, dtype=dtype))
+            scale1 = (.5/K[0], .5/K[1])
+        self.register_buffer("scale1", torch.as_tensor(scale1, dtype=dtype))
+        self.scale2 = scale2
         
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
@@ -256,8 +265,8 @@ class MLPConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        # return self.kernel(xy * self.scale).reshape(xy.size(0), self.out_channels, self.group_size)
-        return self.kernel(torch.sin(self.first(xy*self.scale) * 10)).reshape(xy.size(0), self.out_channels, self.group_size)
+        # return self.kernel(xy * self.scale1).reshape(xy.size(0), self.out_channels, self.group_size)
+        return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale2)).reshape(xy.size(0), self.out_channels, self.group_size)
 
 
 
@@ -274,6 +283,7 @@ class BallConv(Conv):
         if p_norm == "inf":
             p_norm = torch.inf
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
+        self.diffs_in_support = lambda diffs: self.norm(diffs) < self.radius
 
         if input_dims == 2 and parameterization == "polynomial":
             if p_norm == 2:

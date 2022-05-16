@@ -5,7 +5,7 @@ nn = torch.nn
 F = nn.functional
 
 from inrnet import inn, util
-from inrnet.inn import functional as inrF
+from inrnet.inn import qmc, functional as inrF
 
 def produce_inr(values, **kwargs):
     # values - (B,C,H,W)
@@ -53,7 +53,7 @@ class GlobalAvgPoolSequence(nn.Module):
         self.layers = layers
     def forward(self, inr):
         vvf = inr.create_derived_inr()
-        vvf.integrator = inrF.Integrator(GAPseq, 'GlobalPoolSeq', layer=self, inr=inr)
+        vvf.integrator = qmc.Integrator(GAPseq, 'GlobalPoolSeq', layer=self, inr=inr)
         return vvf
 
 def GAPseq(values, layer, inr):
@@ -71,7 +71,7 @@ class AdaptiveAvgPoolSequence(nn.Module):
         self.extrema = extrema
     def forward(self, inr):
         vvf = inr.create_derived_inr()
-        vvf.integrator = inrF.Integrator(AAPseq, 'AdaptivePoolSeq', layer=self, inr=inr)
+        vvf.integrator = qmc.Integrator(AAPseq, 'AdaptivePoolSeq', layer=self, inr=inr)
         return vvf
 
 def AAPseq(values, layer, inr, eps=1e-6):

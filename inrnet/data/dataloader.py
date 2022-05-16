@@ -50,6 +50,10 @@ def get_img_dataset(args):
         return torchvision.datasets.CIFAR10(root=DS_DIR, train=dl_args['subset'] == 'train',
             transform=transforms.ToTensor())
 
+    elif dl_args["dataset"] == "fmnist":
+        return torchvision.datasets.FashionMNIST(root=DS_DIR, train=dl_args['subset'] == 'train',
+            transform=transforms.ToTensor())
+
     elif dl_args["dataset"] == "cityscapes":
         size = dl_args['image shape']
         trans = transforms.Compose([
@@ -92,6 +96,8 @@ def get_inr_dataloader(dl_args):
             subset=dl_args['subset'], size=dl_args['image shape'])
     elif dl_args["dataset"] == "inet12":
         return inet.get_inr_loader_for_inet12(bsz=dl_args['batch size'], subset=dl_args['subset'])
+    elif dl_args["dataset"] == "fmnist":
+        return get_inr_loader_for_fmnist(bsz=dl_args['batch size'])
     elif dl_args["dataset"] == "flowers":
         # return get_inr_loader_for_imgds('flowers', bsz=dl_args['batch size'], subset=dl_args['subset'])
         return get_inr_loader_for_flowers(bsz=dl_args['batch size'])
@@ -115,6 +121,23 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
                 except RuntimeError:
                     continue
                 yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
+    return random_loader()
+
+def get_inr_loader_for_fmnist(bsz):
+    paths = glob2(f"{DS_DIR}/inrnet/fmnist/*.pt")
+    keys = siren.get_siren_keys()
+    def random_loader():
+        inrs = []
+        while True:
+            np.random.shuffle(paths)
+            for path in paths:
+                inr = siren.Siren(out_channels=1, C=32, first_omega_0=30, hidden_omega_0=30)
+                param_dict,cls = torch.load(path)
+                inr.load_state_dict(param_dict)
+                inrs.append(inr)
+                if len(inrs) == bsz:
+                    yield siren.to_black_box(inrs).cuda()
+                    inrs = []
     return random_loader()
 
 def get_inr_loader_for_flowers(bsz):

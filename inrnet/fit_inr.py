@@ -12,17 +12,17 @@ from inrnet.data import inet
 
 DATA_DIR = osp.expanduser("/data/vision/polina/scratch/clintonw/datasets/inrnet")
 
-def fit_siren_to_data(data, total_steps):
-    if data.shape == 3:
-        return fit_siren_to_img(data, total_steps)
-    elif data.shape == 2:
-        return fit_siren_to_sound(data, total_steps)
+def fit_siren_to_data(data, total_steps, **kwargs):
+    if len(data.shape) == 3:
+        return fit_siren_to_img(data, total_steps, **kwargs)
+    elif len(data.shape) == 2:
+        return fit_siren_to_sound(data, total_steps, **kwargs)
 
-def fit_siren_to_img(img, total_steps):
+def fit_siren_to_img(img, total_steps, **kwargs):
     imgFit = siren.ImageFitting(img.unsqueeze_(0))
     H,W = imgFit.H, imgFit.W
     dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
-    inr = siren.Siren(out_channels=img.size(1)).cuda()
+    inr = siren.Siren(out_channels=img.size(1), **kwargs).cuda()
     optim = torch.optim.Adam(lr=1e-4, params=inr.parameters())
     model_input, ground_truth = next(iter(dl))
     model_input, ground_truth = model_input.cuda(), ground_truth.cuda()
@@ -33,7 +33,9 @@ def fit_siren_to_img(img, total_steps):
         optim.zero_grad()
         loss.backward()
         optim.step()
+        # if step % 200 == 199:
     print("Loss %0.4f" % (loss), flush=True)
+
     return inr, loss
 
 def fit_siren_to_sound(sound, total_steps):
@@ -41,8 +43,7 @@ def fit_siren_to_sound(sound, total_steps):
 
 
 
-def train_inr(args):
-    raise NotImplementedError('deprecated')
+def train_inr(args, **kwargs):
     dl_args = args["data loading"]
     ds_name = dl_args["dataset"]
     start_ix = int(args["start_ix"])
@@ -53,24 +54,27 @@ def train_inr(args):
         start_ix += 1
     print("Starting", flush=True)
 
-    if network['type'] == 'SIREN':
+    if args['network']['type'] == 'SIREN':
         fit_fxn = fit_siren_to_data
-    elif network['type'] == 'RFF':
+    elif args['network']['type'] == 'RFF':
         fit_fxn = rff.fit_rff_to_img
 
     dataset = dataloader.get_img_dataset(args)
     param_dict = {}
     for ix in range(start_ix,end_ix):
+        path = DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{ix}.pt"
+        if osp.exists(path):
+            continue
+
         data = dataset[ix]
         if isinstance(data, tuple):
             img, data = data[0], data[1:]
         else:
             img = data
-        inr,loss = fit_fxn(img, total_steps)
+        inr,loss = fit_fxn(img, total_steps, **kwargs)
         for k,v in inr.state_dict().items():
             param_dict[k] = v.cpu()
 
-        path = DATA_DIR+f"/{ds_name}/{dl_args['subset']}_{ix}.pt"
         loss_path = DATA_DIR+f"/{ds_name}/loss_{dl_args['subset']}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 
@@ -94,6 +98,8 @@ def main(args):
         train_cityscapes(args)
     elif args["data loading"]["dataset"] == "flowers":
         train_flowers(args)
+    elif args["data loading"]["dataset"] == "fmnist":
+        train_inr(args, C=32, first_omega_0=30, hidden_omega_0=30)
     else:
         train_inr(args)
 
@@ -198,13 +204,5 @@ def train_cityscapes(args):
 
 
 if __name__ == "__main__":
-    # from data import kitti
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--config_name')
-    # parser.add_argument('-j', '--job_id', default="manual")
-    # parser.add_argument('-s', '--start_ix', default=0, type=int)
-    # args = parser.parse_args()
-    # print(args.start_ix)
-    # kitti.save_kitti_imgs(args.start_ix)
     args = args_module.parse_args()
     main(args)

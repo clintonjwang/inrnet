@@ -4,7 +4,7 @@ from functools import partial
 nn = torch.nn
 F = nn.functional
 
-from inrnet.inn import functional as inrF
+from inrnet.inn import qmc, functional as inrF
 
 def translate_upsample(layer, input_shape, extrema):
     h,w = input_shape
@@ -19,9 +19,10 @@ def translate_upsample(layer, input_shape, extrema):
     raise NotImplementedError
 
 
-def upsample_nn(values, inr, layer):
+def get_new_coords(inr, layer):
     coords = inr.sampled_coords
-    if inr.grid_mode:
+    N_in = coords.size(0)
+    if inr.sample_mode == 'grid':
         if layer.scale == 4:
             new_coords = torch.cat((
                 torch.stack((coords[:,0], coords[:,1]+layer.spacing[1]), dim=1),
@@ -30,11 +31,26 @@ def upsample_nn(values, inr, layer):
             ), dim=0)
         else:
             raise NotImplementedError
+    elif hasattr(inr, 'dropped_coords'):
+        N_new = round(N_in*(layer.scale-1))
+        new_coords = inr.dropped_coords[:N_new]
+        if inr.dropped_coords.size(0) == N_new:
+            delattr(inr, 'dropped_coords')
+        elif inr.dropped_coords.size(0) < N_new:
+            raise ValueError('not enough dropped coords')
+        else:
+            inr.dropped_coords = inr.dropped_coords[N_new:]
+    elif inr.sample_mode == 'masked':
+        raise ValueError('could not find dropped coords')
     else:
-        down_size = coords.size(0)
-        new_coords = inrF.generate_quasirandom_sequence(n=down_size*layer.scale,
-            d=coords.size(1), like=coords)[down_size:]
-    
+        new_coords = qmc.generate_quasirandom_sequence(n=N_in*layer.scale,
+            d=coords.size(1), like=coords)[N_in:]
+    return new_coords
+
+def upsample_nn(values, inr, layer):
+    coords = inr.sampled_coords
+    new_coords = get_new_coords(inr, layer)
+
     inr.sampled_coords = torch.cat((coords, new_coords), dim=0)
     if layer.mode == 'nearest':
         Diffs = ((new_coords - layer.shift).unsqueeze(1) - coords.unsqueeze(0)).norm(dim=-1)
@@ -46,20 +62,10 @@ def upsample_nn(values, inr, layer):
         values = values[:,Diffs.topk(k=layer.scale, dim=1, largest=False).indices].mean(2)
         return values
 
-
 def upsample_conv(values, inr, layer):
     coords = inr.sampled_coords
-    if inr.grid_mode:
-        new_coords = torch.cat((
-            torch.stack((coords[:,0], coords[:,1]+layer.spacing[1]), dim=1),
-            torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]), dim=1),
-            torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]+layer.spacing[1]), dim=1),
-        ), dim=0)
-    else:
-        down_size = coords.size(0)
-        new_coords = inrF.generate_quasirandom_sequence(n=down_size*layer.scale,
-            d=coords.size(1), like=coords)[down_size:]
-    
+    new_coords = get_new_coords(inr, layer)
+
     inr.sampled_coords = torch.cat((coords, new_coords), dim=0)
     Diffs = ((inr.sampled_coords - layer.shift).unsqueeze(1) - coords.unsqueeze(0))
     mask = (Diffs[...,0].abs() < layer.kernel_size[0]) & (Diffs[...,1].abs() < layer.kernel_size[1])

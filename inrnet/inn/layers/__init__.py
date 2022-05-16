@@ -6,4 +6,4 @@ from .pooling import *
 from .activation import *
 from .upsample import *
 from .reshape import *
-from . import upsample, reshape
+from .other import *

@@ -34,13 +34,16 @@ def translate_pool(layer, input_shape, extrema):
 
 
 class AvgPool(nn.Module):
-    def __init__(self, kernel_size, down_ratio=1., shift=(0,0)):
+    def __init__(self, kernel_size, down_ratio=.25, shift=(0,0)):
         super().__init__()
         if not hasattr(kernel_size, '__iter__'):
             kernel_size = (kernel_size, kernel_size)
         self.kernel_size = kernel_size
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
+        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
+                        diffs[...,1].abs() < self.kernel_size[1]/2)
+
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
@@ -49,7 +52,7 @@ class AvgPool(nn.Module):
 class AvgPoolNeighbor(nn.Module):
     def __init__(self, k, down_ratio=1., shift=(0,0)):
         super().__init__()
-        self.k = k
+        self.num_neighbors = k
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
     def forward(self, inr):
@@ -65,19 +68,24 @@ class AvgPoolBall(nn.Module):
         if p_norm == "inf":
             p_norm = torch.inf
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
+        self.diffs_in_support = lambda diffs: self.norm(diffs) < self.radius
+        
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
 
 class MaxPool(nn.Module):
-    def __init__(self, kernel_size, down_ratio=1., shift=(0,0)):
+    def __init__(self, kernel_size, down_ratio=.25, shift=(0,0)):
         super().__init__()
         if not hasattr(kernel_size, '__iter__'):
             kernel_size = (kernel_size, kernel_size)
         self.kernel_size = kernel_size
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
+        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
+                        diffs[...,1].abs() < self.kernel_size[1]/2)
+
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.max_pool, 'MaxPool', layer=self)
@@ -86,7 +94,7 @@ class MaxPool(nn.Module):
 class MaxPoolNeighbor(nn.Module):
     def __init__(self, k, down_ratio=1., shift=(0,0)):
         super().__init__()
-        self.k = k
+        self.num_neighbors = k
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
     def forward(self, inr):
@@ -102,6 +110,8 @@ class MaxPoolBall(nn.Module):
         if p_norm == "inf":
             p_norm = torch.inf
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
+        self.diffs_in_support = lambda diffs: self.norm(diffs) < self.radius
+        
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.max_pool, 'MaxPoolBall', layer=self)

@@ -1,9 +1,9 @@
 import numpy as np 
-import torch
+import torch, pdb
 nn = torch.nn
 F = nn.functional
 
-from inrnet import util
+from inrnet import util, inn
 from inrnet.inn import functional as inrF
 
 def CrossEntropy(N=128):
@@ -53,13 +53,31 @@ def adv_loss_fxns(loss_settings):
         raise NotImplementedError
 
 def gradient_penalty(real_img, generated_img, D):
-    B = real_img.size()[0]
-    alpha = torch.rand(B, 1, 1, 1).expand_as(real_img).cuda()
-    interp_img = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach()).cuda()
+    B = real_img.size(0)
+    alpha = torch.rand(B, 1, 1, 1, device='cuda')
+    interp_img = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach())
     interp_logit = D(interp_img)
 
     grads = torch.autograd.grad(outputs=interp_logit, inputs=interp_img,
-               grad_outputs=torch.ones(interp_logit.size()).cuda(),
+               grad_outputs=torch.ones(interp_logit.size(), device='cuda'),
+               create_graph=True, retain_graph=True)[0].view(B, -1)
+    grads_norm = torch.sqrt(torch.sum(grads ** 2, dim=1) + 1e-12)
+    return (grads_norm - 1) ** 2
+
+def gradient_penalty_inr(coords, real_inr, generated_inr, D):
+    real_img = real_inr.cached_outputs
+    generated_img = generated_inr.cached_outputs
+    B = real_img.size(0)
+    alpha = torch.rand(B, 1, 1, device='cuda')
+    interp_vals = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach())
+    class dummy_inr(nn.Module):
+        def forward(self, coords):
+            return interp_vals
+    interp_img = inn.BlackBoxINR([dummy_inr()], channels=1, input_dims=2).cuda()
+    interp_logit = D(interp_img)(coords)
+
+    grads = torch.autograd.grad(outputs=interp_logit, inputs=interp_vals,
+               grad_outputs=torch.ones(interp_logit.size(), device='cuda'),
                create_graph=True, retain_graph=True)[0].view(B, -1)
     grads_norm = torch.sqrt(torch.sum(grads ** 2, dim=1) + 1e-12)
     return (grads_norm - 1) ** 2

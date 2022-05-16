@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
 from inrnet import inn, util, losses, jobs as job_mgmt
-from inrnet.inn import functional as inrF
+from inrnet.inn import qmc, functional as inrF
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
+import inrnet.models.common
 import inn.nets.inr2inr
 
 rescale_float = mtr.ScaleIntensity()
@@ -28,16 +29,12 @@ def load_pretrained_model(args):
         elif net_args["type"] == "inr-3":
             return inn.nets.inr2inr.ISeg3(in_channels=3, out_channels=7)
         elif net_args["type"] == "inr-5":
-            return inn.nets.inr2inr.ISeg4(in_channels=3, out_channels=7)
+            return inn.nets.inr2inr.ISeg5(in_channels=3, out_channels=7)
         elif net_args["type"] == "cnn-3":
-            return 
+            return inrnet.models.common.Seg3(in_channels=3, out_channels=7)
         elif net_args["type"] == "cnn-5":
-            return 
-        elif net_args["type"] == "inr-simpleskip":
-            return inn.nets.inr2inr.SimpleSkip(in_channels=3, out_channels=7)
+            return inrnet.models.common.Seg5(in_channels=3, out_channels=7)
         elif net_args["type"] == "inr-convnext":
-            if pretrained is False:
-                print('from scratch not implemented yet')
             InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
         elif net_args["type"] == "inr-mlpconv":
             InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
@@ -87,23 +84,23 @@ def train_segmenter(args):
         global_step += 1
         
         if args["network"]['type'].startswith('inr'):
-            if global_step == args["optimizer"]["max steps"]//2:
-                inrnet.inn.nets.convnext.enable_cn_blocks(model)
-
+            # if global_step == args["optimizer"]["max steps"]//2:
+            #     inrnet.inn.nets.convnext.enable_cn_blocks(model)
             seg_inr = model(img_inr)
-            if dl_args['sample type'] == 'valid':
-                coords = inrF.generate_valid_sample_points(mask=(segs.amax(1) == True),
+            if dl_args['sample type'] == 'masked':
+                seg_inr.change_sample_mode('masked')
+                coords = qmc.generate_masked_sample_points(mask=(segs.amax(1) == True),
                     sample_size=dl_args["sample points"])
                 seg_gt = get_seg_at_coords(segs, coords)
 
             elif dl_args['sample type'] == 'grid':
+                seg_inr.change_sample_mode('grid')
                 seg_gt = segs.flatten(start_dim=2).transpose(2,1)
-                seg_inr.toggle_grid_mode(True)
                 coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
             
             else:
-                seg_gt = get_seg_at_coords(segs, coords)
                 coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
+                seg_gt = get_seg_at_coords(segs, coords)
             logits = seg_inr.cuda()(coords)
             if dl_args['sample type'] == 'grid':
                 logits = util.realign_values(logits, coords=coords)
@@ -132,38 +129,45 @@ def train_segmenter(args):
                 "; acc:", np.round(acc*100, decimals=2),
                 flush=True)
 
-        if global_step % 2 == 0:
+        if global_step % 100 == 0:
             torch.save(model.state_dict(), osp.join(paths["weights dir"], "model.pth"))
             loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
             iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
             acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
 
+            path = paths["job output dir"]+f"/imgs/{global_step}.png"
             with torch.no_grad():
                 rgb = img_inr.produce_images(*dl_args['image shape'])[0]
-                if args["network"]['type'].startswith('inr'):
-                    if dl_args['sample type'] == 'valid':
-                        pdb.set_trace()
-                        coords = inrF.generate_valid_sample_points(mask=(segs.amax(1) == True),
-                            sample_size=dl_args["sample points"])
-                        seg_gt = get_seg_at_coords(segs, coords)
-                        grid_coords = seg_inr.generate_sample_points(
-                            dims=dl_args['image shape'], mode='grid')
+                if args["network"]['type'].startswith('inr') and dl_args['sample type'] == 'masked':
+                    grid_seg = torch.zeros(*dl_args['image shape'], device=coords.device, dtype=torch.long)
+                    pred_seg = util.realign_values(pred_seg, coords=coords)
+                    # inrF.nn_interpolate(grid_seg, pred_seg)
+                    coo = torch.floor(coords).long()
+                    grid_seg[coo[:,0], coo[:,1]] = pred_seg[0] + 1
 
-                    # elif dl_args['sample type'] != 'grid':
-                    #     seg_gt = segs.flatten(start_dim=2).transpose(2,1)
-                    #     maxes, gt_labels = seg_gt.max(-1)
-                    #     seg_inr = model(img_inr)
-                    #     seg_inr.toggle_grid_mode(True)
-                    #     coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
-                    #     logits = seg_inr.cuda()(coords)
-                    #     logits = util.realign_values(logits, coords=coords)
-                    #     pred_seg = logits.max(-1).indices
-                gt_labels += 1
-                gt_labels[maxes == 0] = 0
-                pred_seg += 1
-                pred_seg[maxes == 0] = 0
-            path = paths["job output dir"]+f"/imgs/{global_step}.png"
-            save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
+                    gt_label = segs[0].max(0).indices + 1
+                    save_example_segs(path, rgb, grid_seg, gt_label)
+                    
+                    # seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+                    # maxes, gt_labels = seg_gt.max(-1)
+                    # seg_inr = model(img_inr)
+                    # seg_inr.change_sample_mode('grid')
+                    # coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+                    # logits = seg_inr.cuda()(coords)
+                    # logits = util.realign_values(logits, coords=coords)
+                    # pred_seg = logits.max(-1).indices
+                    # gt_labels += 1
+                    # gt_labels[maxes == 0] = 0
+                    # pred_seg += 1
+                    # pred_seg[maxes == 0] = 0
+                    # save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
+
+                else:
+                    gt_labels += 1
+                    gt_labels[maxes == 0] = 0
+                    pred_seg += 1
+                    pred_seg[maxes == 0] = 0
+                    save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
 
         if global_step >= args["optimizer"]["max steps"]:
             break
@@ -174,8 +178,13 @@ def train_segmenter(args):
 def test_inr_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
+    global_step = 0
+    ciou_tracker = util.MetricTracker("coarse IoU", function=mean_iou)
+    fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)
+    cacc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
+    facc_tracker = util.MetricTracker("fine pixel accuracy", function=pixel_acc)
     data_loader = dataloader.get_inr_dataloader(dl_args)
-    top3, top1 = 0,0
+
     origin = args['target_job']
     model = load_model_from_job(origin).cuda().eval()
     orig_args = job_mgmt.get_job_args(origin)
@@ -228,25 +237,4 @@ def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'build
 
     img = imgviz.io.pyplot_to_numpy()
     plt.imsave(path, img)
-    plt.close()
-
-def save_figure():
-    with torch.no_grad():
-        h,w = H//4, W//4
-        tensors = [torch.linspace(-1, 1, steps=h), torch.linspace(-1, 1, steps=w)]
-        mgrid = torch.stack(torch.meshgrid(*tensors, indexing='ij', device='cuda'), dim=-1)
-        xy_grid = mgrid.reshape(-1, 2).half()
-        InrNet.eval()
-        z_pred = Seg_inr(xy_grid)
-        z_pred = rescale_float(z_pred.reshape(h,w).cpu().float().numpy())
-        plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_z.png"), z_pred, cmap="gray")
-
-        del z_pred, Seg_inr
-        torch.cuda.empty_cache()
-        rgb = img_inr.evaluator(xy_grid)
-        rgb = rescale_float(rgb.reshape(h,w, 3).cpu().float().numpy())
-        plt.imsave(osp.join(paths["job output dir"]+"/imgs", f"{global_step}_rgb.png"), rgb)
-
-        torch.cuda.empty_cache()
-        InrNet.train()
-        
+    plt.close('all')

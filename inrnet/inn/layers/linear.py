@@ -2,7 +2,7 @@ import torch
 nn = torch.nn
 F = nn.functional
 from functools import partial
-he_init = nn.init.kaiming_normal_
+he_init = nn.init.kaiming_uniform_
 
 from inrnet.inn import functional as inrF, polynomials
 

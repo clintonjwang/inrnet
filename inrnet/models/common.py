@@ -4,16 +4,18 @@ nn = torch.nn
 F = nn.functional
 
 def conv_bn_relu(in_, out_):
-    return nn.Sequential(nn.Conv2d(in_, out_, 3,1,1, bias=False),
+    cv = nn.Conv2d(in_, out_, 3,1,1, bias=False)
+    nn.init.kaiming_uniform_(cv.weight)
+    return nn.Sequential(cv,
         nn.BatchNorm2d(out_),
         nn.ReLU(inplace=True))
 
-def Conv2(in_channels, out_dims):
-    layers = [conv_bn_relu(in_channels, 32),
+def Conv2(in_channels, out_dims, C=32):
+    layers = [conv_bn_relu(in_channels, C),
         nn.MaxPool2d(2),
-        conv_bn_relu(32, 64),
+        conv_bn_relu(C, C*2),
         nn.AdaptiveAvgPool2d(output_size=1), nn.Flatten(1),
-        nn.Linear(64, out_dims)]
+        nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims)]
     for l in layers:
         if hasattr(l, 'weight'):
             nn.init.kaiming_uniform_(l.weight)
@@ -21,22 +23,61 @@ def Conv2(in_channels, out_dims):
             nn.init.zeros_(l.bias)
     return nn.Sequential(*layers)
 
-def Conv5(in_channels, out_dims):
-    layers = [conv_bn_relu(in_channels, 32),
+def Conv5(in_channels, out_dims, C=16):
+    layers = [conv_bn_relu(in_channels, C),
         nn.MaxPool2d(2),
-        conv_bn_relu(32, 64),
-        conv_bn_relu(64, 64),
+        conv_bn_relu(C, C*2),
+        conv_bn_relu(C*2, C*2),
         nn.MaxPool2d(2),
-        conv_bn_relu(64, 64),
-        conv_bn_relu(64, 64),
+        conv_bn_relu(C*2, C*2),
+        conv_bn_relu(C*2, C*2),
         nn.AdaptiveAvgPool2d(output_size=1), nn.Flatten(1),
-        nn.Linear(64, out_dims)]
+        nn.Linear(C*2, out_dims)]
     for l in layers:
         if hasattr(l, 'weight'):
             nn.init.kaiming_uniform_(l.weight)
         if hasattr(l, 'bias'):
             nn.init.zeros_(l.bias)
     return nn.Sequential(*layers)
+
+class Seg3(nn.Module):
+    def __init__(self, in_channels, out_channels, C=16):
+        super().__init__()
+        layers = [
+            conv_bn_relu(in_channels, C),
+            conv_bn_relu(C, C*2),
+            nn.Conv2d(C*2, out_channels, 1, bias=True),
+        ]
+        self.layers = nn.Sequential(*layers)
+        for l in self.layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+            if hasattr(l, 'bias'):
+                nn.init.zeros_(l.bias)
+    def forward(self, x):
+        return self.layers(x)
+
+class Seg5(nn.Module):
+    def __init__(self, in_channels, out_channels, C=16):
+        super().__init__()
+        self.first = nn.Sequential(
+            conv_bn_relu(in_channels, C),)
+        layers = [
+            conv_bn_relu(C, C),
+            nn.MaxPool2d(2),
+            conv_bn_relu(C, C),
+            conv_bn_relu(C, C),
+            nn.Upsample(scale_factor=(2,2), mode='nearest'),
+        ]
+        self.layers = nn.Sequential(*layers)
+        self.last = nn.Sequential(
+            nn.Conv2d(C, out_channels, 1, bias=True))
+
+    def forward(self, x):
+        x = self.first(x)
+        x = x + self.layers(x)
+        return self.last(x)
+
 
 # def conv1d_bn_relu(in_, out_):
 #     return nn.Sequential(nn.Conv2d(in_, out_, 3,1,1, bias=False),
@@ -55,25 +96,3 @@ def Conv5(in_channels, out_dims):
 #         if hasattr(l, 'bias'):
 #             nn.init.zeros_(l.bias)
 #     return nn.Sequential(*layers)
-
-class SimpleSeg(nn.Module):
-    def __init__(in_channels, out_dims):
-        super().__init__()
-        self.in_channels = in_channels
-        self.out_dims = out_dims
-        self.layers = nn.Sequential(
-            conv_bn_relu(in_channels, 32),
-            nn.MaxPool2d(2),
-            conv_bn_relu(32, 64),
-            nn.Upsample2d(2, mode='bilinear'),
-            *out_layers)
-        self.last = nn.Conv2d(64, out_dims,1)
-        for l in self.layers+[self.last]:
-            if hasattr(l, 'weight'):
-                nn.init.kaiming_uniform_(l.weight)
-            if hasattr(l, 'bias'):
-                nn.init.zeros_(l.bias)
-    def forward(self, x):
-        self.last
-
-# def SimpleG():

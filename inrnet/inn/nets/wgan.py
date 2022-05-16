@@ -4,6 +4,46 @@ nn = torch.nn
 
 from inrnet import inn
 from inrnet.inn import functional as inrF
+from inrnet.inn.nets.effnet import InrCls2
+
+def Gan4():
+    G = G4(in_dims=64, out_channels=1)
+    D = InrCls2(in_channels=1, out_dims=1, C=16)
+    return G,D
+
+class G4(nn.Module):
+    def __init__(self, in_dims, out_channels, C=8):
+        super().__init__()
+        self.first = nn.Sequential(
+            nn.Linear(in_dims, C*8, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(C*8, C*4, bias=True),
+            nn.ReLU(inplace=True),
+            nn.Linear(C*4, C*49, bias=True),
+        )
+        for l in self.first:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+            if hasattr(l, 'bias'):
+                nn.init.zeros_(l.bias)
+
+        layers = [
+            # inn.blocks.conv_norm_act(C, C*2, kernel_size=(.5,.5)), #
+            inn.Upsample(4),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(1.,1.)), #14x14
+            inn.Upsample(4),
+            inn.PositionalEncoding(N=C//2),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.5,.5)), #28x28
+            inn.ChannelMixer(C*2, out_channels), inn.Tanh()
+        ]
+        self.layers = nn.Sequential(*layers)
+                
+    def forward(self, x):
+        x = torch.reshape(self.first(x), (x.size(0), -1, 7, 7))
+        inrs = inn.produce_inr(x)
+        return self.layers(inrs)
+
+
 
 #G_layers=16, D_layers=14
 def translate_wgan_model(G_layers=10, D_layers=8, mlp=128):

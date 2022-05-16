@@ -11,22 +11,26 @@ from inrnet import inn, util, losses, jobs as job_mgmt
 import inrnet.inn.nets.wgan
 import inrnet.models.wgan
 
-rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=5, upper=95, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_float = mtr.ScaleIntensity()
 
+n_ch = 1
 def load_pretrained_model(args):
     net_args = args["network"]
     pretrained = net_args['pretrained']
     if isinstance(pretrained, str):
-        raise NotImplementedError
+        raise NotImplementedError('cant pretrain')
         base = load_model_from_job(pretrained)
     else:
         if net_args["type"] == "wgan":
-            G,D = inrnet.models.wgan.simple_wgan()
+            G,D = inrnet.models.wgan.wgan()
         elif net_args["type"] == "inr-wgan":
             G,D = inrnet.inn.nets.wgan.translate_wgan_model()
+        elif net_args["type"] == "inr-4":
+            G,D = inrnet.inn.nets.wgan.Gan4()
+        elif net_args["type"] == "cnn-4":
+            G,D = inrnet.models.wgan.Gan4()
         else:
-            raise NotImplementedError
+            raise NotImplementedError('bad net type')
     return G.cuda(), D.cuda()
 
 def load_model_from_job(origin):
@@ -46,24 +50,30 @@ def train_generator(args):
     G_fxn, D_fxn = losses.adv_loss_fxns(args["loss settings"])
     G_loss_tracker = util.MetricTracker("G loss", function=G_fxn)
     D_loss_tracker = util.MetricTracker("D loss", function=D_fxn)
-    GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty)
+    if args["network"]['type'].startswith('inr'):
+        GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty_inr)
+    else:
+        GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty)
+
     bsz = dl_args['batch size']
+    D_step = 2
 
     G,D = load_pretrained_model(args)
     G_optim = torch.optim.AdamW(G.parameters(), lr=args["optimizer"]["learning rate"], betas=(.5,.999))
     D_optim = torch.optim.AdamW(D.parameters(), lr=args["optimizer"]["learning rate"], betas=(.5,.999))
     for true_inr in data_loader:
         global_step += 1
-        noise = torch.randn(dl_args["batch size"], 128, device='cuda')
-        if global_step % 4 == 0:
+        noise = torch.randn(dl_args["batch size"], 64, device='cuda')
+        noise = torch.where((noise>1) | (noise<-1), torch.randn_like(noise), noise)
+        if global_step % D_step == 0:
             if args["network"]['type'].startswith('inr'):
                 gen_inr = G(noise)
                 fake_fxn = D(gen_inr)
                 if dl_args['sample type'] == 'qmc':
-                    coords = true_inr.generate_sample_points(sample_size=dl_args["initial sample points"], method='qmc')
+                    coords = fake_fxn.generate_sample_points(sample_size=dl_args["initial sample points"], method='qmc')
                 else:
-                    fake_fxn.toggle_grid_mode(True)
-                    coords = true_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
+                    fake_fxn.change_sample_mode('grid')
+                    coords = fake_fxn.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
                 fake_logits = fake_fxn(coords)
 
             else:
@@ -86,6 +96,11 @@ def train_generator(args):
             with torch.no_grad():
                 if args["network"]['type'].startswith('inr'):
                     gen_inr = G(noise)
+                    if dl_args['sample type'] == 'qmc':
+                        coords = gen_inr.generate_sample_points(sample_size=dl_args["initial sample points"], method='qmc')
+                    else:
+                        gen_inr.change_sample_mode('grid')
+                        coords = gen_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
                 else:
                     gen_img = G(noise)
 
@@ -93,11 +108,15 @@ def train_generator(args):
             fake_fxn = D(gen_inr.detach())
             true_fxn = D(true_inr)
             if dl_args['sample type'] == 'grid':
-                fake_fxn.toggle_grid_mode(True)
-                true_fxn.toggle_grid_mode(True)
+                fake_fxn.change_sample_mode('grid')
+                true_fxn.change_sample_mode('grid')
+                true_coords = true_inr.generate_sample_points(dims=dl_args['image shape'], method='grid')
+            elif dl_args['sample type'] == 'qmc':
+                true_coords = true_inr.generate_sample_points(sample_size=dl_args["sample points"], method='qmc')
             fake_logits = fake_fxn(coords)
-            true_logits = true_fxn(coords)
-            D_loss = D_loss_tracker(fake_logits, true_logits)
+            true_logits = true_fxn(true_coords)
+            gp = GP_tracker(true_coords, true_inr, gen_inr, D)
+            D_loss = D_loss_tracker(fake_logits, true_logits) + gp * 10
         else:
             true_img = true_inr.produce_images(*dl_args['image shape'])
             fake_logits = D(gen_img.detach())
@@ -115,7 +134,6 @@ def train_generator(args):
         if global_step % 20 == 0:
             print("G:", np.round(G_loss, decimals=3), "; D:", np.round(D_loss.item(), decimals=3), flush=True)
 
-
         if global_step % 100 == 0:
             torch.save(G.state_dict(), osp.join(paths["weights dir"], "G.pth"))
             torch.save(D.state_dict(), osp.join(paths["weights dir"], "D.pth"))
@@ -125,18 +143,19 @@ def train_generator(args):
             if args["network"]['type'].startswith('inr'):
                 true = true_inr.produce_images(*dl_args['image shape'])[0]
                 coords = true_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
-                gen_inr.toggle_grid_mode(True)
-                fake = gen_inr(coords)[0]
+                gen_inr.change_sample_mode('grid')
+                fake = gen_inr(coords)[:1]
+                fake = util.realign_values(fake, inr=gen_inr)[0]
                 coll_img = torch.cat((rescale_float(true.permute(1,2,0)),
-                    rescale_float(fake.reshape(*dl_args['image shape'],3))), dim=1)
-                coll_img = F.interpolate(coll_img.unsqueeze(0).unsqueeze(0), size=(150,300,3)).squeeze()
-                plt.imsave(paths["job output dir"]+f"/imgs/{global_step}.png", coll_img.detach().cpu().numpy())
+                    rescale_float(fake.reshape(*dl_args['image shape'],n_ch))), dim=1)
+                coll_img = F.interpolate(coll_img.unsqueeze(0).unsqueeze(0), size=(150,300,n_ch)).squeeze()
+                plt.imsave(paths["job output dir"]+f"/imgs/{global_step}.png", coll_img.detach().cpu().numpy(), cmap='gray')
             else:
                 true = rescale_float(true_img[0].permute(1,2,0))
                 fake = rescale_float(gen_img[0].permute(1,2,0))
                 coll_img = torch.cat((true,fake), dim=1)
-                coll_img = F.interpolate(coll_img.unsqueeze(0).unsqueeze(0), size=(150,300,3)).squeeze()
-                plt.imsave(paths["job output dir"]+f"/imgs/{global_step}.png", coll_img.detach().cpu().numpy())
+                coll_img = F.interpolate(coll_img.unsqueeze(0).unsqueeze(0), size=(150,300,n_ch)).squeeze()
+                plt.imsave(paths["job output dir"]+f"/imgs/{global_step}.png", coll_img.detach().cpu().numpy(), cmap='gray')
             
         if global_step >= args["optimizer"]["max steps"]:
             break

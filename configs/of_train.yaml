@@ -1,17 +1,18 @@
 parent: classify
 network:
-  type: inr-effnet-s3
+  type: inr-2
 data loading:
-  batch size: 240
+  batch size: 4
   subset: train
   dataset: inet12
-  input channels: 3
   classes: 12
-  sample points: 1024
+  classes: 12
+  sample points: 4096
   image shape:
-  - 32
-  - 32
+  - 16
+  - 16
+  - 16
 optimizer:
-  learning rate: 5e-3
-  max steps: 16000
+  learning rate: 1e-2
+  max steps: 1000
 #N=9600 / bsz * 40 epochs

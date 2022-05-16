@@ -1,0 +1,9 @@
+network:
+  type: SIREN
+data loading:
+  end_ix: 5000
+  dataset: fmnist
+  subset: train
+  variables: img, cls
+optimizer:
+  max steps: 1200

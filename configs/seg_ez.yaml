@@ -1,5 +1,0 @@
-parent: seg_train
-network:
-  type: inr-simple2
-  pretrained: false
-  frozen: false
