@@ -5,21 +5,22 @@ F = nn.functional
 
 from inrnet.models.common import Conv2, conv_bn_relu
 
-def Gan4():
-    G = G4(in_dims=64, out_channels=1)
+def Gan4(reshape):
+    G = G4(in_dims=64, out_channels=1, reshape=reshape)
     D = Conv2(in_channels=1, out_dims=1, C=16)
     return G,D
 
 class G4(nn.Module):
-    def __init__(self, in_dims, out_channels, C=8):
+    def __init__(self, in_dims, out_channels, C=8, reshape=(7,7)):
         super().__init__()
         self.first = nn.Sequential(
-            nn.Linear(in_dims, C*8, bias=True),
+            nn.Linear(in_dims, C*64, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(C*8, C*4, bias=True),
+            nn.Linear(C*64, C*32, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(C*4, C*49, bias=True),
+            nn.Linear(C*32, C*reshape[0]*reshape[1], bias=True),
         )
+        self.reshape = reshape
         for l in self.first:
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
@@ -28,16 +29,16 @@ class G4(nn.Module):
 
         layers = [
             # conv_bn_relu(C, C*2),
-            nn.Upsample(scale_factor=(2,2), mode='nearest'), #14x14
-            conv_bn_relu(C, C*4),
-            nn.Upsample(scale_factor=(2,2), mode='nearest'), #28x28
-            conv_bn_relu(C*4, C*2),
-            nn.Conv2d(C*2, out_channels, 1, bias=True), nn.Tanh()
+            # nn.Upsample(scale_factor=(2,2), mode='nearest'), #14x14
+            # conv_bn_relu(C, C*4),
+            # nn.Upsample(scale_factor=(2,2), mode='nearest'), #28x28
+            # conv_bn_relu(C*4, C*2),
+            nn.Conv2d(C, out_channels, 1, bias=True), nn.Tanh()
         ]
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = torch.reshape(self.first(x), (x.size(0), -1, 7, 7))
+        x = torch.reshape(self.first(x), (x.size(0), -1, *self.reshape))
         return self.layers(x)
 
 #G_layers=16, D_layers=14

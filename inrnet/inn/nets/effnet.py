@@ -35,13 +35,13 @@ class InrClsWide2(nn.Module):
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
-        kwargs.pop('mid_ch', None);
-        kwargs.pop('N_bins', None);
+        # kwargs.pop('mid_ch', None);
+        # kwargs.pop('N_bins', None);
+        # kwargs.pop('scale2', None);
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.4,.4), down_ratio=.5,
-                N_bins=2048, mid_ch=(64,32), **kwargs),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.2,.2), down_ratio=.5,
-                N_bins=512, mid_ch=(32,32), **kwargs),
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.25, **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]
         self.layers = nn.Sequential(*self.layers)
@@ -82,14 +82,14 @@ class InrClsWide4(nn.Module):
         kwargs.pop('mid_ch', None);
         kwargs.pop('N_bins', None);
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.4,.4), down_ratio=.5,
-                N_bins=2048, mid_ch=(64,32), **kwargs),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.5,
-                N_bins=1024, mid_ch=(64,32), **kwargs),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.3,.3), down_ratio=.5,
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.25, **kwargs,
+                N_bins=512),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3),
                 N_bins=512, mid_ch=(32,32), **kwargs),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.3,.3), down_ratio=.5,
-                N_bins=256, mid_ch=(16,32), **kwargs),
+            # inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.3,.3), down_ratio=.5,
+            #     N_bins=256, mid_ch=(16,32), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]
         self.layers = nn.Sequential(*self.layers)

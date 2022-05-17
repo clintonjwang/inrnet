@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import monai.transforms as mtr
 
-import args as args_module
+import inrnet.args as args_module
 from inrnet import optim, util, losses
 from inrnet.data import dataloader
 from inrnet.models.inrs import siren, rff
@@ -19,7 +19,11 @@ def fit_siren_to_data(data, total_steps, **kwargs):
         return fit_siren_to_sound(data, total_steps, **kwargs)
 
 def fit_siren_to_img(img, total_steps, **kwargs):
-    imgFit = siren.ImageFitting(img.unsqueeze_(0))
+    if len(img.shape) == 3:
+        img = img.unsqueeze(0)
+    elif len(img.shape) != 4:
+        raise ValueError(f'bad shape {img.shape}')
+    imgFit = siren.ImageFitting(img)
     H,W = imgFit.H, imgFit.W
     dl = torch.utils.data.DataLoader(imgFit, batch_size=1, pin_memory=True, num_workers=0)
     inr = siren.Siren(out_channels=img.size(1), **kwargs).cuda()
@@ -187,18 +191,14 @@ def train_cityscapes(args):
     print("Starting", flush=True)
 
     dataset = dataloader.get_img_dataset(args)
-    param_dict = {}
     for ix in range(start_ix,end_ix):
         if dl_args['subset']=='train_extra':
             img,seg = dataset[ix-2975]
         else:
             img,seg = dataset[ix]
         inr,loss = fit_siren_to_img(img, total_steps)
-        for k,v in inr.state_dict().items():
-            param_dict[k] = v.cpu()
-
         path = DATA_DIR+f"/cityscapes/{subset}_{ix}.pt"
-        torch.save((param_dict, seg.squeeze(0)), path)
+        torch.save((inr.state_dict(), seg.squeeze(0)), path)
         loss_path = DATA_DIR+f"/cityscapes/loss_{subset}_{ix}.txt"
         open(loss_path, 'w').write(str(loss.item()))
 

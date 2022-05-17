@@ -61,12 +61,12 @@ def args_from_file(path, cmd_args=None):
                 args['data loading'] = {'N': 1000}
             else:
                 raise ValueError(f"bad config_name {cmd_args.config_name}")
-        elif cmd_args.config_name.endswith('200'):
-            path = path.replace('200.yaml', '.yaml')
+        elif cmd_args.config_name.endswith('4k'):
+            path = path.replace('4k.yaml', '.yaml')
             if osp.exists(path):
                 args = yaml.safe_load(open(path, 'r'))
                 if 'data loading' in args: raise NotImplementedError
-                args['data loading'] = {'N': 200}
+                args['data loading'] = {'N': 4000}
             else:
                 raise ValueError(f"bad config_name {cmd_args.config_name}")
         else:

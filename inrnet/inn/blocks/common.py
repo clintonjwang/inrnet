@@ -6,7 +6,9 @@ from inrnet import inn
 
 def conv_norm_act(in_, out_, kernel_size=(.1,.1), **kwargs):
     act_layer = inn.get_activation_layer(kwargs.pop("activation", "swish"))
-    return nn.Sequential(inn.MLPConv(in_, out_, kernel_size=kernel_size, **kwargs),
+    cv = inn.MLPConv(in_, out_, kernel_size=kernel_size, **kwargs)
+    # cv.mask_tracker = True
+    return nn.Sequential(cv,
         inn.ChannelNorm(out_),
         act_layer,
     )
@@ -36,3 +38,5 @@ class ResConv(ResBlock):
         down_ratio = kwargs.pop("down_ratio", 1)
         super().__init__(nn.Sequential(conv_norm_act(C, C, down_ratio=1, **kwargs),
             conv_norm_act(C, C, down_ratio=down_ratio, **kwargs)))
+    # def get_convs(self):
+    #     return self.sequential[0][0], self.sequential[1][0]

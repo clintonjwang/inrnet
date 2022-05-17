@@ -22,6 +22,7 @@ def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, spl
         coords = inr.sampled_coords
     indices = torch.sort((coords[:,0]+2)*coords.size(0)/2 + coords[:,1]).indices
     return out[:,indices]
+    #coords[indices]
 
 def meshgrid(*tensors, indexing='ij'):
     try:
@@ -59,6 +60,7 @@ def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="c
         while x_step > 0 or y_step > 0:
             if y_step > 0:
                 if y_step > 1 and y_step % 2 == 1:
+                    raise NotImplementedError('meshgrid is only working for powers of 2')
                     new_y_indices = [y for y in range(1,dims[1]) if y not in y_indices]
                     ind_iters += list(itertools.product(x_indices, new_y_indices))
                 else:

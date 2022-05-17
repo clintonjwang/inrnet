@@ -33,11 +33,25 @@ def get_new_coords(inr, layer):
             inr.dropped_coords = inr.dropped_coords[N_new:]
     elif inr.sample_mode == 'grid':
         if layer.scale == 4:
-            new_coords = torch.cat((
-                torch.stack((coords[:,0], coords[:,1]+layer.spacing[1]), dim=1),
-                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]), dim=1),
-                torch.stack((coords[:,0]+layer.spacing[0], coords[:,1]+layer.spacing[1]), dim=1),
-            ), dim=0)
+            s0,s1 = layer.spacing
+            if layer.align_corners:
+                coords[:,0] -= s0/2
+                coords[:,1] -= s1/2
+                new_coords = torch.cat((
+                    torch.stack((coords[:,0], coords[:,1]+s1), dim=1),
+                    torch.stack((coords[:,0]+s0, coords[:,1]), dim=1),
+                    torch.stack((coords[:,0]+s0, coords[:,1]+s1), dim=1),
+                ), dim=0)
+                coords[:,0] *= 2/(2+s0)
+                coords[:,1] *= 2/(2+s1)
+                new_coords[:,0] *= 2/(2+s0)
+                new_coords[:,1] *= 2/(2+s1)
+            else:
+                new_coords = torch.cat((
+                    torch.stack((coords[:,0], coords[:,1]+s1), dim=1),
+                    torch.stack((coords[:,0]+s0, coords[:,1]), dim=1),
+                    torch.stack((coords[:,0]+s0, coords[:,1]+s1), dim=1),
+                ), dim=0)
         else:
             raise NotImplementedError
     elif inr.sample_mode == 'masked':
@@ -84,6 +98,7 @@ class Upsample(nn.Module):
         super().__init__()
         self.scale = scale
         self.mode = mode
+        self.align_corners = align_corners
         self.spacing = spacing
         if mode == 'nearest':
             self.register_buffer('shift', torch.tensor((spacing[0]/2,spacing[1]/2), dtype=dtype))

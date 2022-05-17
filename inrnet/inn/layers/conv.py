@@ -219,7 +219,7 @@ class MLPConv(Conv):
             kernel_size = (kernel_size, kernel_size)
         self.kernel_size = K = kernel_size
         if N_bins is None:
-            self.N_bins = 2**math.ceil(math.log2(1/K[0]/K[1])+4)
+            self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
         else:
             self.N_bins = N_bins
         self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (

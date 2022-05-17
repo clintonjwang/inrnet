@@ -11,37 +11,15 @@ def Gan4(reshape):
     D = D4(in_channels=1, C=32)
     return G,D
 
-class D4(nn.Module):
-    def __init__(self, in_channels, out_dims=1, C=64, **kwargs):
-        super().__init__()
-        out_layers = nn.Sequential(nn.Linear(C*2, 64), nn.ReLU(inplace=True), nn.Linear(64, out_dims))
-        for l in out_layers:
-            if hasattr(l, 'weight'):
-                nn.init.kaiming_uniform_(l.weight)
-                nn.init.zeros_(l.bias)
-        self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.25,.25), down_ratio=.5,
-                activation='leakyrelu', **kwargs),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.5,.5), down_ratio=.5,
-                activation='leakyrelu', **kwargs),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.5,.5), down_ratio=.5,
-                activation='leakyrelu', **kwargs),
-            inn.GlobalAvgPoolSequence(out_layers),
-        ]
-        self.layers = nn.Sequential(*self.layers)
-
-    def forward(self, inr):
-        return self.layers(inr)
-
 class G4(nn.Module):
-    def __init__(self, in_dims, out_channels, C=8, reshape=(7,7)):
+    def __init__(self, in_dims, out_channels, C=4, reshape=(7,7)):
         super().__init__()
         self.first = nn.Sequential(
-            nn.Linear(in_dims, C*8, bias=True),
+            nn.Linear(in_dims, C*64, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(C*8, C*4, bias=True),
+            nn.Linear(C*64, C*32, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(C*4, C*49, bias=True),
+            nn.Linear(C*32, C*reshape[0]*reshape[1], bias=True),
         )
         cm = inn.ChannelMixer(C, out_channels, bias=True)
         for l in [*self.first, cm]:
@@ -51,17 +29,17 @@ class G4(nn.Module):
                 nn.init.zeros_(l.bias)
         self.reshape = reshape
 
-        #kwargs = dict() #i4b
-        kwargs = dict(mid_ch=(8,8), N_bins=32, scale2=10) #i4c
+        #kwargs = dict(mid_ch=(8,8), N_bins=32, scale2=10) #
+        kwargs = dict(mid_ch=(16,8), N_bins=64) #i4a
         #activation='relu') #mid_ch=(16,16)
         layers = [
             # inn.blocks.conv_norm_act(C, C*2, kernel_size=(.5,.5)), #
-            inn.Upsample(4, spacing=(1/6,1/6)),
+            # inn.Upsample(4, spacing=(1/6,1/6), align_corners=True),
             # inn.blocks.conv_norm_act(C, C*2, kernel_size=(.85,.85), **kwargs), #5x5 kernel, 14x14 (-1,1.167)
             # inn.PositionalEncoding(N=C),
-            inn.blocks.conv_norm_act(C, C, kernel_size=(.5,.5), **kwargs), #3x3 kernel, 14x14
-            inn.Upsample(4, spacing=((2+1/6)/13/2,(2+1/6)/13/2)),
-            inn.blocks.conv_norm_act(C, C, kernel_size=(.25,.25), **kwargs), #28x28, (-1,1.25)
+            # inn.blocks.conv_norm_act(C, C, kernel_size=(.5,.5), **kwargs), #3x3 kernel, 14x14
+            # inn.Upsample(4, spacing=(1/13,1/13), align_corners=True),
+            # inn.blocks.conv_norm_act(C, C, kernel_size=(.25,.25), **kwargs), #28x28, (-1,1.25)
             cm, inn.Tanh(),
         ]
         self.layers = nn.Sequential(*layers)
@@ -71,6 +49,29 @@ class G4(nn.Module):
         inrs = inn.produce_inr(x)
         return self.layers(inrs)
 
+
+class D4(nn.Module):
+    def __init__(self, in_channels, out_dims=1, C=64):#, **kwargs):
+        super().__init__()
+        out_layers = nn.Sequential(nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+        kwargs = dict(mid_ch=(16,8), N_bins=64)
+        self.layers = [
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.2,.2), activation='relu', **kwargs),
+            inn.MaxPool((.21,.21), down_ratio=.25),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.4,.4), activation='relu', **kwargs),
+            inn.GlobalAvgPoolSequence(out_layers),
+        ]
+        self.layers = nn.Sequential(*self.layers)
+
+    def get_convs(self):
+        return self.layers[0][0], self.layers[2][0]
+
+    def forward(self, inr):
+        return self.layers(inr)
 
 
 #G_layers=16, D_layers=14

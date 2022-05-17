@@ -4,23 +4,27 @@ network:
   pretrained: false
   frozen: false
 data loading:
+  N: 5000
   batch size: 64
   subset: train
   dataset: fmnist
   sample type: grid
-  initial sample points: 49
+  # initial sample points: 49
+  # initial grid shape:
+  # - 7
+  # - 7
   initial grid shape:
-  - 7
-  - 7
-  sample points: 784
+  - 32
+  - 32
+  sample points: 1024
   image shape:
-  - 28
-  - 28
+  - 32
+  - 32
 optimizer:
   type: AdamW
-  G learning rate: 1e-3
-  D learning rate: 1e-4
-  max steps: 30000
+  G learning rate: 1e-4
+  D learning rate: 1e-3
+  max steps: 10000
 loss settings:
   adversarial loss type: WGAN
 #N=? / bsz * 10 epochs

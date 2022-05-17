@@ -19,24 +19,16 @@ DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
 def load_pretrained_model(args):
     net_args = args["network"]
-    pretrained = net_args['pretrained']
-    if isinstance(pretrained, str):
-        raise NotImplementedError
-        base = load_model_from_job(pretrained)
+    if net_args["type"] == "inr-3":
+        return inn.nets.inr2inr.ISeg3(in_channels=2, out_channels=2)
+    elif net_args["type"] == "inr-5":
+        return inn.nets.inr2inr.ISeg5(in_channels=2, out_channels=2)
+    elif net_args["type"] == "cnn-3":
+        return inrnet.models.common.Seg3(in_channels=2, out_channels=2)
+    elif net_args["type"] == "cnn-5":
+        return inrnet.models.common.Seg5(in_channels=2, out_channels=2)
     else:
-        if net_args["type"] == "inr-3":
-            return inn.nets.inr2inr.ISeg3(in_channels=1, out_channels=2)
-        elif net_args["type"] == "inr-5":
-            return inn.nets.inr2inr.ISeg5(in_channels=1, out_channels=2)
-        elif net_args["type"] == "cnn-3":
-            return inrnet.models.common.Seg3(in_channels=1, out_channels=2)
-        elif net_args["type"] == "cnn-5":
-            return inrnet.models.common.Seg5(in_channels=1, out_channels=2)
-        else:
-            raise NotImplementedError
-            
-    if net_args['frozen'] is True:
-        inn.inrnet.freeze_layer_types(InrNet)
+        raise NotImplementedError
     return InrNet
 
 def load_model_from_job(origin):
@@ -51,8 +43,8 @@ def mean_l1(pred_atlas, gt_atlas):
     iou_per_channel = (pred_atlas & gt_atlas).sum(0) / (pred_atlas | gt_atlas).sum(0)
     return iou_per_channel.mean()
 
-def pixel_acc(pred_atlas, gt_atlas):
-    return (pred_atlas & gt_atlas).sum() / pred_atlas.size(0)
+# def dice(pred_atlas, gt_atlas):
+#     return (pred_atlas & gt_atlas).sum() / pred_atlas.size(0)
 
 def get_atlas_at_coords(atlas, coords):
     coo = torch.floor(coords).long()
@@ -76,17 +68,10 @@ def train_warp(args):
             # if global_step == args["optimizer"]["max steps"]//2:
             #     inrnet.inn.nets.convnext.enable_cn_blocks(model)
             atlas_inr = model(img_inr)
-            if dl_args['sample type'] == 'masked':
-                atlas_inr.change_sample_mode('masked')
-                coords = qmc.generate_masked_sample_points(mask=(atlass.amax(1) == True),
-                    sample_size=dl_args["sample points"])
-                atlas_gt = get_atlas_at_coords(atlass, coords)
-
-            elif dl_args['sample type'] == 'grid':
+            if dl_args['sample type'] == 'grid':
                 atlas_inr.change_sample_mode('grid')
                 atlas_gt = atlass.flatten(start_dim=2).transpose(2,1)
                 coords = atlas_inr.generate_sample_points(dims=dl_args['image shape'])
-            
             else:
                 atlas_gt = get_atlas_at_coords(atlass, coords)
                 coords = atlas_inr.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])

@@ -28,7 +28,7 @@ def load_pretrained_model(args):
         elif net_args["type"] == "inr-4":
             G,D = inrnet.inn.nets.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
         elif net_args["type"] == "cnn-4":
-            G,D = inrnet.models.wgan.Gan4()
+            G,D = inrnet.models.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
         else:
             raise NotImplementedError('bad net type')
     return G.cuda(), D.cuda()
