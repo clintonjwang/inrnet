@@ -1,0 +1,17 @@
+network:
+  task: warp
+data loading:
+  seg type: fine
+  batch size: 32
+  subset: train
+  dataset: oasis
+  sample type: grid
+  sample points: 1024
+  image shape:
+  - 32
+  - 32
+optimizer:
+  type: AdamW
+  learning rate: 1e-2
+  max steps: 5000
+#N=2975 / bsz * 10 epochs

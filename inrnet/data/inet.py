@@ -92,7 +92,7 @@ def get_inr_loader_for_inet12(bsz, subset, N=None):
 
         spatial_augs = [coord_noise, rand_flip]
         intensity_augs = [intensity_noise]
-    elif subset == 'test':
+    elif subset in ('test', 'val'):
         N = 200
         paths = [[f"{DS_DIR}/inrnet/inet12/{c}/{subset}_{ix}.pt" for ix in range(N)] \
             for c in range(12)]

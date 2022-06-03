@@ -7,7 +7,7 @@ F = nn.functional
 from inrnet import inn
 from inrnet.inn import functional as inrF
 
-def translate_convnext_model(input_shape, n_stages=2, mlp=128):
+def translate_convnext_model(input_shape, n_stages=2, mlp=9999):
     extrema = ((-1,1),(-1,1))
     current_shape = input_shape
     sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
@@ -28,7 +28,7 @@ def translate_convnext_model(input_shape, n_stages=2, mlp=128):
     in_ = 256
     out_ = 128
     if in_ >= mlp:
-        cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5), groups=32)
+        cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5))#, groups=32)
     else:
         cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
         cv.weight.data = fpn_bot_sd['conv.weight'][:out_, :in_]
@@ -84,7 +84,7 @@ def translate_convnext_model(input_shape, n_stages=2, mlp=128):
         in_ //= 2
         out_ //= 4
         if in_ >= mlp:
-            cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5), groups=32)
+            cv = inn.MLPConv(in_, out_, inn.get_kernel_size(current_shape, extrema, k=5))#, groups=32)
         else:
             cv = nn.Conv2d(in_, out_, 3, padding=1, bias=False)
             cv.weight.data = dec_fpn_sd[f'{i}.conv.weight'][:out_, :in_]

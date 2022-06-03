@@ -14,12 +14,29 @@ class InrCls2(nn.Module):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), down_ratio=.5, **kwargs),
-            # inn.PositionalEncoding(N=C//4),
-            # inn.MaxPool((.08,.08), down_ratio=.5),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.2,.2), down_ratio=.5, **kwargs),
-            # inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.1,.1), **kwargs),
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.2,.2), down_ratio=.25, **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
+        ]
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, inr):
+        return self.layers(inr)
+
+class AAPCls2(nn.Module):
+    def __init__(self, in_channels, out_dims, C=64, **kwargs):
+        super().__init__()
+        out_layers = nn.Sequential(nn.Linear(C*16, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+        self.layers = [
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.conv_norm_act(C, C, kernel_size=(.2,.2), down_ratio=.25, **kwargs),
+            inn.AdaptiveAvgPoolSequence((4,4), out_layers, extrema=None),
         ]
         self.layers = nn.Sequential(*self.layers)
 
@@ -59,13 +76,30 @@ class InrCls4(nn.Module):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), down_ratio=.5, **kwargs),
-            inn.MaxPool((.07,.07), down_ratio=.5),
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
             inn.PositionalEncoding(N=C//4),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.1,.1), down_ratio=.5, **kwargs),
-            # inn.blocks.ResConv(C, kernel_size=(.08,.08), **kwargs),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.15,.15), down_ratio=.5, **kwargs),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.2,.2), down_ratio=.25, **kwargs),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
+        ]
+        self.layers = nn.Sequential(*self.layers)
+    def forward(self, inr):
+        return self.layers(inr)
+
+class AAPInrCls4(nn.Module):
+    def __init__(self, in_channels, out_dims, C=32, **kwargs):
+        super().__init__()
+        out_layers = nn.Sequential(nn.Linear(C*2*16, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+        self.layers = [
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.2,.2), down_ratio=.25, **kwargs),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
+            inn.AdaptiveAvgPoolSequence((4,4), out_layers, extrema=None),
         ]
         self.layers = nn.Sequential(*self.layers)
     def forward(self, inr):
@@ -84,10 +118,8 @@ class InrClsWide4(nn.Module):
         self.layers = [
             inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
             inn.PositionalEncoding(N=C//4),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.25, **kwargs,
-                N_bins=512),
-            inn.blocks.ResConv(C*2, kernel_size=(.3,.3),
-                N_bins=512, mid_ch=(32,32), **kwargs),
+            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.25, **kwargs),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
             # inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(.3,.3), down_ratio=.5,
             #     N_bins=256, mid_ch=(16,32), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),

@@ -6,6 +6,7 @@ import args as args_module
 # from experiments.depth import train_depth_model
 from experiments.classify import test_inr_classifier
 from experiments.segment import test_inr_segmenter
+from experiments.generate import test_inr_generator
 # from experiments.cyclegan import train_cyclegan
 
 def main(args):
@@ -20,6 +21,8 @@ def main(args):
         test_inr_segmenter(args)
     elif args["network"]["task"] == "classify":
         test_inr_classifier(args)
+    elif args["network"]["task"] == "generate":
+        test_inr_generator(args)
 
 if __name__ == "__main__":
     args = args_module.parse_args()

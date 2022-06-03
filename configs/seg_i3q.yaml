@@ -1,0 +1,4 @@
+parent: seg_i3
+data loading:
+  seg type: coarse
+  sample type: qmc

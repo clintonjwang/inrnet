@@ -4,10 +4,11 @@ import torchvision
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-
+nn=torch.nn
 from inrnet.models.inrs import siren
 from inrnet.util import glob2
 from inrnet.data import kitti, inet, cityscapes
+nearest = transforms.InterpolationMode('nearest')
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
@@ -99,6 +100,9 @@ def get_inr_dataloader(dl_args):
             N=dl_args['N'])
     elif dl_args["dataset"] == "fmnist":
         return get_inr_loader_for_fmnist(bsz=dl_args['batch size'])
+    elif dl_args["dataset"] == "oasis":
+        return get_inr_loader_for_oasis(bsz=dl_args['batch size'],
+            size=dl_args['image shape'], subset=dl_args['subset'])
     elif dl_args["dataset"] == "flowers":
         # return get_inr_loader_for_imgds('flowers', bsz=dl_args['batch size'], subset=dl_args['subset'])
         return get_inr_loader_for_flowers(bsz=dl_args['batch size'])
@@ -124,11 +128,10 @@ def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
                 yield inr.cuda(), torch.tensor(classes[ix]['cls']).unsqueeze(0)
     return random_loader()
 
-def get_inr_loader_for_fmnist(bsz, N=10000):
+def get_inr_loader_for_fmnist(bsz, N=5000, subset='train'):
     ix_to_cls = torch.load(f"{DS_DIR}/inrnet/fmnist/ix_to_cls.pt")
-    paths = [f"{DS_DIR}/inrnet/fmnist/train_{ix}.pt" for ix in range(60000) if ix_to_cls[ix] in [5,7,9]]
+    paths = [f"{DS_DIR}/inrnet/fmnist/{subset}_{ix}.pt" for ix in range(60000) if ix_to_cls[ix] in [5,7,9]]
     paths = [p for p in paths if osp.exists(p)][:N]
-    keys = siren.get_siren_keys()
     def random_loader():
         inrs = []
         while True:
@@ -159,6 +162,49 @@ def get_inr_loader_for_flowers(bsz):
                     yield siren.to_black_box(inrs).cuda()
                     inrs = []
     return random_loader()
+
+
+def get_inr_loader_for_oasis(bsz, size, subset):
+    paths = glob2(f"{DS_DIR}/inrnet/oasis/{subset}_*_0.pt")
+    shrink = transforms.Resize(size, interpolation=nearest)
+    loop = subset == 'train'
+    N = len(paths)
+    N = (N // bsz) * bsz
+    def random_loader(loop=True):
+        while True:
+            np.random.shuffle(paths)
+            for path_ix in range(0,N,bsz):
+                start = np.random.randint(3)
+                s_path = paths[path_ix].replace('0.pt', f'{start}.pt')
+                t_path = paths[path_ix].replace('0.pt', f'{start+1}.pt')
+
+                inrs = [siren.Siren(out_channels=1) for _ in range(bsz*2)]
+                merged_inrs = []
+                segs = []
+                for i in range(bsz):
+                    param_dict, sseg = torch.load(s_path)
+                    inrs[i*2].load_state_dict(param_dict)
+                    param_dict, tseg = torch.load(t_path)
+                    inrs[i*2+1].load_state_dict(param_dict)
+                    segs.append(torch.cat([sseg, tseg], dim=1))
+                    merged_inrs.append(MergeSIREN(inrs[i*2:i*2+2]))
+                segs = torch.cat(segs, dim=0).cuda()
+                yield siren.to_black_box(merged_inrs).cuda(), shrink(segs)
+            if not loop:
+                break
+    
+    return random_loader(loop=loop)
+
+class MergeSIREN(nn.Module):
+    def __init__(self, inrs):
+        super().__init__()
+        self.evaluator = nn.ModuleList(inrs).eval()
+        self.out_channels = len(inrs) * inrs[0].out_channels
+    def forward(self, coords):
+        out = []
+        for inr in self.evaluator:
+            out.append(inr(coords))
+        return torch.cat(out, dim=0)
 
 
 def get_inr_loader_for_imgds(ds_name, bsz, subset):

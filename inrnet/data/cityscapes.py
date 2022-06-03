@@ -24,7 +24,6 @@ def get_inr_loader_for_cityscapes(bsz, subset, size, mode):
         loop = False
     assert len(paths) == N, 'incomplete subset'
 
-    keys = siren.get_siren_keys()
     if N % bsz != 0:
         print('warning: dropping last minibatch')
         N = (N // bsz) * bsz

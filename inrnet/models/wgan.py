@@ -4,6 +4,7 @@ nn = torch.nn
 F = nn.functional
 
 from inrnet.models.common import Conv2, conv_bn_relu
+from inrnet import inn
 
 def Gan4(reshape):
     G = G4(in_dims=64, out_channels=1, reshape=reshape)
@@ -20,20 +21,20 @@ class G4(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(C*32, C*reshape[0]*reshape[1], bias=True),
         )
+        cv = nn.Conv2d(C, out_channels, 1, bias=True)
         self.reshape = reshape
-        for l in self.first:
+        for l in [*self.first, cv]:
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
             if hasattr(l, 'bias'):
                 nn.init.zeros_(l.bias)
 
         layers = [
-            # conv_bn_relu(C, C*2),
-            # nn.Upsample(scale_factor=(2,2), mode='nearest'), #14x14
+            # nn.Upsample(scale_factor=(2,2), mode='nearest'),
             # conv_bn_relu(C, C*4),
-            # nn.Upsample(scale_factor=(2,2), mode='nearest'), #28x28
-            # conv_bn_relu(C*4, C*2),
-            nn.Conv2d(C, out_channels, 1, bias=True), nn.Tanh()
+            # nn.Upsample(scale_factor=(2,2), mode='nearest'), #32x32
+            # conv_bn_relu(C, C*2),
+            cv, nn.Tanh()
         ]
         self.layers = nn.Sequential(*layers)
 

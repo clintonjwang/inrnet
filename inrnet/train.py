@@ -7,6 +7,7 @@ from experiments.depth import train_depth_model
 from experiments.classify import train_classifier
 from experiments.segment import train_segmenter
 from experiments.generate import train_generator
+from experiments.warp import train_warp
 
 def main(args):
     if not torch.cuda.is_available():
@@ -28,6 +29,8 @@ def main(args):
         train_segmenter(args)
     elif args["network"]["task"] == "generate":
         train_generator(args)
+    elif args["network"]["task"] == "warp":
+        train_warp(args)
 
 if __name__ == "__main__":
     args = args_module.parse_args()

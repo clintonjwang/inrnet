@@ -1,4 +1,4 @@
-parent: seg_vallg
+parent: seg_val_c
 data loading:
   batch size: 128
   sample type: qmc

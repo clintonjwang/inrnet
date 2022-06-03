@@ -61,7 +61,7 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
         groups=conv2d.groups, shift=shift,
         padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
         # N_bins=0,
-        N_bins=2**math.ceil(math.log2(k1*k2)+4),
+        N_bins=2**math.ceil(math.log2(k1*k2)+3), #4
         kernel_size=K, down_ratio=down_ratio, bias=bias, **kwargs)
     if bias:
         layer.bias.data = conv2d.bias.data
@@ -124,6 +124,8 @@ class SplineConv(Conv):
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         self.register_buffer('shift', torch.tensor(shift, dtype=dtype))
+        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
+                        diffs[...,1].abs() < self.kernel_size[1]/2)
 
         # fit pretrained kernel with b-spline
         h,w = init_weights.shape[2:]
@@ -211,7 +213,8 @@ class SplineConv(Conv):
 
 class MLPConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(64,32), down_ratio=1.,
-            input_dims=2, groups=1, padded_extrema=None, bias=False, scale1=None, scale2=30,
+            input_dims=2, groups=1, padded_extrema=None, bias=False,
+            mlp_type='siren', scale1=None, scale2=30, scale3=1,
             dtype=torch.float, N_bins=None):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
@@ -234,6 +237,8 @@ class MLPConv(Conv):
             scale1 = (.5/K[0], .5/K[1])
         self.register_buffer("scale1", torch.as_tensor(scale1, dtype=dtype))
         self.scale2 = scale2
+        self.scale3 = scale3
+        self.mlp_type = mlp_type
         
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
@@ -267,8 +272,12 @@ class MLPConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        # return self.kernel(xy * self.scale1).reshape(xy.size(0), self.out_channels, self.group_size)
-        return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale2)).reshape(xy.size(0), self.out_channels, self.group_size)
+        if self.mlp_type == 'siren':
+            return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale2)).reshape(
+                xy.size(0), self.out_channels, self.group_size) * self.scale3
+        else:
+            return self.kernel(self.first(xy * self.scale1)).reshape(
+                xy.size(0), self.out_channels, self.group_size) * self.scale3
 
 
 

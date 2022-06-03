@@ -169,13 +169,13 @@ def train_classifier(args):
 
     model = load_pretrained_model(args).cuda()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
-    if 'masking' in args["data loading"]:
+    if 'masking' in dl_args:
         raise NotImplementedError()
         N = dl_args["sample points"]
         for img_inr, labels in data_loader:
             global_step += 1
             logit_fxn = model(img_inr)
-            coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
+            coords = logit_fxn.generate_sample_points(sample_size=N, method=dl_args['sample type'])
             logits = logit_fxn(coords)
             backprop(model)
             if global_step >= args["optimizer"]["max steps"]:
@@ -187,7 +187,11 @@ def train_classifier(args):
             for img_inr, labels in data_loader:
                 global_step += 1
                 logit_fxn = model(img_inr)
-                coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
+                if dl_args['sample type'] == 'grid':
+                    logit_fxn.change_sample_mode('grid')
+                    coords = logit_fxn.generate_sample_points(dims=dl_args['image shape'], method=dl_args['sample type'])
+                else:
+                    coords = logit_fxn.generate_sample_points(sample_size=N, method=dl_args['sample type'])
                 logits = logit_fxn(coords)
                 backprop(model)
                 if global_step >= args["optimizer"]["max steps"]:
@@ -203,6 +207,40 @@ def train_classifier(args):
                     break
 
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
+
+
+def benchmark_inr_cls():
+    args = job_mgmt.get_job_args('inet_nn5')
+    from time import time
+    paths = args["paths"]
+    dl_args = args["data loading"]
+    times = 20
+    dl_args['batch size'] = 48
+    data_loader = dataloader.get_inr_dataloader(dl_args)
+    model = load_model_from_job('inet_nn5').cuda().eval()
+    N = dl_args["sample points"]
+    
+    for img_inr, labels in data_loader:
+        with torch.no_grad():
+            coords = img_inr.generate_sample_points(dims=dl_args['image shape'])
+            img = img_inr(coords)
+            model(img.transpose(1,2).reshape(-1,3,*dl_args['image shape']));
+        break
+
+    all_times = []
+    ix = 0
+    for img_inr, labels in data_loader:
+        print(ix)
+        ix += 1
+        with torch.no_grad():
+            coords = img_inr.generate_sample_points(dims=dl_args['image shape'])
+            t = time()
+            img = img_inr(coords)
+            model(img.transpose(1,2).reshape(-1,3,*dl_args['image shape']));
+            all_times.append(time()-t)
+        if ix >= times:
+            print(np.mean(all_times), np.std(all_times))
+            return
 
 
 def benchmark_inr_classifier(args):
@@ -253,7 +291,11 @@ def test_inr_classifier(args):
         for img_inr, labels in data_loader:
             with torch.no_grad():
                 logit_fxn = model(img_inr).cuda().eval()
-                coords = logit_fxn.generate_sample_points(sample_size=dl_args["sample points"], method='rqmc')
+                if dl_args['sample type'] == 'grid':
+                    logit_fxn.change_sample_mode('grid')
+                    coords = logit_fxn.generate_sample_points(dims=dl_args['image shape'])
+                else:
+                    coords = logit_fxn.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
                 logits = logit_fxn(coords)
                 pred_cls = logits.topk(k=3).indices
                 top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()

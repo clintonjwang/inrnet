@@ -26,6 +26,8 @@ def load_pretrained_model(args):
         elif net_args["type"] == "inr-wgan":
             G,D = inrnet.inn.nets.wgan.translate_wgan_model()
         elif net_args["type"] == "inr-4":
+            # _,D = inrnet.models.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
+            # D, _ = inn.conversion.translate_discrete_model(D, args['data loading']['image shape'])
             G,D = inrnet.inn.nets.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
         elif net_args["type"] == "cnn-4":
             G,D = inrnet.models.wgan.Gan4(reshape=args['data loading']['initial grid shape'])
@@ -56,7 +58,7 @@ def train_generator(args):
         GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty)
 
     bsz = dl_args['batch size']
-    D_step = 1
+    D_step = args["optimizer"]['D steps']
     # G_step = 1
 
     G,D = load_pretrained_model(args)
@@ -131,7 +133,7 @@ def train_generator(args):
         if torch.isnan(D_loss):
             print('NaN D loss')
             pdb.set_trace()
-
+        
         if global_step % 20 == 0:
             print("G:", np.round(G_loss, decimals=3), "; D:", np.round(D_loss.item(), decimals=3), flush=True)
 
@@ -170,29 +172,29 @@ def test_inr_generator(args):
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
-    top3, top1 = 0,0
     origin = args['target_job']
     G = load_model_from_job(origin)[0].cuda().eval()
     orig_args = job_mgmt.get_job_args(origin)
     bsz = dl_args['batch size']
+    num_samples = dl_args['N']
+    assert num_samples % bsz == 0
 
     for ix in range(0, num_samples, bsz):
         noise = torch.randn(bsz, 64, device='cuda')
-        noise = torch.where((noise>1) | (noise<-1), torch.randn_like(noise), noise)
-        if args["network"]['type'].startswith('inr'):
-            gen_inr = G(noise).eval()
-            gen_inr.change_sample_mode('grid')
-            coords = gen_inr.generate_sample_points(dims=dl_args['initial grid shape'], method='grid')
-            gen_img = gen_inr(coords)
-            gen_img = util.realign_values(gen_img, inr=gen_inr)
-        else:
-            gen_img = G(noise)
-
-        for i in range(bsz):
-            if args["network"]['type'].startswith('inr'):
-                gen_img = rescale_float(gen_img[i].reshape(*dl_args['image shape'],n_ch))
+        with torch.no_grad():
+            if orig_args["network"]['type'].startswith('inr'):
+                gen_inr = G(noise).eval()
+                gen_inr.change_sample_mode('grid')
+                coords = gen_inr.generate_sample_points(dims=orig_args['initial grid shape'], method='grid')
+                gen_imgs = gen_inr(coords)
+                gen_imgs = util.realign_values(gen_imgs, inr=gen_inr)
             else:
-                gen_img = rescale_float(gen_img[i].permute(1,2,0))
-                
-        gen_img = F.interpolate(gen_img.unsqueeze(0).unsqueeze(0), size=(150,150,n_ch)).squeeze()
-        plt.imsave(paths["job output dir"]+f"/imgs/{ix+i}.png", gen_img.detach().cpu().numpy(), cmap='gray')
+                gen_imgs = G(noise)
+
+            for i in range(bsz):
+                if orig_args["network"]['type'].startswith('inr'):
+                    gen_img = rescale_float(gen_imgs[i].reshape(*dl_args['image shape'],n_ch))
+                else:
+                    gen_img = rescale_float(gen_imgs[i].permute(1,2,0))
+                    
+            plt.imsave(paths["job output dir"]+f"/imgs/{ix+i}.png", gen_img.squeeze().detach().cpu().numpy(), cmap='gray')

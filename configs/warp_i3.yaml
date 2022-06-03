@@ -1,0 +1,3 @@
+parent: warp_train
+network:
+  type: inr-3

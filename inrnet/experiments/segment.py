@@ -76,7 +76,7 @@ def train_segmenter(args):
     loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss(weight=weight.cuda()))#nn.BCEWithLogitsLoss())
     iou_tracker = util.MetricTracker("mean IoU", function=mean_iou)
     acc_tracker = util.MetricTracker("pixel accuracy", function=pixel_acc)
-    if dl_args['sample type'] == 'valid':
+    if dl_args['sample type'] == 'masked':
         dl_args['batch size'] = 1 #cannot handle different masks per datapoint
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
@@ -96,13 +96,15 @@ def train_segmenter(args):
                 seg_gt = get_seg_at_coords(segs, coords)
 
             elif dl_args['sample type'] == 'grid':
-                seg_inr.change_sample_mode('grid')
                 seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+                seg_inr.change_sample_mode('grid')
                 coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
             
             else:
-                coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
+                coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"],
+                    method=dl_args['sample type'])
                 seg_gt = get_seg_at_coords(segs, coords)
+                
             logits = seg_inr.cuda()(coords)
             if dl_args['sample type'] == 'grid':
                 logits = util.realign_values(logits, coords=coords)
@@ -116,7 +118,10 @@ def train_segmenter(args):
         maxes, gt_labels = seg_gt.max(-1)
         loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         if torch.isnan(loss):
-            raise ValueError('nan loss')
+            pdb.set_trace()
+            print('nan loss')
+            continue
+            # raise ValueError('nan loss')
         pred_seg = logits.max(-1).indices
         pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
         iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
@@ -185,6 +190,8 @@ def test_inr_segmenter(args):
     acc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
     # fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)
     # facc_tracker = util.MetricTracker("fine pixel accuracy", function=pixel_acc)
+    if dl_args['sample type'] == 'masked':
+        dl_args['batch size'] = 1 #cannot handle different masks per datapoint
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
     origin = args['target_job']
@@ -194,15 +201,29 @@ def test_inr_segmenter(args):
     for img_inr, segs in data_loader:
         ix += 1
         with torch.no_grad():
-            seg_gt = segs.flatten(start_dim=2).transpose(2,1)
             if orig_args["network"]['type'].startswith('inr'):
                 seg_inr = model(img_inr).eval()
-                seg_inr.change_sample_mode('grid')
-                coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+                if dl_args['sample type'] == 'masked':
+                    seg_inr.change_sample_mode('masked')
+                    coords = qmc.generate_masked_sample_points(mask=(segs.amax(1) == True),
+                        sample_size=dl_args["sample points"])
+                    seg_gt = get_seg_at_coords(segs, coords)
+
+                elif dl_args['sample type'] == 'grid':
+                    seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+                    seg_inr.change_sample_mode('grid')
+                    coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
+                
+                else:
+                    coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"],
+                        method=dl_args['sample type'])
+                    seg_gt = get_seg_at_coords(segs, coords)
+                    
                 logits = seg_inr(coords)
                 logits = util.realign_values(logits, coords=coords)
 
             else:
+                seg_gt = segs.flatten(start_dim=2).transpose(2,1)
                 img = img_inr.produce_images(*dl_args['image shape'])
                 logits = model(img).flatten(start_dim=2).transpose(2,1)
 
@@ -212,14 +233,15 @@ def test_inr_segmenter(args):
             iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
             acc = acc_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
 
-        rgb = img_inr.produce_images(*dl_args['image shape'])
-        gt_labels += 1
-        pred_seg += 1
-        gt_labels[maxes == 0] = 0
-        pred_seg[maxes == 0] = 0
-        for i in range(3):
-            path = paths["job output dir"]+f"/imgs/{ix}_{i}.png"
-            save_example_segs(path, rgb[i], pred_seg[i].reshape(*rgb.shape[-2:]), gt_labels[i].reshape(*rgb.shape[-2:]))
+        if dl_args['sample type'] == 'grid':
+            rgb = img_inr.produce_images(*dl_args['image shape'])
+            gt_labels += 1
+            pred_seg += 1
+            gt_labels[maxes == 0] = 0
+            pred_seg[maxes == 0] = 0
+            for i in range(3):
+                path = paths["job output dir"]+f"/imgs/{ix}_{i}.png"
+                save_example_segs(path, rgb[i], pred_seg[i].reshape(*rgb.shape[-2:]), gt_labels[i].reshape(*rgb.shape[-2:]))
 
     torch.save((iou_tracker.minibatch_values['val'], acc_tracker.minibatch_values['val']),
         osp.join(paths["job output dir"], "stats.pt"))

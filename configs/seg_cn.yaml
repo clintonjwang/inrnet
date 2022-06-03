@@ -1,9 +1,10 @@
 parent: seg_train
 network:
-  type: convnext
+  type: inr-convnext
 data loading:
   seg type: fine
   batch size: 1
+  sample type: grid
   image shape:
   - 32
   - 64

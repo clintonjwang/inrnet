@@ -1,0 +1,6 @@
+parent: inet_train
+data loading:
+  sample type: qmc
+  augment: false
+network:
+  type: inr-2

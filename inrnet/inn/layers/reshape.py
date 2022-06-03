@@ -81,6 +81,9 @@ def AAPseq(values, layer, inr, eps=1e-6):
     else:
         layer.eval()
     h,w = layer.output_size
+    if layer.extrema is None:
+        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
 
     Tx = torch.linspace(layer.extrema[0][0]-eps, layer.extrema[0][1]+eps, steps=h+1, device=coords.device)
     Ty = torch.linspace(layer.extrema[1][0]-eps, layer.extrema[1][1]+eps, steps=w+1, device=coords.device)
@@ -89,9 +92,18 @@ def AAPseq(values, layer, inr, eps=1e-6):
     Y = coords[:,1].unsqueeze(1)
 
     v, kx = (Tx<=X).min(dim=-1)
-    assert v.max() == False
+    if not v.max() == False:
+        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
+        return AAPseq(values, layer, inr)
+
     v, ky = (Ty<=Y).min(dim=-1)
-    assert v.max() == False
+    if not v.max() == False:
+        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
+        return AAPseq(values, layer, inr)
+        
     bins = kx-1 + (ky-1)*h
-    return torch.cat([values[:,bins==b].mean(1) for b in range(h*w)])
+    out = torch.cat([values[:,bins==b].mean(1) for b in range(h*w)], dim=1)
+    return layer.layers(out)
     

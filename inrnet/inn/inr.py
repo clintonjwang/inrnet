@@ -106,6 +106,10 @@ class INRBatch(nn.Module):
             if dims is None:
                 raise ValueError("declare dims or turn off grid mode")
             return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
+        elif method == "shrunk" or self.sample_mode == 'shrunk':
+            coords = qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
+                bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
+            return coords * coords.abs()
         elif method in ("qmc", 'rqmc'):
             return qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
                 bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))

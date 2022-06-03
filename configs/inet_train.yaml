@@ -3,16 +3,18 @@ network:
   type: inr-effnet-s3
 data loading:
   N: 500
+  augment: true
   batch size: 192
   subset: train
   dataset: inet12
   input channels: 3
   classes: 12
   sample points: 1024
+  sample type: rqmc
   image shape:
   - 32
   - 32
 optimizer:
-  learning rate: 5e-3
-  max steps: 8000
+  learning rate: 1e-3
+  max steps: 5000
 #N=9600 / bsz * 40 epochs

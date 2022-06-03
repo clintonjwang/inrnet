@@ -4,6 +4,7 @@ data loading:
   batch size: 96
   subset: test
   dataset: inet12
+  sample type: rqmc
   classes: 12
   sample points: 1024
   image shape:
