@@ -1,4 +1,4 @@
-
+import torch
 from inrnet.inn import point_set, qmc
 
 def test_qmc2d():

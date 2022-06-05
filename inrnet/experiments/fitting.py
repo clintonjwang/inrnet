@@ -84,7 +84,7 @@ class ApproxNet(nn.Module):
     def __init__(self, dims, channels, w=64, depth=3, seed=None):
         self.layers = nn.Sequential(
             inn.MLPConv(in_ch, w, kernel_size=(.2,.2)), nn.ReLU(inplace=True),
-            *[inn.MLPConv(w, w, kernel_size=(.2,.2)), nn.ReLU(inplace=True) for _ in range()],
+            # *[inn.MLPConv(w, w, kernel_size=(.2,.2)), nn.ReLU(inplace=True) for _ in range()],
             inn.MLPConv(w, out_ch, kernel_size=(.2,.2)),
         )
     def forward(self, coords): #(B,N,Cin)
