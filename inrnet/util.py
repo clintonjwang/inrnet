@@ -9,7 +9,7 @@ import seaborn as sns
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
-def get_optimizer(model, args):
+def get_optimizer(model, args: dict):
     if args['optimizer']['type'].lower() == 'adamw':
         return torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning_rate"])
     elif args['optimizer']['type'].lower() == 'adam':

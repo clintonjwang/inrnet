@@ -18,12 +18,12 @@ from inrnet import inn
 #         return self.layer4(x)
 
 def translate_vit_model(input_shape):
-    ViT = VisionTransformer(num_heads=6, embed_dims=384, drop_path_rate=0.1)
-    dict(num_classes=7, in_channels=[384, 384, 384, 384])
+    # ViT = VisionTransformer(num_heads=6, embed_dims=384, drop_path_rate=0.1)
+    # dict(num_classes=7, in_channels=[384, 384, 384, 384])
 
     extrema = ((-1,1),(-1,1))
     current_shape = input_shape
-    sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
+    # sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
     return
 
 

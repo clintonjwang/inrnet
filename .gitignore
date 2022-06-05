@@ -3,7 +3,6 @@ old_results
 temp
 inrnet/wandb
 *.pt
-.github
 
 __pycache__/
 *.pyc

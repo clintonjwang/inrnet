@@ -73,7 +73,7 @@ class RandINRdataset(nn.Module):
     def __init__(self, dims, channels, w=64, depth=3, seed=None):
         self.layers = nn.Sequential(
             nn.Linear(dims, w), nn.ReLU(inplace=True),
-            *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
+            # *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
             nn.Linear(w, channels),
         )
     @torch.no_grad()
