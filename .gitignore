@@ -1,6 +1,7 @@
 results
 old_results
 temp
+inrnet/wandb
 *.pt
 
 __pycache__/

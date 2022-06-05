@@ -30,6 +30,8 @@ def parse_args():
 
 def infer_missing_args(args):
     """Convert str to float, etc."""
+    if args['sweep_id'] is not None:
+        
     paths = args["paths"]
     paths["slurm output dir"] = osp.expanduser(paths["slurm output dir"])
     if args["job_id"].startswith("lg_") or args["job_id"].startswith("A6"):
