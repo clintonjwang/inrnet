@@ -60,7 +60,7 @@ class TargetNet(nn.Module):
         self.layers = nn.Sequential(
             nn.Flatten(1),
             nn.Linear(N*in_ch, w), nn.ReLU(inplace=True),
-            *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
+            # *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
             nn.Linear(w, N*out_ch),
         )
         self.N = N

@@ -2,7 +2,8 @@ from os.path import join
 import numpy as np
 import random
 import os
-
+import torch
+F = torch.nn.functional
 
 # Standardize audio
 def change_audio_rate(audio_fname, src_dir, new_audio_rate, dest_dir=None):

@@ -30,7 +30,6 @@ def get_model(args):
         return inrnet.models.common.Seg5(in_channels=2, out_channels=2)
     else:
         raise NotImplementedError
-    return InrNet
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
@@ -140,6 +139,8 @@ def save_example_imgs(path, start, pred, end):
     plt.imsave(path, coll_img)
 
 def test_inr_warp(args):
+    vf2df = DVF2DDF().cuda()
+    warp = Warp().cuda()
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
@@ -149,7 +150,7 @@ def test_inr_warp(args):
     orig_args = job_mgmt.get_job_args(origin)
 
     with torch.no_grad():
-        for img_inr, labels in data_loader:
+        for img_inrs, labels in data_loader:
             if orig_args["network"]['type'].startswith('inr'):
                 imgs = img_inrs.produce_images(*dl_args['image shape'])
                 src_imgs = imgs[:,:1]
@@ -166,7 +167,7 @@ def test_inr_warp(args):
                 
                 dices.append()
             else:
-                img = img_inr.produce_images(*dl_args['image shape'])
+                img = img_inrs.produce_images(*dl_args['image shape'])
                 logits = model(img)
                 pred_cls = logits.topk(k=3).indices
                 dices.append()

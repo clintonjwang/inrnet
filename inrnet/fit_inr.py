@@ -42,8 +42,8 @@ def fit_siren_to_img(img, total_steps, **kwargs):
 
     return inr, loss
 
-# def fit_siren_to_sound(sound, total_steps):
-#     return inr, loss
+def fit_siren_to_sound(sound, total_steps):
+    return NotImplemented
 
 
 

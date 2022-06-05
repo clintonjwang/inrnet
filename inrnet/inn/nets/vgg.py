@@ -1,9 +1,11 @@
 from functools import partial
 from typing import Union, List, Dict, Any, Optional, cast
 
-import torch
+import torch, torchvision
 nn = torch.nn
 F = nn.functional
+
+from inrnet import inn
 
 def get_vgg11():
     src_model = torchvision.models.vgg11(pretrained=True)

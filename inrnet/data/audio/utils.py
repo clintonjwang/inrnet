@@ -275,9 +275,10 @@ class ESC50(object):
             label = (eye[label1] * r + eye[label2] * (1 - r)).astype(np.float32)
 
         else:  # Training phase of standard learning or testing phase
-            sound, label = self.base[i]
-            sound = self.preprocess(sound).astype(np.float32)
-            label = np.array(label, dtype=np.int32)
+            raise NotImplementedError
+            # sound, label = self.base[i]
+            # sound = self.preprocess(sound).astype(np.float32)
+            # label = np.array(label, dtype=np.int32)
 
         if self.train and self.opt.strongAugment:
             sound = U.random_gain(6)(sound).astype(np.float32)
