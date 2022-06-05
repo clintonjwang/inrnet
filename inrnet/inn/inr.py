@@ -424,9 +424,9 @@ class SumINR(MergeINR):
 class MulINR(MergeINR):
     def __init__(self, inr1, inr2):
         super().__init__(inr1, inr2, channels=inr1.channels, merge_function=operator.__mul__)
-# class MatMulINR(MergeINR):
-#     def __init__(self, inr1, inr2):
-#         super().__init__(inr1, inr2, channels=inr2.channels, merge_function=torch.matmul)
+class MatMulINR(MergeINR):
+    def __init__(self, inr1, inr2):
+        super().__init__(inr1, inr2, channels=inr2.channels, merge_function=torch.matmul)
 class CatINR(MergeINR):
     def __init__(self, inr1, inr2):
         super().__init__(inr1, inr2, channels=inr1.channels+inr2.channels,

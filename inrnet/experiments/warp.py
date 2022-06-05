@@ -128,12 +128,12 @@ def train_warp(args):
 
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "model.pth"))
 
-def compose_velocity_fields(vf1, vf2, vf3):
-    grid_coords = warp_inrs.generate_sample_points(dims=dl_args['image shape'])
-    VF_est = model(imgs)(grid_coords) #S->T
-    DF_est = vf2df(-VF_est) #T->S
-    est_imgs = warp(targ_imgs, DF_est)
-    est_segs = warp(targ_segs, DF_est)
+# def compose_velocity_fields(warp_inrs, dl_args, vf1, vf2, vf3):
+#     grid_coords = warp_inrs.generate_sample_points(dims=dl_args['image shape'])
+#     VF_est = model(imgs)(grid_coords) #S->T
+#     DF_est = vf2df(-VF_est) #T->S
+#     est_imgs = warp(targ_imgs, DF_est)
+#     est_segs = warp(targ_segs, DF_est)
 
 def save_example_imgs(path, start, pred, end):
     coll_img = torch.cat((start, pred, end), dim=1).detach().cpu().numpy()

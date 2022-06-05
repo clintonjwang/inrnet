@@ -3,7 +3,7 @@ osp = os.path
 import dill as pickle
 import numpy as np
 
-from inrnet import util, losses
+from inrnet import RESULTS_DIR, ANALYSIS_DIR, util, losses
 from inrnet.data import dataloader
 
 def rename_job(job, new_name):

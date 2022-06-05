@@ -52,7 +52,8 @@ def conv(values: torch.Tensor, # [B,N,c_in]
                     # if g is num groups, each i/g channels produces o/g channels, then concat
                     w_og = layer.interpolate_weights(-bin_centers)
                     n,o,i_g = w_og.shape
-                    o_g, g = o//g, layer.num_groups
+                    g = layer.num_groups
+                    o_g = o//g
                     Wsplit = w_og.view(n, o_g,g, i_g).index_select(dim=0, index=bin_ixs).split(lens)
                     for ix,y in enumerate(Ysplit):
                         newVals.append(torch.einsum('bnig,nogi->bog', y.reshape(-1, n, i_g, g),

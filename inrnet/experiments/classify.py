@@ -115,53 +115,52 @@ def test_inr_classifier(args):
 
 
 
-import pandas as pd
+# import pandas as pd
 
-def train_material_classifier(args):
-    paths = args["paths"]
-    df = pd.read_csv(osp.expanduser('~/code/ObjectFolder/objects300.csv'), index_col=0)
-    df = df[df['material'].isin(('Ceramic', 'Polycarbonate', 'Wood'))]
-    materials = df['material']
-    classes, counts = np.unique(materials.values, return_counts=True)
-    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
-    top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
-    top1_tracker = util.MetricTracker("top1", function=top1)
+# def train_material_classifier(args):
+#     paths = args["paths"]
+#     df = pd.read_csv(osp.expanduser('~/code/ObjectFolder/objects300.csv'), index_col=0)
+#     df = df[df['material'].isin(('Ceramic', 'Polycarbonate', 'Wood'))]
+#     materials = df['material']
+#     classes, counts = np.unique(materials.values, return_counts=True)
+#     loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
+#     top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
+#     top1_tracker = util.MetricTracker("top1", function=top1)
 
-    model = load_pretrained_model(args).cuda()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
+#     model = load_pretrained_model(args).cuda()
+#     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
 
-    while True:
-        for i in df.index:
-            
-            N = dl_args["sample points"]
-            global_step += 1
-            logit_fxn = model(img_inr)
-            coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
-            logits = logit_fxn(coords)
+#     while True:
+#         for i in df.index:
+#             N = dl_args["sample points"]
+#             global_step += 1
+#             logit_fxn = model(img_inr)
+#             coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
+#             logits = logit_fxn(coords)
 
-            loss = loss_tracker(logits, labels)
-            pred_cls = logits.topk(k=5).indices
-            top_5 = top3_tracker(pred_cls, labels).item()
-            top_1 = top1_tracker(pred_cls, labels).item()
+#             loss = loss_tracker(logits, labels)
+#             pred_cls = logits.topk(k=5).indices
+#             top_5 = top3_tracker(pred_cls, labels).item()
+#             top_1 = top1_tracker(pred_cls, labels).item()
 
-            optimizer.zero_grad(set_to_none=True)
-            loss.backward()
-            optimizer.step()
+#             optimizer.zero_grad(set_to_none=True)
+#             loss.backward()
+#             optimizer.step()
 
-            if global_step % 20 == 0:
-                print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5, decimals=2),
-                    "; top_1:", np.round(top_1, decimals=2),
-                    flush=True)
-            if global_step % 100 == 0:
-                torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-                loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-                top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
-                top3_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top3.png")
+#             if global_step % 20 == 0:
+#                 print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5, decimals=2),
+#                     "; top_1:", np.round(top_1, decimals=2),
+#                     flush=True)
+#             if global_step % 100 == 0:
+#                 torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+#                 loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
+#                 top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
+#                 top3_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top3.png")
 
-            if global_step >= args["optimizer"]["max steps"]:
-                break
+#             if global_step >= args["optimizer"]["max steps"]:
+#                 break
 
-    torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
+#     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
 
 

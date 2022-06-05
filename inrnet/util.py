@@ -33,7 +33,7 @@ def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, spl
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:
-        init_weight_path = osp.join(TMP_DIR, paths["pretrained model name"])
+        init_weight_path = osp.join('~/code/inrnet/temp', paths["pretrained model name"])
         if not osp.exists(init_weight_path):
             raise ValueError(f"bad pretrained model path {init_weight_path}")
 

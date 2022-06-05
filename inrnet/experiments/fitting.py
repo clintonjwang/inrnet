@@ -58,7 +58,7 @@ def get_model(args):
 class TargetNet(nn.Module):
     def __init__(self, in_ch, out_ch, N, w=64, depth=3, seed=None):
         self.layers = nn.Sequential(
-            nn.Flatten(1)
+            nn.Flatten(1),
             nn.Linear(N*in_ch, w), nn.ReLU(inplace=True),
             *[nn.Linear(w, w), nn.ReLU(inplace=True) for _ in range()],
             nn.Linear(w, N*out_ch),

@@ -1,6 +1,9 @@
-import torch
+from typing import Optional
+import math, torch
 nn=torch.nn
 F=nn.functional
+from torch.nn import *
+from torch import Tensor
 
 class Transformer(nn.Module):
     def __init__(self, d_model=512, nhead=8, num_encoder_layers=6, num_decoder_layers=6,
@@ -14,20 +17,20 @@ class TransformerEncoder(nn.Module):
     def __init__(self, encoder_layer, num_layers, norm=None):
         super().__init__()
     def forward(self, src, mask=None, src_key_padding_mask=None):
-        return inr
+        return NotImplemented
 
 class TransformerDecoder(nn.Module):
     def __init__(self, decoder_layer, num_layers, norm=None):
         super().__init__()
     def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, tgt_key_padding_mask=None, memory_key_padding_mask=None):
-        return inr
+        return NotImplemented
 
 
 class TransformerEncoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):
         super().__init__()
     def forward(self, src, src_mask=None, src_key_padding_mask=None):
-        return inr
+        return NotImplemented
 
 class TransformerDecoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1, activation="relu"):

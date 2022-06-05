@@ -42,8 +42,8 @@ def fit_siren_to_img(img, total_steps, **kwargs):
 
     return inr, loss
 
-def fit_siren_to_sound(sound, total_steps):
-    return inr, loss
+# def fit_siren_to_sound(sound, total_steps):
+#     return inr, loss
 
 
 
@@ -163,7 +163,7 @@ def train_flowers(args):
     else:
         args["data loading"]['subset']='test'
         args["start_ix"] -= 2040
-    return train_siren(args)
+    return train_inr(args)
 
 
 def train_cityscapes(args):
