@@ -35,6 +35,10 @@ class ResBlock(nn.Module):
 
 class ResConv(ResBlock):
     def __init__(self, C, **kwargs):
+        super().__init__(conv_norm_act(C, C, **kwargs))
+
+class ResConv2(ResBlock):
+    def __init__(self, C, **kwargs):
         down_ratio = kwargs.pop("down_ratio", 1)
         super().__init__(nn.Sequential(conv_norm_act(C, C, down_ratio=1, **kwargs),
             conv_norm_act(C, C, down_ratio=down_ratio, **kwargs)))

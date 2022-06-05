@@ -1,0 +1,132 @@
+2022-06-05 10:00:37,485 INFO    MainThread:6403 [wandb_setup.py:_flush():76] Loading settings from /data/vision/polina/users/clintonw/.config/wandb/settings
+2022-06-05 10:00:37,485 INFO    MainThread:6403 [wandb_setup.py:_flush():76] Loading settings from /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/settings
+2022-06-05 10:00:37,485 INFO    MainThread:6403 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2022-06-05 10:00:37,485 INFO    MainThread:6403 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'inrnet/train.py', 'program': '/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py'}
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [wandb_init.py:_log_setup():428] Logging user logs to /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/run-20220605_100037-18ar1gvb/logs/debug.log
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [wandb_init.py:_log_setup():429] Logging internal logs to /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/run-20220605_100037-18ar1gvb/logs/debug-internal.log
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [wandb_init.py:init():462] calling init triggers
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [wandb_init.py:init():465] wandb.init called with sweep_config: {}
+config: {'network': {'type': 'inr-w2', 'task': 'classify', 'pretrained': True, 'frozen': False, 'conv': {'scale2': 30, 'mid_ch': [64, 32]}}, 'config_name': 'inet_w2', 'start_ix': 0, 'target_job': None, 'data loading': {'N': 1000, 'augment': True, 'batch size': 192, 'subset': 'train', 'dataset': 'inet12', 'input channels': 3, 'classes': 12, 'sample points': 1024, 'sample type': 'rqmc', 'image shape': [64, 64]}, 'optimizer': {'learning rate': 0.001, 'max steps': 5000, 'type': 'Adam', 'weight decay': 0.0001}, 'random seed': 0, 'paths': {'slurm output dir': '/data/vision/polina/users/clintonw/code/diffcoord/results', 'temp dir': '~/code/diffcoord/temp', 'job output dir': '/data/vision/polina/users/clintonw/code/diffcoord/results/manual', 'weights dir': '/data/vision/polina/users/clintonw/code/diffcoord/results/manual/weights'}}
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [wandb_init.py:init():515] starting backend
+2022-06-05 10:00:37,486 INFO    MainThread:6403 [backend.py:_multiprocessing_setup():97] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2022-06-05 10:00:37,499 INFO    MainThread:6403 [backend.py:ensure_launched():217] starting backend process...
+2022-06-05 10:00:37,502 INFO    MainThread:6403 [backend.py:ensure_launched():222] started backend process with pid: 6466
+2022-06-05 10:00:37,503 INFO    MainThread:6403 [wandb_init.py:init():525] backend started and connected
+2022-06-05 10:00:37,512 INFO    MainThread:6403 [wandb_init.py:init():596] updated telemetry
+2022-06-05 10:00:37,526 INFO    MainThread:6403 [wandb_init.py:init():627] communicating run to backend with 30 second timeout
+2022-06-05 10:00:39,211 INFO    MainThread:6403 [wandb_run.py:_on_init():1924] communicating current version
+2022-06-05 10:00:39,288 INFO    MainThread:6403 [wandb_run.py:_on_init():1928] got version response 
+2022-06-05 10:00:39,288 INFO    MainThread:6403 [wandb_init.py:init():662] starting run threads in backend
+2022-06-05 10:00:43,891 INFO    MainThread:6403 [wandb_run.py:_console_start():1898] atexit reg
+2022-06-05 10:00:43,892 INFO    MainThread:6403 [wandb_run.py:_redirect():1771] redirect: SettingsConsole.REDIRECT
+2022-06-05 10:00:43,893 INFO    MainThread:6403 [wandb_run.py:_redirect():1776] Redirecting console.
+2022-06-05 10:00:43,896 INFO    MainThread:6403 [wandb_run.py:_redirect():1832] Redirects installed.
+2022-06-05 10:00:43,896 INFO    MainThread:6403 [wandb_init.py:init():688] run started, returning control to user process
+2022-06-05 10:00:46,693 INFO    MainThread:6403 [wandb_watch.py:watch():47] Watching
+2022-06-05 10:00:46,695 INFO    MainThread:6403 [wandb_watch.py:watch():47] Watching
+2022-06-05 10:00:47,862 INFO    MainThread:6403 [wandb_run.py:_atexit_cleanup():1867] got exitcode: 1
+2022-06-05 10:00:47,870 INFO    MainThread:6403 [wandb_run.py:_restore():1839] restore
+2022-06-05 10:00:49,919 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 864
+  total_bytes: 864
+}
+
+2022-06-05 10:00:50,026 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 864
+  total_bytes: 864
+}
+
+2022-06-05 10:00:50,158 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 864
+  total_bytes: 864
+}
+
+2022-06-05 10:00:50,261 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 864
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,371 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 864
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,481 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,584 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,689 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,792 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:50,895 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:51,160 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+
+2022-06-05 10:00:51,554 INFO    MainThread:6403 [wandb_run.py:_on_finish():1996] got exit ret: done: true
+exit_result {
+}
+file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 7458
+  total_bytes: 7458
+}
+local_info {
+}
+
+2022-06-05 10:00:52,765 INFO    MainThread:6403 [wandb_run.py:_footer_history_summary_info():3104] rendering history
+2022-06-05 10:00:52,766 INFO    MainThread:6403 [wandb_run.py:_footer_history_summary_info():3136] rendering summary
+2022-06-05 10:00:52,776 INFO    MainThread:6403 [wandb_run.py:_footer_sync_info():3060] logging synced files

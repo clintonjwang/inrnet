@@ -6,9 +6,6 @@ import numpy as np
 from inrnet import util, losses
 from inrnet.data import dataloader
 
-ANALYSIS_DIR = osp.expanduser("~/code/diffcoord/temp")
-RESULTS_DIR = osp.expanduser("~/code/diffcoord/results")
-
 def rename_job(job, new_name):
     os.rename(osp.join(RESULTS_DIR, job), osp.join(RESULTS_DIR, new_name))
     for folder in util.glob2(ANALYSIS_DIR, "*", job):

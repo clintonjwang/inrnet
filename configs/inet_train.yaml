@@ -2,7 +2,7 @@ parent: classify
 network:
   type: inr-effnet-s3
 data loading:
-  N: 500
+  N: 1000
   augment: true
   batch size: 192
   subset: train
@@ -12,9 +12,9 @@ data loading:
   sample points: 1024
   sample type: rqmc
   image shape:
-  - 32
-  - 32
+  - 64
+  - 64
 optimizer:
   learning rate: 1e-3
-  max steps: 5000
+  max steps: 3000
 #N=9600 / bsz * 40 epochs

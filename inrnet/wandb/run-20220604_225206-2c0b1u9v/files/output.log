@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 104, in train_classifier
+    wandb.watch(model.layers[0])
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1185, in __getattr__
+    raise AttributeError("'{}' object has no attribute '{}'".format(
+AttributeError: 'Sequential' object has no attribute 'layers'

@@ -56,9 +56,12 @@ class InrClsWide2(nn.Module):
         # kwargs.pop('N_bins', None);
         # kwargs.pop('scale2', None);
         self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), **kwargs),
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), down_ratio=.25, **kwargs),
             inn.PositionalEncoding(N=C//4),
-            inn.blocks.conv_norm_act(C, C*2, kernel_size=(.3,.3), down_ratio=.25, **kwargs),
+            inn.blocks.ResConv(C, kernel_size=(.2,.2), **kwargs),
+            inn.ChannelMixer(C, C*2),
+            inn.MaxPool(kernel_size=(.1,.1), down_ratio=.25),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]
         self.layers = nn.Sequential(*self.layers)

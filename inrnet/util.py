@@ -4,7 +4,6 @@ osp = os.path
 from glob import glob
 import matplotlib.pyplot as plt
 import monai.transforms as mtr
-from scipy.stats.qmc import Sobol
 import seaborn as sns
 
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
@@ -154,12 +153,6 @@ def format_float(x, n_decimals):
             return ('%d'%x)
         else:
             return ('{:.%df}'%n_decimals).format(x)
-
-
-def cycle(iterator):
-    while True:
-        for data in iterator:
-            yield data
 
 
 

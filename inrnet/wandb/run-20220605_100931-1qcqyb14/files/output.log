@@ -1,0 +1,25 @@
+
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 138, in train_classifier
+    img_inr, labels = next(val_data_loader)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/data/dataloader.py", line 120, in get_val_inr_dataloader
+    for data in dl:
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/data/inet.py", line 128, in get_inr_loader_for_inet12
+    inrs = [model() for _ in range(bsz)]
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/data/inet.py", line 128, in <listcomp>
+    inrs = [model() for _ in range(bsz)]
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/models/inrs/siren.py", line 25, in __init__
+    self.net.append(SineLayer(C, C,
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/models/inrs/siren.py", line 71, in __init__
+    self.init_weights()
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/models/inrs/siren.py", line 79, in init_weights
+    self.linear.weight.uniform_(-np.sqrt(6 / self.in_features) / self.omega_0,
+KeyboardInterrupt

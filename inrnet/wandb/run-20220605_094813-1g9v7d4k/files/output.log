@@ -1,0 +1,28 @@
+warning: dropping last minibatch
+> /data/vision/polina/users/clintonw/code/inrnet/inrnet/data/inet.py(123)get_inr_loader_for_inet12()
+-> while True:
+(Pdb) N
+960
+(Pdb) bsz
+192
+
+(Pdb) c
+warning: dropping last minibatch
+> /data/vision/polina/users/clintonw/code/inrnet/inrnet/data/inet.py(123)get_inr_loader_for_inet12()
+-> while True:
+(Pdb) N
+0
+(Pdb) bsz
+768
+
+
+(Pdb) N = 192
+(Pdb) c
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 153, in train_classifier
+    'val top 3 acc': top3(pred_cls, labels).item(),
+TypeError: 'float' object is not callable

@@ -99,22 +99,22 @@ class INRBatch(nn.Module):
         else:
             return self.create_modified_copy(lambda x: torch.cat(x,other))
 
-    def generate_sample_points(self, method="qmc", sample_size=None, dims=None, ordering='c2f'):
-        if sample_size is None:
-            sample_size = self.sample_size
-        if method == "grid" or self.sample_mode == 'grid':
-            if dims is None:
-                raise ValueError("declare dims or turn off grid mode")
-            return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
-        elif method == "shrunk" or self.sample_mode == 'shrunk':
-            coords = qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
-                bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
-            return coords * coords.abs()
-        elif method in ("qmc", 'rqmc'):
-            return qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
-                bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
-        else:
-            raise NotImplementedError("invalid method: "+method)
+    # def generate_sample_points(self, method="qmc", sample_size=None, dims=None, ordering='c2f'):
+    #     if sample_size is None:
+    #         sample_size = self.sample_size
+    #     if method == "grid" or self.sample_mode == 'grid':
+    #         if dims is None:
+    #             raise ValueError("declare dims or turn off grid mode")
+    #         return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
+    #     elif method == "shrunk" or self.sample_mode == 'shrunk':
+    #         coords = qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
+    #             bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
+    #         return coords * coords.abs()
+    #     elif method in ("qmc", 'rqmc'):
+    #         return qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
+    #             bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
+    #     else:
+    #         raise NotImplementedError("invalid method: "+method)
 
     def set_integrator(self, function, name, layer=None, **kwargs):
         self.integrator = qmc.Integrator(function, name, inr=self, layer=layer, **kwargs)

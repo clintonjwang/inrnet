@@ -118,6 +118,8 @@ def get_inr_loader_for_inet12(bsz, subset, N=None):
         n_per_cls = bsz // 12
         if N % bsz != 0:
             print('warning: dropping last minibatch')
+            if bsz > N:
+                raise NotImplementedError
             N = (N // bsz) * bsz
         while True:
             for p in paths:

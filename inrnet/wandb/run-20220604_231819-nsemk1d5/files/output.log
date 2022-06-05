@@ -1,0 +1,11 @@
+
+warning: dropping last minibatch
+warning: dropping last minibatch
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 142, in train_classifier
+    for img_inr, labels in val_data_loader:
+NameError: name 'orig_args' is not defined

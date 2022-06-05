@@ -1,0 +1,83 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.12.17
+    framework: huggingface
+    huggingface_version: 4.18.0
+    is_jupyter_run: false
+    is_kaggle_kernel: true
+    python_version: 3.10.3
+    start_time: 1654436538
+    t:
+      1:
+      - 1
+      - 11
+      - 41
+      - 48
+      - 49
+      - 55
+      3:
+      - 1
+      - 13
+      - 16
+      4: 3.10.3
+      5: 0.12.17
+      6: 4.18.0
+      8:
+      - 2
+      - 5
+config_name:
+  desc: null
+  value: inet_nn2
+data loading:
+  desc: null
+  value:
+    N: 1000
+    augment: true
+    batch size: 192
+    classes: 12
+    dataset: inet12
+    image shape:
+    - 64
+    - 64
+    input channels: 3
+    sample points: 1024
+    sample type: rqmc
+    subset: train
+network:
+  desc: null
+  value:
+    conv:
+      mid_ch:
+      - 64
+      - 32
+      scale2: 30
+    frozen: false
+    pretrained: true
+    task: classify
+    type: cnn-2
+optimizer:
+  desc: null
+  value:
+    learning rate: 0.001
+    max steps: 5000
+    type: Adam
+    weight decay: 0.0001
+paths:
+  desc: null
+  value:
+    job output dir: /data/vision/polina/users/clintonw/code/diffcoord/results/manual
+    slurm output dir: /data/vision/polina/users/clintonw/code/diffcoord/results
+    temp dir: ~/code/diffcoord/temp
+    weights dir: /data/vision/polina/users/clintonw/code/diffcoord/results/manual/weights
+random seed:
+  desc: null
+  value: 0
+start_ix:
+  desc: null
+  value: 0
+target_job:
+  desc: null
+  value: null

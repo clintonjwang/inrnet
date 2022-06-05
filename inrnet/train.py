@@ -1,37 +1,44 @@
+"""
+Entrypoint for training
+"""
 import torch
 import numpy as np
 
-import args as args_module
-from experiments.diffusion import train_diffusion_model
-from experiments.depth import train_depth_model
-from experiments.classify import train_classifier
-from experiments.segment import train_segmenter
-from experiments.generate import train_generator
-from experiments.warp import train_warp
+import wandb
 
-def main(args):
+from inrnet import args as args_module
+from inrnet.experiments.diffusion import train_diffusion_model
+from inrnet.experiments.depth import train_depth_model
+from inrnet.experiments.classify import train_classifier
+from inrnet.experiments.segment import train_segmenter
+from inrnet.experiments.generate import train_generator
+from inrnet.experiments.warp import train_warp
+
+def main():
+    """Entrypoint for training"""
+    args = args_module.parse_args()
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
     torch.backends.cudnn.benchmark = True
     if args["random seed"] >= 0:
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
+    wandb.init(project="inrnet", entity="clintonjwang", job_type="train", name=args["job_id"],
+        config=wandb.helper.parse_config(args, exclude=['job_id', 'start_ix'])) #'paths',
 
-    if args["network"]["task"] == "diffusion":
-        train_diffusion_model(args)
-    elif args["network"]["task"] == "classify":
-        train_classifier(args)
-    elif args["network"]["task"] == "depth":
-        train_depth_model(args)
-    elif args["network"]["task"] == "cyclegan":
-        train_cyclegan(args)
-    elif args["network"]["task"] == "segment":
-        train_segmenter(args)
-    elif args["network"]["task"] == "generate":
-        train_generator(args)
-    elif args["network"]["task"] == "warp":
-        train_warp(args)
+    method_dict = {
+        'diffusion': train_diffusion_model,
+        'classify': train_classifier,
+        'depth': train_depth_model,
+        'segment': train_segmenter,
+        'generate': train_generator,
+        'warp': train_warp,
+    }
+    method = method_dict[args["network"]["task"]]
+    if args['sweep_id'] is not None:
+        wandb.agent(args['sweep_id'], function=method)
+    else:
+        method()
 
 if __name__ == "__main__":
-    args = args_module.parse_args()
-    main(args)
+    main()

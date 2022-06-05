@@ -1,13 +1,16 @@
+"""INR classification"""
 import os, pdb, torch, gc
 osp = os.path
 nn = torch.nn
 F = nn.functional
 import numpy as np
-import matplotlib.pyplot as plt
 import torchvision.models
+import wandb
 
+# from inrnet import RESULTS_DIR
+from inrnet import inn, jobs as job_mgmt
 from inrnet.data import dataloader, inet
-from inrnet import inn, util, losses, jobs as job_mgmt
+from inrnet.inn import point_set
 from inrnet.models.common import Conv2, Conv5
 from inrnet.inn.nets.effnet import InrCls2, InrCls4, InrClsWide2, InrClsWide4
 
@@ -80,10 +83,111 @@ def load_pretrained_model(args):
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
-    path = osp.expanduser(f"~/code/diffcoord/results/{origin}/weights/best.pth")
+    path = osp.expanduser(f"~/code/inrnet/results/{origin}/weights/best.pth")
     model = load_pretrained_model(orig_args)
     model.load_state_dict(torch.load(path))
     return model
+
+
+def train_classifier():
+    args = wandb.config
+    paths = args["paths"]
+    dl_args = args["data loading"]
+    data_loader = dataloader.get_inr_dataloader(dl_args)
+    val_data_loader = dataloader.get_val_inr_dataloader(dl_args)
+    global_step = 0
+    loss_fxn = nn.CrossEntropyLoss()
+    top3 = lambda pred_cls, labels: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
+    top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
+
+    model = load_pretrained_model(args).cuda()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
+    if hasattr(model, 'layers'):
+        wandb.watch(model.layers[0][0])
+        wandb.watch(model.layers[2][0])
+    else:
+        wandb.watch(model[0][0])
+        wandb.watch(model[2][0])
+        
+    for img_inr, labels in data_loader:
+        global_step += 1
+
+        if args["network"]['type'].startswith('inr'):
+            logit_fxn = model(img_inr)
+            logit_fxn.change_sample_mode(dl_args['sample type'])
+            coords = point_set.generate_sample_points(logit_fxn, dl_args)
+            logits = logit_fxn(coords)
+        else:
+            img = img_inr.produce_images(*dl_args['image shape'])
+            logits = model(img)
+
+        loss = loss_fxn(logits, labels)
+        pred_cls = logits.topk(k=3).indices
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        wandb.log({'train loss':loss.item(),
+            'top 3 acc': top3(pred_cls, labels).item(),
+            'top 1 acc': top1(pred_cls, labels).item(),
+        })
+        if global_step % 100 == 0:
+            torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
+        if global_step >= args["optimizer"]["max steps"]:
+            break
+        if global_step % 2 == 0:
+            with torch.no_grad():
+                img_inr, labels = next(val_data_loader)
+                if args["network"]['type'].startswith('inr'):
+                    logit_fxn = model(img_inr).eval()
+                    logit_fxn.change_sample_mode(dl_args['sample type'])
+                    coords = point_set.generate_sample_points(logit_fxn, dl_args)
+                    logits = logit_fxn(coords)
+
+                else:
+                    img = img_inr.produce_images(*dl_args['image shape'])
+                    logits = model(img)
+
+                loss = loss_fxn(logits, labels)
+                pred_cls = logits.topk(k=3).indices
+                wandb.log({'val loss':loss.item(),
+                    'val top 3 acc': top3(pred_cls, labels).item(),
+                    'val top 1 acc': top1(pred_cls, labels).item(),
+                }, step=global_step)
+            
+    torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
+
+
+
+
+def test_inr_classifier(args):
+    paths = args["paths"]
+    dl_args = args["data loading"]
+    data_loader = dataloader.get_inr_dataloader(dl_args)
+    top3, top1 = 0,0
+    origin = args['target_job']
+    model = load_model_from_job(origin).cuda().eval()
+    orig_args = job_mgmt.get_job_args(origin)
+
+    with torch.no_grad():
+        for img_inr, labels in data_loader:
+            if orig_args["network"]['type'].startswith('inr'):
+                logit_fxn = model(img_inr).cuda().eval()
+                logit_fxn.change_sample_mode(dl_args['sample type'])
+                coords = point_set.generate_sample_points(logit_fxn, dl_args)
+                logits = logit_fxn(coords)
+            else:
+                img = img_inr.produce_images(*dl_args['image shape'])
+                logits = model(img)
+
+            pred_cls = logits.topk(k=3).indices
+            top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
+            top1 += (labels == pred_cls[:,0]).float().sum().item()
+
+    torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
+
+
+
+
 
 # def train_material_classifier(args):
 #     import pandas as pd
@@ -94,7 +198,6 @@ def load_model_from_job(origin):
 #     loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
 #     top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
 #     top1_tracker = util.MetricTracker("top1", function=top1)
-#     bsz = dl_args['batch size']
 
 #     model = load_pretrained_model(args).cuda()
 #     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
@@ -110,7 +213,7 @@ def load_model_from_job(origin):
 
 #             loss = loss_tracker(logits, labels)
 #             pred_cls = logits.topk(k=5).indices
-#             top_5 = top5_tracker(pred_cls, labels).item()
+#             top_5 = top3_tracker(pred_cls, labels).item()
 #             top_1 = top1_tracker(pred_cls, labels).item()
 
 #             optimizer.zero_grad(set_to_none=True)
@@ -125,196 +228,12 @@ def load_model_from_job(origin):
 #                 torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
 #                 loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
 #                 top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
-#                 top5_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top5.png")
+#                 top3_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top3.png")
 
 #             if global_step >= args["optimizer"]["max steps"]:
 #                 break
 
 #     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
-
-
-def train_classifier(args):
-    paths = args["paths"]
-    dl_args = args["data loading"]
-    data_loader = dataloader.get_inr_dataloader(dl_args)
-    global_step = 0
-    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss())
-    top5 = lambda pred_cls, labels: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
-    top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
-    top5_tracker = util.MetricTracker("top5", function=top5)
-    top1_tracker = util.MetricTracker("top1", function=top1)
-    bsz = dl_args['batch size']
-
-    def backprop(network):
-        loss = loss_tracker(logits, labels)
-        pred_cls = logits.topk(k=5).indices
-        top_5 = top5_tracker(pred_cls, labels).item()
-        top_1 = top1_tracker(pred_cls, labels).item()
-
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-
-        if global_step % 20 == 0:
-            print(np.round(loss.item(), decimals=3), "; top_5:", np.round(top_5, decimals=2),
-                "; top_1:", np.round(top_1, decimals=2),
-                flush=True)
-        if global_step % 100 == 0:
-            torch.save(network.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-            loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            top1_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top1.png")
-            top5_tracker.plot_running_average(path=paths["job output dir"]+"/plots/top5.png")
-        # if attr_tracker.is_at_min("train"):
-        #     torch.save(InrNet.state_dict(), osp.join(paths["weights dir"], "best.pth"))
-
-    model = load_pretrained_model(args).cuda()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
-    if 'masking' in dl_args:
-        raise NotImplementedError()
-        N = dl_args["sample points"]
-        for img_inr, labels in data_loader:
-            global_step += 1
-            logit_fxn = model(img_inr)
-            coords = logit_fxn.generate_sample_points(sample_size=N, method=dl_args['sample type'])
-            logits = logit_fxn(coords)
-            backprop(model)
-            if global_step >= args["optimizer"]["max steps"]:
-                break
-
-    else:
-        if args["network"]['type'].startswith('inr'):
-            N = dl_args["sample points"]
-            for img_inr, labels in data_loader:
-                global_step += 1
-                logit_fxn = model(img_inr)
-                if dl_args['sample type'] == 'grid':
-                    logit_fxn.change_sample_mode('grid')
-                    coords = logit_fxn.generate_sample_points(dims=dl_args['image shape'], method=dl_args['sample type'])
-                else:
-                    coords = logit_fxn.generate_sample_points(sample_size=N, method=dl_args['sample type'])
-                logits = logit_fxn(coords)
-                backprop(model)
-                if global_step >= args["optimizer"]["max steps"]:
-                    break
-
-        else:
-            for img_inr, labels in data_loader:
-                global_step += 1
-                img = img_inr.produce_images(*dl_args['image shape'])
-                logits = model(img)
-                backprop(model)
-                if global_step >= args["optimizer"]["max steps"]:
-                    break
-
-    torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
-
-
-def benchmark_inr_cls():
-    args = job_mgmt.get_job_args('inet_nn5')
-    from time import time
-    paths = args["paths"]
-    dl_args = args["data loading"]
-    times = 20
-    dl_args['batch size'] = 48
-    data_loader = dataloader.get_inr_dataloader(dl_args)
-    model = load_model_from_job('inet_nn5').cuda().eval()
-    N = dl_args["sample points"]
-    
-    for img_inr, labels in data_loader:
-        with torch.no_grad():
-            coords = img_inr.generate_sample_points(dims=dl_args['image shape'])
-            img = img_inr(coords)
-            model(img.transpose(1,2).reshape(-1,3,*dl_args['image shape']));
-        break
-
-    all_times = []
-    ix = 0
-    for img_inr, labels in data_loader:
-        print(ix)
-        ix += 1
-        with torch.no_grad():
-            coords = img_inr.generate_sample_points(dims=dl_args['image shape'])
-            t = time()
-            img = img_inr(coords)
-            model(img.transpose(1,2).reshape(-1,3,*dl_args['image shape']));
-            all_times.append(time()-t)
-        if ix >= times:
-            print(np.mean(all_times), np.std(all_times))
-            return
-
-
-def benchmark_inr_classifier(args):
-    from time import time
-    paths = args["paths"]
-    dl_args = args["data loading"]
-    times = 20
-    dl_args['batch size'] = 48
-    data_loader = dataloader.get_inr_dataloader(dl_args)
-    origin = args['target_job']
-    model = load_model_from_job(origin).cuda().eval()
-    orig_args = job_mgmt.get_job_args(origin)
-    N = dl_args["sample points"]
-
-    #warmup
-    for img_inr, labels in data_loader:
-        with torch.no_grad():
-            logit_fxn = model(img_inr).eval()
-            coords = logit_fxn.generate_sample_points(sample_size=N)
-            logit_fxn(coords)
-        break
-
-    all_times = []
-    ix = 0
-    for img_inr, labels in data_loader:
-        print(ix)
-        ix += 1
-        with torch.no_grad():
-            t = time()
-            logit_fxn = model(img_inr).eval()
-            coords = logit_fxn.generate_sample_points(sample_size=N)
-            logit_fxn(coords)
-            all_times.append(time()-t)
-        if ix >= times:
-            print(np.mean(all_times), np.std(all_times))
-            return
-
-def test_inr_classifier(args):
-    paths = args["paths"]
-    dl_args = args["data loading"]
-    data_loader = dataloader.get_inr_dataloader(dl_args)
-    top3, top1 = 0,0
-    origin = args['target_job']
-    model = load_model_from_job(origin).cuda().eval()
-    orig_args = job_mgmt.get_job_args(origin)
-
-    if orig_args["network"]['type'].startswith('inr'):
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
-                logit_fxn = model(img_inr).cuda().eval()
-                if dl_args['sample type'] == 'grid':
-                    logit_fxn.change_sample_mode('grid')
-                    coords = logit_fxn.generate_sample_points(dims=dl_args['image shape'])
-                else:
-                    coords = logit_fxn.generate_sample_points(sample_size=dl_args["sample points"], method=dl_args['sample type'])
-                logits = logit_fxn(coords)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
-
-    else:
-        for img_inr, labels in data_loader:
-            with torch.no_grad():
-                img = img_inr.produce_images(*dl_args['image shape'])
-                logits = model(img)
-                pred_cls = logits.topk(k=3).indices
-                top3 += (labels.unsqueeze(1) == pred_cls).amax(1).float().sum().item()
-                top1 += (labels == pred_cls[:,0]).float().sum().item()
-
-    torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
-
-
-
-
 
 
 def analyze_interpolate_grid_to_qmc():
@@ -359,7 +278,7 @@ def analyze_interpolate_grid_to_qmc():
         qmc_mask = (front_conv.mask_tracker, back_conv.mask_tracker)
 
         torch.save((base_logits, grid_logits, grid_mask, qmc_logits, qmc_mask, intermediate_logits, intermediate_masks),
-            osp.expanduser('~/code/diffcoord/temp/analyze_logit_mismatch.pt'))
+            osp.expanduser('~/code/inrnet/temp/analyze_logit_mismatch.pt'))
 
 
 
@@ -390,7 +309,7 @@ def analyze_output_variance_rqmc():
             logits.append(logit_fxn.eval()(coords).cpu())
             masks.append((front_conv.mask_tracker, back_conv.mask_tracker))
 
-        torch.save((base_logits, logits, masks), osp.expanduser('~/code/diffcoord/temp/output_variance_rqmc.pt'))
+        torch.save((base_logits, logits, masks), osp.expanduser('~/code/inrnet/temp/output_variance_rqmc.pt'))
 
 
 def analyze_change_resolution_grid_vs_qmc():
@@ -426,9 +345,9 @@ def analyze_change_resolution_grid_vs_qmc():
             grid_masks.append((front_conv.mask_tracker, back_conv.mask_tracker))
 
             # torch.save((base_logits, grid_logits, grid_masks),
-            #     osp.expanduser('~/code/diffcoord/temp/change_resolution_grid_only.pt'))
+            #     osp.expanduser('~/code/inrnet/temp/change_resolution_grid_only.pt'))
             torch.save((base_logits, grid_logits, grid_masks, qmc_logits, qmc_masks),
-                osp.expanduser('~/code/diffcoord/temp/change_resolution_grid_vs_qmc.pt'))
+                osp.expanduser('~/code/inrnet/temp/change_resolution_grid_vs_qmc.pt'))
             gc.collect()
             torch.cuda.empty_cache()
 
@@ -458,4 +377,4 @@ def analyze_divergence_over_depth():
             masks.append((front_conv.mask_tracker, back_conv.mask_tracker))
 
         torch.save((base_logits, logits, masks),
-            osp.expanduser('~/code/diffcoord/temp/analyze_logit_mismatch.pt'))
+            osp.expanduser('~/code/inrnet/temp/analyze_logit_mismatch.pt'))

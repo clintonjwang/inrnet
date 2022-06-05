@@ -1,0 +1,12 @@
+
+warning: dropping last minibatch
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 198, in train_classifier
+    backprop(model)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 159, in backprop
+    'top 5 acc': top_5.item(),
+AttributeError: 'float' object has no attribute 'item'

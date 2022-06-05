@@ -1,0 +1,904 @@
+2022-06-04 17:41:58,592 INFO    MainThread:7736 [wandb_setup.py:_flush():76] Loading settings from /data/vision/polina/users/clintonw/.config/wandb/settings
+2022-06-04 17:41:58,592 INFO    MainThread:7736 [wandb_setup.py:_flush():76] Loading settings from /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/settings
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'inrnet/train.py', 'program': '/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py'}
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_init.py:_log_setup():428] Logging user logs to /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/run-20220604_174158-jykdomwg/logs/debug.log
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_init.py:_log_setup():429] Logging internal logs to /data/vision/polina/users/clintonw/code/inrnet/inrnet/wandb/run-20220604_174158-jykdomwg/logs/debug-internal.log
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_init.py:init():462] calling init triggers
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_init.py:init():465] wandb.init called with sweep_config: {}
+config: {'network': {'type': 'cnn-2', 'task': 'classify', 'pretrained': True, 'frozen': False, 'conv': {'scale2': 30, 'mid_ch': [64, 32]}}, 'config_name': 'inet_nn2', 'start_ix': 0, 'target_job': None, 'data loading': {'N': 500, 'augment': True, 'batch size': 192, 'subset': 'train', 'dataset': 'inet12', 'input channels': 3, 'classes': 12, 'sample points': 1024, 'sample type': 'rqmc', 'image shape': [32, 32]}, 'optimizer': {'learning rate': 0.001, 'max steps': 5000, 'type': 'Adam', 'weight decay': 0.0001}, 'random seed': 0, 'paths': {'slurm output dir': '/data/vision/polina/users/clintonw/code/diffcoord/results', 'temp dir': '~/code/diffcoord/temp', 'job output dir': '/data/vision/polina/users/clintonw/code/diffcoord/results/manual', 'weights dir': '/data/vision/polina/users/clintonw/code/diffcoord/results/manual/weights'}}
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [wandb_init.py:init():515] starting backend
+2022-06-04 17:41:58,593 INFO    MainThread:7736 [backend.py:_multiprocessing_setup():97] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2022-06-04 17:41:58,606 INFO    MainThread:7736 [backend.py:ensure_launched():217] starting backend process...
+2022-06-04 17:41:58,610 INFO    MainThread:7736 [backend.py:ensure_launched():222] started backend process with pid: 7804
+2022-06-04 17:41:58,611 INFO    MainThread:7736 [wandb_init.py:init():525] backend started and connected
+2022-06-04 17:41:58,624 INFO    MainThread:7736 [wandb_init.py:init():596] updated telemetry
+2022-06-04 17:41:58,638 INFO    MainThread:7736 [wandb_init.py:init():627] communicating run to backend with 30 second timeout
+2022-06-04 17:42:00,228 INFO    MainThread:7736 [wandb_run.py:_on_init():1924] communicating current version
+2022-06-04 17:42:00,298 INFO    MainThread:7736 [wandb_run.py:_on_init():1928] got version response 
+2022-06-04 17:42:00,298 INFO    MainThread:7736 [wandb_init.py:init():662] starting run threads in backend
+2022-06-04 17:42:04,823 INFO    MainThread:7736 [wandb_run.py:_console_start():1898] atexit reg
+2022-06-04 17:42:04,825 INFO    MainThread:7736 [wandb_run.py:_redirect():1771] redirect: SettingsConsole.REDIRECT
+2022-06-04 17:42:04,826 INFO    MainThread:7736 [wandb_run.py:_redirect():1776] Redirecting console.
+2022-06-04 17:42:04,829 INFO    MainThread:7736 [wandb_run.py:_redirect():1832] Redirects installed.
+2022-06-04 17:42:04,830 INFO    MainThread:7736 [wandb_init.py:init():688] run started, returning control to user process
+2022-06-04 17:42:09,810 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:11,924 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:13,638 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:15,305 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:16,749 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:18,234 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:19,683 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:21,208 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:22,871 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:24,026 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:25,145 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:26,244 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:27,524 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:28,659 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:29,804 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:31,277 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:32,567 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:33,869 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:35,164 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:36,553 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:37,893 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:39,228 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:40,636 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:41,692 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:42,754 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:43,844 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:45,275 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:46,589 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:47,879 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:49,359 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:50,665 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:51,947 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:53,236 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:54,669 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:55,776 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:56,816 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:58,041 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:42:59,108 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:00,417 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:01,582 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:02,983 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:04,309 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:05,612 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:08,675 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:11,267 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:13,765 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:16,772 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:19,682 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:21,221 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:22,571 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:24,644 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:26,352 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:27,845 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:29,164 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:31,042 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:32,379 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:33,639 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:35,204 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:36,935 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:39,145 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:40,821 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:42,540 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:44,495 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:45,889 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:47,524 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:49,168 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:50,672 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:52,020 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:53,583 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:55,116 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:56,329 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:57,881 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:43:59,271 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:00,618 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:02,158 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:03,596 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:04,766 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:05,902 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:07,427 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:08,479 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:09,853 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:11,251 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:12,635 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:14,005 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:15,305 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:16,964 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:18,451 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:19,803 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:21,132 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:22,662 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:24,001 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:25,254 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:26,658 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:27,931 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:29,333 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:30,762 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:32,035 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:33,306 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:34,580 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:36,020 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:37,473 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:38,578 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:39,806 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:40,991 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:42,136 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:43,386 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:44,476 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:45,603 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:46,695 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:47,984 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:49,038 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:50,145 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:51,538 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:52,590 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:53,980 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:55,553 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:56,796 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:57,937 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:44:59,301 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:00,570 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:01,768 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:02,907 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:04,010 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:05,272 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:06,544 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:07,673 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:08,908 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:10,018 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:11,126 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:12,210 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:13,493 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:14,793 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:15,951 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:17,165 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:18,254 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:19,358 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:20,584 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:21,779 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:23,034 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:24,299 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:25,672 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:26,881 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:27,990 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:29,152 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:30,673 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:31,942 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:33,239 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:34,527 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:35,966 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:37,240 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:38,316 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:39,555 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:40,660 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:41,761 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:43,065 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:44,331 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:45,693 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:46,858 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:48,083 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:49,170 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:50,412 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:51,706 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:52,926 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:54,051 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:55,167 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:56,304 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:57,701 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:45:58,987 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:00,069 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:01,359 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:02,487 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:03,586 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:04,868 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:06,142 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:07,427 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:08,687 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:09,936 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:11,092 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:12,386 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:13,661 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:15,025 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:16,322 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:17,628 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:18,909 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:20,339 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:21,655 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:22,949 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:24,390 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:25,675 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:26,971 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:28,258 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:29,669 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:31,039 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:32,327 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:33,580 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:34,967 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:36,254 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:37,539 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:38,819 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:40,109 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:41,566 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:42,811 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:44,041 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:45,254 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:46,471 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:47,811 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:48,929 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:50,038 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:51,149 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:52,365 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:53,424 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:54,526 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:55,923 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:57,104 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:58,305 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:46:59,627 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:00,911 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:02,211 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:03,499 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:04,758 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:06,129 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:07,382 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:08,522 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:09,851 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:11,171 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:12,496 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:13,805 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:15,251 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:16,565 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:17,880 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:19,193 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:20,486 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:21,611 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:23,089 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:24,284 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:25,574 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:26,733 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:27,960 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:29,351 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:30,484 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:31,654 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:32,981 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:34,287 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:35,481 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:36,882 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:38,246 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:39,599 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:40,954 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:42,291 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:43,606 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:45,042 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:46,241 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:47,378 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:48,624 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:49,726 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:50,819 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:51,943 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:53,197 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:54,341 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:55,460 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:56,578 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:57,852 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:47:58,946 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:00,058 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:01,163 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:02,403 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:03,551 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:04,745 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:06,139 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:07,287 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:08,576 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:09,924 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:11,327 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:12,664 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:14,002 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:15,325 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:16,610 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:17,915 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:19,265 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:20,716 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:22,038 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:23,370 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:24,701 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:26,129 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:27,450 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:28,778 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:30,074 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:31,380 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:32,476 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:33,789 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:35,236 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:36,348 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:37,444 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:38,548 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:39,828 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:40,951 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:42,268 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:43,582 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:45,005 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:46,321 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:47,824 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:49,124 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:50,576 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:51,845 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:53,073 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:54,503 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:55,822 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:56,966 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:58,142 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:48:59,468 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:00,774 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:01,928 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:03,111 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:04,387 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:05,542 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:06,665 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:07,786 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:09,150 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:10,338 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:11,682 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:12,989 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:14,100 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:15,286 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:16,428 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:17,705 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:18,884 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:20,016 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:21,148 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:22,459 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:23,585 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:24,724 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:25,862 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:27,178 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:28,383 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:29,693 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:30,995 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:32,371 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:33,468 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:34,607 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:35,966 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:37,111 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:38,253 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:39,471 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:40,855 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:42,027 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:43,206 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:44,370 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:45,654 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:46,756 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:47,861 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:49,202 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:50,665 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:51,989 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:53,307 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:54,823 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:56,080 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:57,392 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:58,690 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:49:59,943 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:01,258 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:02,607 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:03,929 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:05,354 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:06,494 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:07,796 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:09,169 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:10,482 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:11,625 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:12,780 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:14,069 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:15,509 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:16,658 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:17,964 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:19,425 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:20,714 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:22,098 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:23,420 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:24,913 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:26,215 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:27,355 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:28,517 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:29,909 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:31,133 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:32,493 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:33,793 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:35,215 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:36,348 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:37,476 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:38,596 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:40,028 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:41,345 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:42,700 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:44,344 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:45,616 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:46,736 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:47,945 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:49,393 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:50,693 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:51,998 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:53,121 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:54,826 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:55,958 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:57,086 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:58,291 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:50:59,613 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:00,808 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:01,991 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:03,368 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:04,580 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:05,754 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:07,044 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:08,296 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:09,649 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:11,007 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:12,317 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:13,669 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:14,917 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:16,088 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:17,293 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:18,633 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:19,894 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:21,270 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:22,520 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:24,020 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:25,265 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:26,580 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:27,831 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:29,329 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:30,507 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:31,735 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:33,052 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:34,213 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:35,546 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:36,718 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:37,936 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:39,382 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:40,745 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:42,082 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:43,321 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:44,823 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:46,108 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:47,305 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:48,509 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:49,865 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:51,200 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:52,304 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:53,602 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:54,978 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:56,168 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:57,329 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:51:58,677 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:00,189 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:01,346 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:02,661 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:04,011 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:05,313 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:06,647 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:07,867 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:09,186 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:10,558 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:11,801 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:12,994 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:14,150 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:15,484 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:16,712 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:17,919 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:19,069 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:20,203 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:21,485 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:22,615 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:23,998 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:25,546 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:26,742 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:27,954 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:29,250 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:30,847 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:32,171 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:33,360 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:34,654 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:35,975 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:37,455 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:38,672 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:39,880 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:41,270 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:42,468 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:43,612 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:44,794 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:46,117 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:47,339 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:48,548 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:49,738 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:50,933 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:52,243 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:53,399 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:54,548 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:55,898 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:57,048 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:58,166 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:52:59,322 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:00,604 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:02,051 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:03,199 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:04,365 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:05,775 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:07,128 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:08,455 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:09,672 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:11,165 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:12,346 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:13,521 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:14,900 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:16,270 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:17,693 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:19,022 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:20,375 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:21,941 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:23,104 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:24,242 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:25,369 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:26,698 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:27,959 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:29,134 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:30,300 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:31,455 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:32,785 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:33,928 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:35,127 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:36,491 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:37,631 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:38,806 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:39,999 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:41,325 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:42,656 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:43,843 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:45,065 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:46,412 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:47,961 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:49,226 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:50,469 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:51,937 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:53,295 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:54,566 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:55,759 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:57,297 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:58,582 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:53:59,904 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:01,204 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:02,584 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:04,047 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:05,203 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:06,386 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:07,795 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:08,948 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:10,130 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:11,366 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:12,925 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:14,245 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:15,511 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:16,687 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:17,872 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:19,192 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:20,365 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:21,561 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:23,093 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:24,473 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:25,688 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:26,837 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:28,365 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:29,667 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:30,912 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:32,095 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:33,419 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:34,902 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:36,203 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:37,405 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:38,708 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:40,034 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:41,404 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:42,731 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:44,184 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:45,442 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:46,789 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:48,027 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:49,226 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:50,598 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:51,773 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:52,986 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:54,356 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:55,842 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:57,200 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:58,492 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:54:59,669 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:01,043 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:02,216 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:03,564 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:04,855 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:06,295 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:07,513 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:08,706 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:09,930 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:11,671 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:12,958 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:14,303 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:15,656 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:17,077 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:18,294 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:19,570 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:20,772 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:22,182 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:23,389 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:24,582 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:25,970 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:27,465 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:28,694 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:29,962 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:31,192 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:32,629 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:33,881 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:35,102 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:36,416 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:37,865 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:39,161 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:40,504 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:41,811 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:43,267 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:44,444 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:45,648 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:46,865 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:48,267 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:49,485 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:50,836 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:52,243 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:53,731 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:54,923 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:56,242 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:57,626 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:55:58,970 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:00,426 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:01,753 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:03,306 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:04,600 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:06,008 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:07,324 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:08,598 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:09,883 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:11,354 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:12,762 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:14,123 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:15,497 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:16,831 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:18,006 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:19,269 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:20,429 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:21,820 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:22,982 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:24,141 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:25,282 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:26,523 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:27,909 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:29,060 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:30,272 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:31,691 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:33,076 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:34,421 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:35,693 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:37,069 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:38,602 INFO    MainThread:7736 [wandb_watch.py:watch():47] Watching
+2022-06-04 17:56:39,642 INFO    MainThread:7736 [wandb_run.py:_atexit_cleanup():1867] got exitcode: 255
+2022-06-04 17:56:39,643 INFO    MainThread:7736 [wandb_run.py:_restore():1839] restore
+2022-06-04 17:56:47,104 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:56:52,207 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:56:57,309 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:02,411 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:07,513 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:12,616 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:17,718 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:22,821 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:27,924 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:33,026 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:38,129 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:43,232 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:48,335 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:53,437 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:57:58,540 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:03,641 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:08,744 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:13,846 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:18,949 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:24,050 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:29,152 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:34,253 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:39,355 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:44,456 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:49,559 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:54,660 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:58:59,762 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: None
+2022-06-04 17:59:00,607 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 865
+}
+
+2022-06-04 17:59:02,789 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 865
+}
+
+2022-06-04 17:59:03,958 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 1
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 865
+}
+
+2022-06-04 17:59:04,742 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 3
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 7701
+}
+
+2022-06-04 17:59:04,845 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:04,948 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,050 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,153 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 865
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,257 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 463686
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,360 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 1926144
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,463 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 4858880
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,566 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 8037376
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,669 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 10904576
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,771 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 14337024
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,874 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 17327104
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:05,977 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:06,080 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:06,183 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:06,287 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:06,390 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:09,344 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+
+2022-06-04 17:59:09,614 INFO    MainThread:7736 [wandb_run.py:_on_finish():1996] got exit ret: done: true
+exit_result {
+}
+file_counts {
+  wandb_count: 5
+}
+pusher_stats {
+  uploaded_bytes: 20923399
+  total_bytes: 20923399
+}
+local_info {
+}
+
+2022-06-04 17:59:12,156 INFO    MainThread:7736 [wandb_run.py:_footer_history_summary_info():3104] rendering history
+2022-06-04 17:59:12,614 INFO    MainThread:7736 [wandb_run.py:_footer_history_summary_info():3136] rendering summary
+2022-06-04 17:59:12,654 INFO    MainThread:7736 [wandb_run.py:_footer_sync_info():3060] logging synced files

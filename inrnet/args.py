@@ -1,18 +1,23 @@
-import argparse, os, yaml, sys, shutil
+"""
+Argument parsing
+"""
+import argparse, os, yaml, shutil
+from inrnet import CONFIG_DIR
+
 osp = os.path
 
-config_dir = osp.expanduser("~/code/diffcoord/configs")
-
 def parse_args():
+    """Command-line args"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_name')
     parser.add_argument('-j', '--job_id', default="manual")
     parser.add_argument('-s', '--start_ix', default=0, type=int)
     parser.add_argument('-t', '--target_job', default=None)
+    parser.add_argument('-i', '--sweep_id', default=None)
     cmd_args = parser.parse_args()
 
     config_name = cmd_args.job_id if cmd_args.config_name is None else cmd_args.config_name
-    main_config_path = osp.join(config_dir, config_name+".yaml")
+    main_config_path = osp.join(CONFIG_DIR, config_name+".yaml")
 
     args = args_from_file(main_config_path, cmd_args)
     paths = args["paths"]
@@ -24,6 +29,7 @@ def parse_args():
     return args
 
 def infer_missing_args(args):
+    """Convert str to float, etc."""
     paths = args["paths"]
     paths["slurm output dir"] = osp.expanduser(paths["slurm output dir"])
     if args["job_id"].startswith("lg_") or args["job_id"].startswith("A6"):
@@ -37,6 +43,7 @@ def infer_missing_args(args):
     args["optimizer"]["weight decay"] = float(args["optimizer"]["weight decay"])
 
 def merge_args(parent_args, child_args):
+    """Merge parent config args into child configs."""
     if "_overwrite_" in child_args.keys():
         return child_args
     for k,parent_v in parent_args.items():
@@ -49,46 +56,38 @@ def merge_args(parent_args, child_args):
 
 
 def args_from_file(path, cmd_args=None):
-    config_dir = osp.dirname(path)
+    """Create args dict from yaml."""
     if osp.exists(path):
         args = yaml.safe_load(open(path, 'r'))
     else:
-        if cmd_args.config_name.endswith('1k'):
-            path = path.replace('1k.yaml', '.yaml')
-            if osp.exists(path):
-                args = yaml.safe_load(open(path, 'r'))
-                if 'data loading' in args: raise NotImplementedError
-                args['data loading'] = {'N': 1000}
-            else:
-                raise ValueError(f"bad config_name {cmd_args.config_name}")
-        elif cmd_args.config_name.endswith('4k'):
-            path = path.replace('4k.yaml', '.yaml')
-            if osp.exists(path):
-                args = yaml.safe_load(open(path, 'r'))
-                if 'data loading' in args: raise NotImplementedError
-                args['data loading'] = {'N': 4000}
-            else:
-                raise ValueError(f"bad config_name {cmd_args.config_name}")
-        else:
-            raise ValueError(f"bad config_name {cmd_args.config_name}")
+        # if cmd_args.config_name.endswith('1k'):
+        #     path = path.replace('1k.yaml', '.yaml')
+        #     if osp.exists(path):
+        #         args = yaml.safe_load(open(path, 'r'))
+        #         if 'data loading' in args: raise NotImplementedError
+        #         args['data loading'] = {'N': 1000}
+        #     else:
+        #         raise ValueError(f"bad config_name {cmd_args.config_name}")
+        # else:
+        raise ValueError(f"bad config_name {cmd_args.config_name}")
 
     if cmd_args is not None:
-        for param in ["job_id", "config_name", "start_ix", 'target_job']:
+        for param in ["job_id", "config_name", "start_ix", 'target_job', 'sweep_id']:
             args[param] = getattr(cmd_args, param)
 
     while "parent" in args:
         if isinstance(args["parent"], str):
-            config_path = osp.join(config_dir, args.pop("parent")+".yaml")
+            config_path = osp.join(CONFIG_DIR, args.pop("parent")+".yaml")
             args = merge_args(yaml.safe_load(open(config_path, 'r')), args)
         else:
             parents = args.pop("parent")
             for p in parents:
-                config_path = osp.join(config_dir, p+".yaml")
+                config_path = osp.join(CONFIG_DIR, p+".yaml")
                 args = merge_args(yaml.safe_load(open(config_path, 'r')), args)
             if "parent" in args:
                 raise NotImplementedError("need to handle case of multiple parents each with other parents")
 
-    config_path = osp.join(config_dir, "default.yaml")
+    config_path = osp.join(CONFIG_DIR, "default.yaml")
     args = merge_args(yaml.safe_load(open(config_path, 'r')), args)
     infer_missing_args(args)
     return args

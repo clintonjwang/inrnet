@@ -1,0 +1,30 @@
+
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+warning: dropping last minibatch
+Traceback (most recent call last):
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 41, in <module>
+    main(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/train.py", line 27, in main
+    train_classifier(args)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/experiments/classify.py", line 137, in train_classifier
+    img_inr, labels = next(val_data_loader)
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/data/dataloader.py", line 120, in get_val_inr_dataloader
+    for data in dl:
+  File "/data/vision/polina/users/clintonw/code/inrnet/inrnet/data/inet.py", line 129, in get_inr_loader_for_inet12
+    for i in range(n_per_cls):
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/serialization.py", line 712, in load
+    return _load(opened_zipfile, map_location, pickle_module, **pickle_load_args)
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/serialization.py", line 1046, in _load
+    result = unpickler.load()
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/serialization.py", line 1016, in persistent_load
+    load_tensor(dtype, nbytes, key, _maybe_decode_ascii(location))
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/serialization.py", line 997, in load_tensor
+    storage = zip_file.get_storage_from_record(name, numel, torch._UntypedStorage).storage()._untyped()
+  File "/data/vision/polina/users/clintonw/anaconda3/envs/cuda11/lib/python3.10/site-packages/torch/_tensor.py", line 183, in storage
+    storage_class = eval(type(storage).__module__ + '.' + storage_name)
+  File "<string>", line 1, in <module>
+KeyboardInterrupt

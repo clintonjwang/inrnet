@@ -109,6 +109,17 @@ def get_inr_dataloader(dl_args):
     else:
         raise NotImplementedError(dl_args["dataset"])
 
+def get_val_inr_dataloader(dl_args):
+    dl_args['subset'] = 'val'
+    if dl_args["dataset"] == "inet12":
+        dl_args['batch size'] = 192
+    else:
+        dl_args['batch size'] *= 4
+    while True:
+        dl = get_inr_dataloader(dl_args)
+        for data in dl:
+            yield data
+
 def get_inr_loader_for_cls_ds(ds_name, bsz, subset):
     inr = siren.Siren(out_channels=3)
     paths = glob2(f"{DS_DIR}/inrnet/{ds_name}/{subset}_*.pt")
