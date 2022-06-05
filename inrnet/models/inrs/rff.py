@@ -2,6 +2,7 @@ import torch, pdb
 nn=torch.nn
 
 from inrnet import util, inn
+from inrnet.inn import point_set
 
 def to_black_box(rff_list, **kwargs):
     evaluator = nn.ModuleList(rff_list).eval()
@@ -55,7 +56,7 @@ def get_rff_keys():
 def fit_rff_to_img(target, total_steps):
     h,w = target.shape[1:]
     target = target.flatten(1).T.cuda()
-    xy_grid = util.meshgrid_coords(h,w, c2f=False)
+    xy_grid = point_set.meshgrid_coords(h,w, c2f=False)
     model = RFFNet().cuda()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     for epoch in range(total_steps):

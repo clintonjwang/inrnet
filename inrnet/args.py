@@ -1,7 +1,7 @@
 """
 Argument parsing
 """
-import argparse, os, yaml, shutil
+import argparse, os, yaml, shutil, wandb, pdb
 from inrnet import CONFIG_DIR
 
 osp = os.path
@@ -28,10 +28,23 @@ def parse_args():
     yaml.safe_dump(args, open(osp.join(paths["job output dir"], "config.yaml"), 'w'))
     return args
 
+def get_wandb_config():
+    wandb_sweep_dict = {
+        'learning_rate': ['optimizer', 'learning_rate'],
+        'sample_type': ['data loading', 'sample type'],
+    }
+    if wandb.config['sweep_id'] is not None:
+        for k,subkeys in wandb_sweep_dict.items():
+            if k in wandb.config:
+                d = wandb.config
+                for subk in subkeys[:-1]:
+                    d = d[subk]
+                d[subkeys[-1]] = wandb.config[k]
+    wandb.config.persist()
+    return dict(wandb.config.items())
+
 def infer_missing_args(args):
     """Convert str to float, etc."""
-    if args['sweep_id'] is not None:
-        
     paths = args["paths"]
     paths["slurm output dir"] = osp.expanduser(paths["slurm output dir"])
     if args["job_id"].startswith("lg_") or args["job_id"].startswith("A6"):
@@ -40,7 +53,7 @@ def infer_missing_args(args):
     paths["job output dir"] = osp.join(paths["slurm output dir"], args["job_id"])
     paths["weights dir"] = osp.join(paths["job output dir"], "weights")
     for k in args["optimizer"]:
-        if "learning rate" in k:
+        if "learning_rate" in k:
             args["optimizer"][k] = float(args["optimizer"][k])
     args["optimizer"]["weight decay"] = float(args["optimizer"]["weight decay"])
 

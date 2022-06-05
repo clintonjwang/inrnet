@@ -6,7 +6,7 @@ F=nn.functional
 from time import time
 
 from inrnet import util
-from inrnet.inn import qmc, functional as inrF
+from inrnet.inn import qmc, point_set, functional as inrF
 
 
 class INRBatch(nn.Module):
@@ -105,7 +105,7 @@ class INRBatch(nn.Module):
     #     if method == "grid" or self.sample_mode == 'grid':
     #         if dims is None:
     #             raise ValueError("declare dims or turn off grid mode")
-    #         return util.meshgrid_coords(*dims, c2f=ordering=='c2f')
+    #         return point_set.meshgrid_coords(*dims, c2f=ordering=='c2f')
     #     elif method == "shrunk" or self.sample_mode == 'shrunk':
     #         coords = qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
     #             bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
@@ -227,7 +227,7 @@ class INRBatch(nn.Module):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = util.meshgrid_coords(H,W)
+            xy_grid = point_set.meshgrid_coords(H,W)
             output = self.forward(xy_grid)
             output = util.realign_values(output, inr=self)
             output = output.reshape(output.size(0),H,W,-1)
@@ -253,7 +253,7 @@ class BlackBoxINR(INRBatch):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = util.meshgrid_coords(H,W, c2f=False)
+            xy_grid = point_set.meshgrid_coords(H,W, c2f=False)
             output = self.forward(xy_grid)
             output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':

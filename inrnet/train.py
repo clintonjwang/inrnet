@@ -1,10 +1,9 @@
 """
 Entrypoint for training
 """
-import torch
+import torch, wandb
 import numpy as np
-
-import wandb
+from functools import partial
 
 from inrnet import args as args_module
 from inrnet.experiments.diffusion import train_diffusion_model
@@ -23,9 +22,6 @@ def main():
     if args["random seed"] >= 0:
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
-    wandb.init(project="inrnet", entity="clintonjwang", job_type="train", name=args["job_id"],
-        config=wandb.helper.parse_config(args, exclude=['job_id', 'start_ix'])) #'paths',
-
     method_dict = {
         'diffusion': train_diffusion_model,
         'classify': train_classifier,
@@ -36,9 +32,9 @@ def main():
     }
     method = method_dict[args["network"]["task"]]
     if args['sweep_id'] is not None:
-        wandb.agent(args['sweep_id'], function=method)
+        wandb.agent(args['sweep_id'], function=partial(method, args=args), count=1, project='inrnet')
     else:
-        method()
+        method(args=args)
 
 if __name__ == "__main__":
     main()

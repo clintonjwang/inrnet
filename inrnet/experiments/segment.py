@@ -81,7 +81,7 @@ def train_segmenter(args):
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
     model = load_pretrained_model(args).cuda()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
+    optimizer = util.get_optimizer(model, args)
     for img_inr, segs in data_loader:
         global_step += 1
         
