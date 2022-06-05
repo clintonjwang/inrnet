@@ -1,7 +1,7 @@
 random seed: 0
 paths:
-  slurm output dir: ~/code/diffcoord/results
-  temp dir: ~/code/diffcoord/temp
+  slurm output dir: ~/code/inrnet/results
+  temp dir: ~/code/inrnet/temp
 network:
   frozen: false
   conv:
@@ -11,4 +11,4 @@ network:
     - 32
 optimizer:
   type: AdamW
-  weight decay: 1e-4
+  weight decay: 1e-3
