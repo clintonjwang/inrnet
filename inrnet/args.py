@@ -36,6 +36,7 @@ def get_wandb_config():
     wandb_sweep_dict = {
         'learning_rate': ['optimizer', 'learning_rate'],
         'sample_type': ['data loading', 'sample type'],
+        'kernel_size0': ['network', 'kernel_size0'],
     }
     if wandb.config['sweep_id'] is not None:
         for k,subkeys in wandb_sweep_dict.items():

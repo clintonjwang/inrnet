@@ -4,6 +4,32 @@ import torch
 nn = torch.nn
 F = nn.functional
 
+class InrCls(nn.Module):
+    def __init__(self, in_channels, out_dims, C=64, **kwargs):
+        super().__init__()
+        out_layers = nn.Sequential(nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+        # kwargs.pop('mid_ch', None);
+        # kwargs.pop('N_bins', None);
+        # kwargs.pop('scale2', None);
+        self.layers = [
+            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), down_ratio=.25, **kwargs),
+            inn.PositionalEncoding(N=C//4),
+            inn.blocks.ResConv(C, kernel_size=(.2,.2), **kwargs),
+            inn.ChannelMixer(C, C*2),
+            inn.MaxPool(kernel_size=(.1,.1), down_ratio=.25),
+            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
+            inn.GlobalAvgPoolSequence(out_layers),
+        ]
+        self.layers = nn.Sequential(*self.layers)
+
+    def forward(self, inr):
+        return self.layers(inr)
+
+
 class InrCls2(nn.Module):
     def __init__(self, in_channels, out_dims, C=64, **kwargs):
         super().__init__()
@@ -36,32 +62,6 @@ class AAPCls2(nn.Module):
             inn.PositionalEncoding(N=C//4),
             inn.blocks.conv_norm_act(C, C, kernel_size=(.2,.2), down_ratio=.25, **kwargs),
             inn.AdaptiveAvgPoolSequence((4,4), out_layers, extrema=None),
-        ]
-        self.layers = nn.Sequential(*self.layers)
-
-    def forward(self, inr):
-        return self.layers(inr)
-
-
-class InrClsWide2(nn.Module):
-    def __init__(self, in_channels, out_dims, C=64, **kwargs):
-        super().__init__()
-        out_layers = nn.Sequential(nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
-        for l in out_layers:
-            if hasattr(l, 'weight'):
-                nn.init.kaiming_uniform_(l.weight)
-                nn.init.zeros_(l.bias)
-        # kwargs.pop('mid_ch', None);
-        # kwargs.pop('N_bins', None);
-        # kwargs.pop('scale2', None);
-        self.layers = [
-            inn.blocks.conv_norm_act(in_channels, C, kernel_size=(.05,.05), down_ratio=.25, **kwargs),
-            inn.PositionalEncoding(N=C//4),
-            inn.blocks.ResConv(C, kernel_size=(.2,.2), **kwargs),
-            inn.ChannelMixer(C, C*2),
-            inn.MaxPool(kernel_size=(.1,.1), down_ratio=.25),
-            inn.blocks.ResConv(C*2, kernel_size=(.3,.3), **kwargs),
-            inn.GlobalAvgPoolSequence(out_layers),
         ]
         self.layers = nn.Sequential(*self.layers)
 
