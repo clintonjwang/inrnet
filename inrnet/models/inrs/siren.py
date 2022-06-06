@@ -85,8 +85,7 @@ class SineLayer(nn.Module):
 
 
 from torch.utils.data import Dataset
-from torchvision.transforms import Resize, Compose, ToTensor, Normalize
-from PIL import Image
+from torchvision.transforms import Compose, Normalize
 class ImageFitting(Dataset):
     def __init__(self, img):
         super().__init__()

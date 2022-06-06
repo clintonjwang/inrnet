@@ -24,9 +24,8 @@ limitations under the License.
 
 https://github.com/mseitzer/pytorch-fid/blob/master/src/pytorch_fid/fid_score.py
 """
-import os, pdb
+import os
 import pathlib
-from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
 import numpy as np
 import torch

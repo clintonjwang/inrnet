@@ -4,15 +4,11 @@ F=nn.functional
 from time import time
 import numpy as np
 
-from inrnet.data import dataloader
 from inrnet import jobs as job_mgmt
-from inrnet import inn, util, experiments, models
-from inrnet.models.inrs.siren import to_black_box
-from inrnet.inn.nets import convnext
+from inrnet import inn, util
 
 def test_equivalence():
     from inrnet.experiments import classify
-    from inrnet.data.cityscapes import get_inr_loader_for_cityscapes
     C = 32
     img_shape = h,w = 8,8
     zz = torch.randn(h*w, C)
@@ -108,7 +104,7 @@ def test_equivalence_dummy():
 
 
 def test_backprop():
-    args = job_mgmt.get_job_args("dep1")
+    job_mgmt.get_job_args("dep1")
     torch.autograd.set_detect_anomaly(True)
     model = torchvision.models.efficientnet_b0(pretrained=True)
     C = 2

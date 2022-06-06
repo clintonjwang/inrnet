@@ -1,4 +1,6 @@
-import os, torch, pdb, pickle
+import os
+import pickle
+import torch
 osp=os.path
 import torchvision
 from torchvision import transforms
@@ -7,7 +9,6 @@ import numpy as np
 
 from inrnet.inn.transforms import coord_noise, rand_flip, intensity_noise
 from inrnet.models.inrs import siren, rff
-from inrnet.util import glob2
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 

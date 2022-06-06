@@ -1,9 +1,10 @@
 """INR classification"""
-import os, pdb, torch, wandb
+import os
+import torch
+import wandb
 osp = os.path
 nn = torch.nn
 F = nn.functional
-import numpy as np
 import torchvision.models
 
 # from inrnet import RESULTS_DIR

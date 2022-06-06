@@ -1,8 +1,0 @@
-parent: seg_val
-data loading:
-  batch size: 8
-  sample type: grid
-  sample points: 2048
-  image shape:
-  - 32
-  - 64

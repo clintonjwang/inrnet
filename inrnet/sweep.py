@@ -1,4 +1,4 @@
-import argparse, os
+import os
 osp=os.path
 
 def launch_script():
@@ -19,7 +19,6 @@ source .bashrc
 python train.py -j=$1_$SLURM_ARRAY_TASK_ID -c=$2 --sweep_id=$3
 """
     osp
-    cmd = "sbatch"
     return lines
 
 if __name__ == "__main__":

@@ -1,10 +1,7 @@
-import torch, pdb, math
-import numpy as np
+import torch
 nn = torch.nn
 
 from inrnet import inn
-from inrnet.inn import functional as inrF
-from inrnet.inn.nets.effnet import InrCls2, InrClsWide2
 
 def Gan4(reshape):
     G = G4(in_dims=64, out_channels=1, reshape=reshape)

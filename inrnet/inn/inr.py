@@ -1,12 +1,11 @@
-import numpy as np
-import torch, operator, copy, pdb
-from functools import partial
+import operator
+import pdb
+import torch
 nn=torch.nn
 F=nn.functional
-from time import time
 
 from inrnet import util
-from inrnet.inn import qmc, point_set, functional as inrF
+from inrnet.inn import point_set, qmc
 
 
 class INRBatch(nn.Module):

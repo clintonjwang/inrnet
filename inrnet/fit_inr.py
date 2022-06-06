@@ -1,11 +1,10 @@
-import os, pdb, torch, argparse
+import os
+import torch
 osp = os.path
 import numpy as np
-import matplotlib.pyplot as plt
-import monai.transforms as mtr
 
 import inrnet.args as args_module
-from inrnet import optim, util, losses
+from inrnet import losses
 from inrnet.data import dataloader
 from inrnet.models.inrs import siren, rff
 from inrnet.data import inet
@@ -109,7 +108,7 @@ def main(args):
 
 
 def train_inet12(args):
-    dl_args = args["data loading"]
+    args["data loading"]
     start_ix = int(args["start_ix"])
 
     if args['network']['type'] == 'SIREN':
@@ -135,7 +134,6 @@ def train_inet12(args):
     total_steps = args["optimizer"]["max steps"]
     print("Starting", flush=True)
 
-    param_dict = {}
     for j in range(start_ix,end_ix):
         if args['network']['type'] == 'RFF':
             cls, ix = j%12, j // 12

@@ -1,11 +1,10 @@
-import torch, pdb, math
-import numpy as np
-from functools import partial
+import pdb
+import torch
 nn = torch.nn
 F = nn.functional
 
-from inrnet import inn, util
-from inrnet.inn import qmc, functional as inrF
+from inrnet import inn
+from inrnet.inn import qmc
 
 def produce_inr(values, **kwargs):
     # values - (B,C,H,W)

@@ -1,5 +1,5 @@
-import math, torch, pdb
-import numpy as np
+import pdb
+import torch
 nn=torch.nn
 
 from inrnet.inn import qmc

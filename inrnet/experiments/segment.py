@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import inn, util, losses, jobs as job_mgmt
-from inrnet.inn import qmc, functional as inrF
+from inrnet import inn, jobs as job_mgmt, util
+from inrnet.inn import qmc
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 import inrnet.models.common
@@ -32,7 +32,7 @@ def load_pretrained_model(args):
     pretrained = net_args['pretrained']
     if isinstance(pretrained, str):
         raise NotImplementedError
-        base = load_model_from_job(pretrained)
+        load_model_from_job(pretrained)
     else:
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
@@ -185,7 +185,6 @@ def train_segmenter(args):
 def test_inr_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
-    global_step = 0
     iou_tracker = util.MetricTracker("coarse IoU", function=mean_iou)
     acc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
     # fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)

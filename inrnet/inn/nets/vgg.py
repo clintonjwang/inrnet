@@ -1,5 +1,3 @@
-from functools import partial
-from typing import Union, List, Dict, Any, Optional, cast
 
 import torch, torchvision
 nn = torch.nn
@@ -9,7 +7,6 @@ from inrnet import inn
 
 def get_vgg11():
     src_model = torchvision.models.vgg11(pretrained=True)
-    inr_net = VGG
 
     layers = []
     for layer in src_model.features:

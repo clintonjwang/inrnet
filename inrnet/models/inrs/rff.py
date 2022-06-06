@@ -1,7 +1,7 @@
-import torch, pdb
+import torch
 nn=torch.nn
 
-from inrnet import util, inn
+from inrnet import inn
 from inrnet.inn import point_set
 
 def to_black_box(rff_list, **kwargs):

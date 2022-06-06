@@ -1,4 +1,5 @@
-import os, pdb, torch
+import os
+import torch
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -7,8 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import inn, util, losses, jobs as job_mgmt
-from inrnet.inn import qmc, functional as inrF
+from inrnet import inn, jobs as job_mgmt, util
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 import inrnet.models.common
@@ -163,7 +163,7 @@ def test_inr_warp(args):
                 VF_est = util.realign_values(VF_est, coords=grid_coords)
                 VF_est = VF_est.transpose(2,1).reshape(-1,2,*dl_args['image shape'])
                 DF_est = vf2df(-VF_est) #T->S
-                est_imgs = warp(targ_imgs, DF_est)
+                warp(targ_imgs, DF_est)
                 
                 dices.append()
             else:

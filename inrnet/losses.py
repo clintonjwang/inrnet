@@ -1,10 +1,8 @@
-import numpy as np 
-import torch, pdb
+import torch
 nn = torch.nn
 F = nn.functional
 
-from inrnet import util, inn
-from inrnet.inn import functional as inrF
+from inrnet import inn
 
 def CrossEntropy(N=128):
     ce = nn.CrossEntropyLoss()

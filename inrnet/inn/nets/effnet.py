@@ -1,5 +1,4 @@
 from inrnet import inn
-from inrnet.inn import functional as inrF
 
 import torch
 nn = torch.nn

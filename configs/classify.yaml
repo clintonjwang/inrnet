@@ -1,9 +1,2 @@
 network:
   task: classify
-  type: inr-effnet-s3
-  pretrained: true
-data loading:
-  subset: siren
-  sample points: 1024
-optimizer:
-  type: Adam

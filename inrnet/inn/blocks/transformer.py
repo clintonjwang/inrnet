@@ -1,5 +1,5 @@
 from typing import Optional
-import math, torch
+import torch
 nn=torch.nn
 F=nn.functional
 from torch.nn import *

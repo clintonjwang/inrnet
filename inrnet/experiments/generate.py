@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import inn, util, losses, jobs as job_mgmt
+from inrnet import jobs as job_mgmt, losses, util
 import inrnet.inn.nets.wgan
 import inrnet.models.wgan
 
@@ -19,7 +19,7 @@ def load_pretrained_model(args):
     pretrained = net_args['pretrained']
     if isinstance(pretrained, str):
         raise NotImplementedError('cant pretrain')
-        base = load_model_from_job(pretrained)
+        load_model_from_job(pretrained)
     else:
         if net_args["type"] == "wgan":
             G,D = inrnet.models.wgan.wgan()
@@ -57,7 +57,7 @@ def train_generator(args):
     else:
         GP_tracker = util.MetricTracker("GP", function=losses.gradient_penalty)
 
-    bsz = dl_args['batch size']
+    dl_args['batch size']
     D_step = args["optimizer"]['D steps']
     # G_step = 1
 
@@ -171,7 +171,7 @@ def train_generator(args):
 def test_inr_generator(args):
     paths = args["paths"]
     dl_args = args["data loading"]
-    data_loader = dataloader.get_inr_dataloader(dl_args)
+    dataloader.get_inr_dataloader(dl_args)
     origin = args['target_job']
     G = load_model_from_job(origin)[0].cuda().eval()
     orig_args = job_mgmt.get_job_args(origin)

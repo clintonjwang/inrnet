@@ -1,10 +1,8 @@
-import torch, pdb, math
-import numpy as np
+import torch
 nn = torch.nn
 F = nn.functional
 
-from inrnet.models.common import Conv2, conv_bn_relu
-from inrnet import inn
+from inrnet.models.common import Conv2
 
 def Gan4(reshape):
     G = G4(in_dims=64, out_channels=1, reshape=reshape)

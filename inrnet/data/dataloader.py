@@ -1,4 +1,5 @@
-import os, torch, pdb
+import os
+import torch
 osp=os.path
 import torchvision
 from torchvision import transforms
@@ -32,7 +33,7 @@ def get_img_dataset(args):
 
     elif dl_args["dataset"] == "kitti":
         raise NotImplementedError("kitti dataset")
-        data_loader = kitti.get_kitti_img_dataloader()
+        kitti.get_kitti_img_dataloader()
 
     elif dl_args["dataset"] == "coco":
         dataset = jpgDS(DS_DIR+"/coco/train2017", transform=transforms.ToTensor())
@@ -159,7 +160,7 @@ def get_inr_loader_for_fmnist(bsz, N=5000, subset='train'):
 
 def get_inr_loader_for_flowers(bsz):
     paths = glob2(f"{DS_DIR}/inrnet/flowers/*.pt")
-    keys = siren.get_siren_keys()
+    siren.get_siren_keys()
     def random_loader():
         inrs = []
         while True:
@@ -222,7 +223,7 @@ def get_inr_loader_for_imgds(ds_name, bsz, subset):
     paths = glob2(f"{DS_DIR}/inrnet/{ds_name}/{subset}_*.pt")
     if len(paths) == 0:
         raise ValueError('bad dataloader specs')
-    keys = siren.get_siren_keys()
+    siren.get_siren_keys()
     def random_loader():
         inrs = []
         while True:
