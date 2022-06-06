@@ -1,6 +1,5 @@
-import os, yaml, torch, argparse, shutil
+import os, yaml, torch, argparse, shutil, pickle
 osp = os.path
-import dill as pickle
 import numpy as np
 
 from inrnet import RESULTS_DIR, ANALYSIS_DIR, util, losses

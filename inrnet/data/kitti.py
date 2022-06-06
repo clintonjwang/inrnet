@@ -2,7 +2,7 @@
 import os, torch
 osp = os.path
 import numpy as np
-import dill as pickle
+import pickle
 from PIL import Image
 from torchvision import transforms
 
@@ -32,7 +32,6 @@ def get_kitti_inr_dataloader():
 
     
 def filter_kitti_imgs():
-    import dill as pickle
     from PIL import Image
     from torchvision import transforms
     to_torch = transforms.ToTensor()
