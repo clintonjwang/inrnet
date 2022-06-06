@@ -1,6 +1,8 @@
 # Deep Learning on Implicit Neural Datasets
 
 [![Build Status](https://github.com/clintonjwang/inrnet/actions/workflows/python-app.yml/badge.svg)](https://github.com/clintonjwang/inrnet/actions/workflows/python-app.yml)
+[![codecov](https://codecov.io/gh/clintonjwang/inrnet/branch/main/graph/badge.svg?token=IEFLBO4XHF)](https://codecov.io/gh/clintonjwang/inrnet)
+
 ![INR-Nets learn directly from datasets of implicit neural representations](https://github.com/clintonjwang/inrnet/blob/main/teaser.png?raw=true)
 
 **INR-Net** is a principled deep learning framework for learning and inference directly with implicit neural representations (INRs) of any type without reverting to grid-based features or operations. INR-Nets evaluate INRs on a low discrepancy sequence, enabling quasi-Monte Carlo (QMC) integration throughout the network. We prove INR-Nets are universal approximators on a large class of maps between $L^2$ functions. Additionally, INR-Nets have convergent gradients under the empirical measure, enabling backpropagation. We design INR-Nets as a continuous generalization of discrete networks, enabling them to be initialized with pre-trained models. We demonstrate learning of INR-Nets on classification (INR&rarr;label) and segmentation (INR&rarr;INR) tasks.
