@@ -9,20 +9,10 @@ from inrnet import inn, util, jobs as job_mgmt
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 
-def test_equivalence_dummy():
+def test_equivalence_dummy(inr):
+    h,w=(16,16)
     if not torch.cuda.is_available():
         pytest.skip('cuda not available')
-    C = 1
-    img_shape = h,w = 4,4
-    zz = torch.zeros(h*w, C)
-    zz[0,:] = 1
-    zz[-4,:] = 1
-    zz[-2,:] = 2
-    zz[2,:] = 2
-    class dummy_inr(nn.Module):
-        def forward(self, coords):
-            return zz.to(dtype=coords.dtype, device='cpu')
-    inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1))
     with torch.no_grad():
         x = inr.produce_images(h,w)
     assert x.shape == (1,1,h,w)

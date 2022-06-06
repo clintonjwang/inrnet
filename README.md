@@ -1,6 +1,6 @@
 # Deep Learning on Implicit Neural Datasets
 
-[![Build Status](https://github.com/clintonjwang/inrnet/actions/workflows/python-app.yml/badge.svg)](https://github.com/clintonjwang/inrnet/actions/workflows/python-app.yml)
+[![main-workflow](https://github.com/clintonjwang/inrnet/actions/workflows/config.yml/badge.svg)](https://github.com/clintonjwang/inrnet/actions/workflows/config.yml)
 [![codecov](https://codecov.io/gh/clintonjwang/inrnet/branch/main/graph/badge.svg?token=IEFLBO4XHF)](https://codecov.io/gh/clintonjwang/inrnet)
 
 ![INR-Nets learn directly from datasets of implicit neural representations](https://github.com/clintonjwang/inrnet/blob/main/teaser.png?raw=true)
