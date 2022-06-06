@@ -5,22 +5,6 @@ from inrnet import args as args_module
 from inrnet import util
 
 @pytest.fixture
-def args():
-    args = {
-        'slurm output dir': '~/code/inrnet/results',
-        'job_id': 'manual',
-        'data loading': {},
-        'optimizer': {
-            'type': 'AdamW',
-            'beta1': .5,
-            'learning_rate': '1e-5',
-            'weight decay': '1e-3',
-        },
-    }
-    args_module.infer_missing_args(args)
-    return args
-
-@pytest.fixture
 def model():
     return nn.Linear(1,1)
 
