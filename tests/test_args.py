@@ -9,11 +9,11 @@ def model():
     return nn.Linear(1,1)
 
 def test_conversion(args):
-    assert isinstance(args['optimizer']['G_learning_rate'], float)
+    assert isinstance(args['optimizer']['learning_rate'], float)
     assert isinstance(args['optimizer']['weight decay'], float)
 
 def test_optimizer(model, args):
-    optim = util.get_optimizer(model.parameters(), args)
+    optim = util.get_optimizer(model, args)
     assert hasattr(optim, 'param_groups')
     assert optim.param_groups[0]['lr'] == 1e-5
     assert optim.param_groups[0]['weight_decay'] == 1e-3

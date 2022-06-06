@@ -1,3 +1,4 @@
+from . import inn, data, models, experiments
 from os.path import expanduser
 ANALYSIS_DIR = expanduser("~/code/inrnet/temp")
 RESULTS_DIR = expanduser("~/code/inrnet/results")

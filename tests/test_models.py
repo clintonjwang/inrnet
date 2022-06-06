@@ -23,7 +23,7 @@ def test_equivalence_dummy():
     inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1))
     with torch.no_grad():
         x = inr.produce_images(h,w)
-    assert x.shape == (h,w)
+    assert x.shape == (1,1,h,w)
     #     conv = nn.Conv2d(1,2,3,1,padding=1,bias=False)
     #     norm = nn.BatchNorm2d(2)
     #     discrete_model = nn.Sequential(conv, norm, nn.LeakyReLU(inplace=True)).eval()
