@@ -12,7 +12,7 @@ from inrnet import args as args_module, inn, util, jobs as job_mgmt
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 from inrnet.models.common import Conv2, Conv5
-from inrnet.inn.nets.effnet import InrCls2, InrCls4, InrClsWide2, InrClsWide4
+from inrnet.inn.nets.effnet import InrCls
 
 def train_classifier(args):
     wandb.init(project="inrnet", job_type="train", name=args["job_id"],
@@ -170,21 +170,14 @@ def load_pretrained_model(args):
     in_ch = args['data loading']['input channels']
     n_classes = args['data loading']['classes']
     kwargs = dict(in_channels=in_ch, out_dims=n_classes)
-    if net_args["type"].startswith("inr"):
-        kwargs['mid_ch'] = net_args['conv']['mid_ch']
-        kwargs['scale2'] = net_args['conv']['scale2']
     if net_args["type"] == "cnn-2":
         return Conv2(**kwargs)
     elif net_args["type"] == "cnn-5":
         return Conv5(**kwargs)
-    elif net_args["type"] == "inr-2":
-        return InrCls2(**kwargs)
-    elif net_args["type"] == "inr-w2":
-        return InrClsWide2(**kwargs)
-    elif net_args["type"] == "inr-5":
-        return InrCls4(**kwargs)
-    elif net_args["type"] == "inr-w5":
-        return InrClsWide4(**kwargs)
+    elif net_args["type"] == "inrnet":
+        return InrCls(**kwargs, **net_args['conv'])
+    else:
+        raise NotImplementedError
 
     pretrained = net_args['pretrained']
     img_shape = args["data loading"]["image shape"]

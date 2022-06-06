@@ -8,7 +8,6 @@ class Experiment:
 
 def start_experiment(name:str):
     experiment = Experiment(name)
-    sweeps
     return experiment
 
 def sweep_sample_type():

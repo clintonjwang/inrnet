@@ -1,3 +1,4 @@
 parent: inet_train
 network:
-  type: inr-2
+  type: inrnet
+  k0: .05
