@@ -1,4 +1,4 @@
-import os
+import os, pytest
 import torch
 osp = os.path
 nn = torch.nn
@@ -10,6 +10,8 @@ from inrnet.data import dataloader
 from inrnet.inn import point_set
 
 def test_equivalence_dummy():
+    if not torch.cuda.is_available():
+        pytest.skip('cuda not available')
     C = 1
     img_shape = h,w = 4,4
     zz = torch.zeros(h*w, C)

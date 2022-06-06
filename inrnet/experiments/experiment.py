@@ -7,8 +7,9 @@ class Experiment:
         self.sweeps = sweeps
 
 def start_experiment(name:str):
-    return
-
+    experiment = Experiment(name)
+    sweeps
+    return experiment
 
 def sweep_sample_type():
     sweep_config = {
@@ -22,17 +23,27 @@ def sweep_sample_type():
     }
     return wandb.sweep(sweep_config, project='inrnet')
 
-def sweep_parameter():
-    name = 'learning_rate_sweep'
+def sweep_parameter(parameter_name, values):
+    name = f'{parameter_name}_sweep'
     sweep_config = {
         "name": name,
         "method": "grid",
         "parameters": {
-            "learning_rate": {
-                "values": [1e-5, 1e-4, 1e-3, 1e-2],
+            parameter_name: {
+                "values": values,
             },
         }
     }
+    # name = 'learning_rate_sweep'
+    # sweep_config = {
+    #     "name": name,
+    #     "method": "grid",
+    #     "parameters": {
+    #         "learning_rate": {
+    #             "values": [1e-5, 1e-4, 1e-3, 1e-2],
+    #         },
+    #     }
+    # }
     sweep_id = wandb.sweep(sweep_config, project='inrnet')
     experiment = Experiment(name, sweeps=[sweep_id])
     return experiment
