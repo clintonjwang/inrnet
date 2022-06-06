@@ -1,11 +1,12 @@
 import pytest
 import torch
-from inrnet import args as args_module
+nn=torch.nn
+from inrnet import inn, args as args_module
 from inrnet.inn import point_set, qmc
 
 @pytest.fixture
-def qmc_2d_sequence():
-    return qmc.generate_quasirandom_sequence(d=2, n=128, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
+def qmc_2d_sequence256():
+    return qmc.generate_quasirandom_sequence(d=2, n=256, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
 
 @pytest.fixture
 def args():
@@ -28,14 +29,18 @@ def args():
 
 
 @pytest.fixture
-def inr(qmc_2d_sequence, C=1, dims=(16,16)):
-    zz = torch.zeros(dims[0]*dims[1], C)
-    zz[0,:] = 1
-    zz[-4,:] = 1
-    zz[-2,:] = 2
-    zz[2,:] = 2
+def inr16x16(C=1, dims=(16,16)):
+    inr_values = torch.zeros(dims[0]*dims[1], C)
+    inr_values[0,:] = 1
+    inr_values[-4,:] = 1
+    inr_values[-2,:] = 2
+    inr_values[2,:] = 2
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
     class dummy_inr(nn.Module):
         def forward(self, coords):
-            return zz.to(dtype=coords.dtype, device='cpu')
-    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=len(dims), domain=(-1,1))
+            return inr_values.to(dtype=coords.dtype, device=device)
+    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=len(dims), domain=(-1,1), device=device)
 

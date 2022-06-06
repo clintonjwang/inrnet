@@ -9,7 +9,7 @@ from inrnet.inn import point_set, qmc
 
 
 class INRBatch(nn.Module):
-    def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1)):
+    def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1), device='cuda'):
         super().__init__()
         self.input_dims = input_dims # input coord size
         self.channels = channels # output size
@@ -20,6 +20,7 @@ class INRBatch(nn.Module):
         self.detached = False
         self.sample_mode = 'qmc'
         self.caching_enabled = True
+        self.device = device
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
@@ -226,7 +227,7 @@ class INRBatch(nn.Module):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = point_set.meshgrid_coords(H,W)
+            xy_grid = point_set.meshgrid_coords(H,W, device=self.device)
             output = self.forward(xy_grid)
             output = util.realign_values(output, inr=self)
             output = output.reshape(output.size(0),H,W,-1)
@@ -252,7 +253,7 @@ class BlackBoxINR(INRBatch):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = point_set.meshgrid_coords(H,W, c2f=False)
+            xy_grid = point_set.meshgrid_coords(H,W, c2f=False, device=self.device)
             output = self.forward(xy_grid)
             output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':

@@ -9,12 +9,10 @@ from inrnet import inn, util, jobs as job_mgmt
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 
-def test_equivalence_dummy(inr):
+def test_equivalence_dummy(inr16x16):
     h,w=(16,16)
-    if not torch.cuda.is_available():
-        pytest.skip('cuda not available')
     with torch.no_grad():
-        x = inr.produce_images(h,w)
+        x = inr16x16.produce_images(h,w)
     assert x.shape == (1,1,h,w)
     #     conv = nn.Conv2d(1,2,3,1,padding=1,bias=False)
     #     norm = nn.BatchNorm2d(2)
