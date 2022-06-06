@@ -8,7 +8,7 @@ def args():
     args = {
         'slurm output dir': '~/code/inrnet/results',
         'job_id': 'manual',
-        'data loading': {}
+        'data loading': {},
         'optimizer': {
             'type': 'AdamW',
             'beta1': .5,
