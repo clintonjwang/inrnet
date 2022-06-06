@@ -38,4 +38,7 @@ jobs:
       run: pytest --cov inrnet/
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v3.1.0
-      token: d90da075-df81-4c32-88de-1b4cd3830e42
+      with:
+        token: d90da075-df81-4c32-88de-1b4cd3830e42
+        fail_ci_if_error: true
+        verbose: true
