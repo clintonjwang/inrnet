@@ -19,9 +19,10 @@ from inrnet.inn import polynomials, functional as inrF
 #         self.num_heads = num_heads
         
 #     def forward(self, inr):
-#         inr.integrator = partial(inrF.gridconv, inr=inr, layer=self)
-#         inr.channels = self.out_channels
-#         return inr.create_derived_inr()
+#         new_inr = inr.create_derived_inr()
+#         new_inr.set_integrator(inrF.conv, 'SplineConv', layer=self)
+#         new_inr.channels = self.out_channels
+#         return new_inr
 
 #         Q_values = inr(self.Q_coords_to_sample) * self.Q_weights
 #         K_values = inr(self.K_coords_to_sample) * self.K_weights
