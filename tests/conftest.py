@@ -44,7 +44,7 @@ def inr16x16(C=1, dims=(16,16)):
             return inr_values.to(dtype=coords.dtype, device=device)
     return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=len(dims), domain=(-1,1), device=device)
 
-# @pytest.fixture
-# def inr_classifier(in_ch=1, n_classes=4):
-#     return InrCls(in_ch, n_classes)
+@pytest.fixture
+def inr_classifier(in_ch=1, n_classes=4):
+    return InrCls(in_ch, n_classes)
 
