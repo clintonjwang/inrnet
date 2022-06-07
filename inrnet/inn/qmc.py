@@ -1,3 +1,4 @@
+"""Quasi-Monte Carlo Method"""
 from scipy.stats import qmc
 import math
 import torch
@@ -5,8 +6,9 @@ import numpy as np
 nn=torch.nn
 
 class Integrator:
-    def __init__(self, function, name, inr=None, layer=None, **kwargs):
-        self.function = function
+    """Estimates an integral"""
+    def __init__(self, integrand, name, inr=None, layer=None, **kwargs):
+        self.function = integrand
         self.name = name
         self.inr = inr
         self.layer = layer
@@ -21,8 +23,24 @@ class Integrator:
             kwargs['layer'] = self.layer
         return self.function(values, *args, **kwargs)
 
-def generate_masked_sample_points(mask, sample_size, eps=1/32):
-    #mask - (1,H,W)
+# class QMCIntegrator:
+#     def __init__(self, integrand):
+#         self.integrand = integrand
+#     def __call__(self, point_set):
+#         return self.integrand(point_set.values).mean()
+
+def generate_masked_sample_points(mask:torch.Tensor, sample_size:int,
+    eps:float=1/32) -> torch.Tensor:
+    """Generates a low discrepancy point set within a masked region.
+
+    Args:
+        mask (1,H,W): generated points must fall in this mask
+        sample_size (int): number of points to generate
+        eps (float, optional): _description_. Defaults to 1/32.
+
+    Returns:
+        tensor (N,d): sampled coordinates
+    """
     mask = mask.squeeze()
     if len(mask.shape) != 2:
         raise NotImplementedError('2D only')
@@ -39,8 +57,22 @@ def generate_masked_sample_points(mask, sample_size, eps=1/32):
     return coord_subset[:sample_size]
 
 
-def generate_quasirandom_sequence(d=2, n=128, bbox=(-1,1,-1,1), scramble=False,
-        like=None, dtype=torch.float, device="cuda"):
+def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramble:bool=False,
+        like=None, dtype=torch.float, device="cuda") -> torch.Tensor:
+    """Generates a low discrepancy point set.
+
+    Args:
+        n (int): number of points to generate.
+        d (int, optional): number of dimensions. Defaults to 2.
+        bbox (tuple, optional): edge of domain. Defaults to (-1,1,-1,1).
+        scramble (bool, optional): randomized QMC. Defaults to False.
+        like (_type_, optional): _description_. Defaults to None.
+        dtype (_type_, optional): _description_. Defaults to torch.float.
+        device (str, optional): _description_. Defaults to "cuda".
+
+    Returns:
+        torch.Tensor (n,d): coordinates
+    """        
     if math.log2(n) % 1 == 0:
         sampler = qmc.Sobol(d=d, scramble=scramble)
         sample = sampler.random_base2(m=int(math.log2(n)))

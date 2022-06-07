@@ -1,3 +1,4 @@
+"""1x1 Conv Layer"""
 import torch
 nn = torch.nn
 F = nn.functional

@@ -1,6 +1,9 @@
 import torch
 from typing import Optional
 import numpy as np
+import itertools
+
+from inrnet.inn.inr import INRBatch
 nn=torch.nn
 
 from inrnet.inn import qmc
@@ -11,16 +14,37 @@ class PointSet:
     def estimate_discrepancy():
         return NotImplemented
 
-def generate_sample_points(inr, dl_args: dict):
+def generate_sample_points(inr: INRBatch, dl_args: dict) -> torch.Tensor:
+    """Generates sample points for integrating along the INR
+
+    Args:
+        inr (INRBatch): INR
+        dl_args (dict): other parameters
+
+    Returns:
+        torch.Tensor: coordinates to sample
+    """    
     if dl_args['sample type'] == 'grid':
         coords = _generate_sample_points(inr, method=dl_args['sample type'], dims=dl_args['image shape'])
     else:
         coords = _generate_sample_points(inr, method=dl_args['sample type'], sample_size=dl_args["sample points"])
     return coords
 
-def _generate_sample_points(inr, method: Optional[str]=None,
+def _generate_sample_points(inr: INRBatch, method: Optional[str]=None,
         sample_size: Optional[int]=None,
-        dims=None, ordering: str='c2f'):
+        dims: Optional[tuple]=None, ordering: str='c2f') -> torch.Tensor:
+    """Generates sample points for integrating along the INR
+
+    Args:
+        inr (INRBatch): INR to sample
+        method (Optional[str], optional): _description_. Defaults to None.
+        sample_size (Optional[int], optional): _description_. Defaults to None.
+        dims (Optional[tuple], optional): _description_. Defaults to None.
+        ordering (str, optional): _description_. Defaults to 'c2f'.
+
+    Returns:
+        torch.Tensor: coordinates to sample
+    """
     if method is None:
         method = inr.sample_mode
 
@@ -41,7 +65,7 @@ def _generate_sample_points(inr, method: Optional[str]=None,
     else:
         raise NotImplementedError("invalid method: "+method)
 
-def meshgrid(*tensors, indexing='ij'):
+def meshgrid(*tensors, indexing='ij') -> torch.Tensor:
     try:
         return torch.meshgrid(*tensors, indexing=indexing)
     except TypeError:
@@ -61,7 +85,6 @@ def meshgrid(*tensors, indexing='ij'):
 #     else:
 #         return standard_order
 
-import itertools
 def meshgrid_coords(*dims, domain=(-1,1), c2f=True, dtype=torch.float, device="cuda"):
     # c2f: coarse-to-fine ordering, puts points along coarser grid-points first
     tensors = [torch.linspace(*domain, steps=d, dtype=dtype, device=device) for d in dims]

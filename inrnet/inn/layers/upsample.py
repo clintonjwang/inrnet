@@ -1,3 +1,4 @@
+"""Upsample Layer"""
 import torch
 nn = torch.nn
 F = nn.functional

@@ -148,29 +148,25 @@ class INRBatch(nn.Module):
         if inplace:
             self.add_modification(torch.sqrt)
             return self
-        else:
-            return self.create_modified_copy(torch.sqrt)
+        return self.create_modified_copy(torch.sqrt)
 
     def log(self, inplace=False):
         if inplace:
             self.add_modification(torch.log)
             return self
-        else:
-            return self.create_modified_copy(torch.log)
+        return self.create_modified_copy(torch.log)
 
     def sigmoid(self, inplace=False):
         if inplace:
             self.add_modification(torch.sigmoid)
             return self
-        else:
-            return self.create_modified_copy(torch.sigmoid)
+        return self.create_modified_copy(torch.sigmoid)
 
     def softmax(self, inplace=False):
         if inplace:
             self.add_modification(lambda x: torch.softmax(x,dim=-1))
             return self
-        else:
-            return self.create_modified_copy(lambda x: torch.softmax(x,dim=-1))
+        return self.create_modified_copy(lambda x: torch.softmax(x,dim=-1))
 
     def matmul(self, other, inplace=False):
         if isinstance(other, INRBatch):
@@ -200,8 +196,7 @@ class INRBatch(nn.Module):
                 return self.cached_outputs.detach()
             with torch.no_grad():
                 return self._forward(coords)
-        else:
-            return self._forward(coords)
+        return self._forward(coords)
 
     def _forward(self, coords):
         if hasattr(self, "cached_outputs"):
@@ -237,8 +232,9 @@ class INRBatch(nn.Module):
 
 
 class BlackBoxINR(INRBatch):
-    """Wrapper for arbitrary INR architectures (SIREN, NeRF, etc.).
-    Not for batched INRs - this generates each INR one at a time
+    """
+    Wrapper for arbitrary INR architectures (SIREN, NeRF, etc.).
+    Not batched - this generates each INR one at a time, then concats them.
     """
     def __init__(self, evaluator, channels, **kwargs):
         super().__init__(channels=channels, **kwargs)

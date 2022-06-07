@@ -1,3 +1,4 @@
+"""Pooling Layer"""
 from functools import partial
 import torch
 nn = torch.nn

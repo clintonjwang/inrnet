@@ -1,3 +1,4 @@
+"""Converting discrete network layers into INR-Net layers"""
 import torch
 nn = torch.nn
 
@@ -10,8 +11,7 @@ try:
 except ModuleNotFoundError:
     SqueezeExcitation = EfficientNet = MBConv = Fire = None
 
-def translate_discrete_model(discrete_model, input_shape):
-    extrema = ((-1,1),(-1,1))
+def translate_discrete_model(discrete_model, input_shape, extrema=((-1,1),(-1,1))):
     if isinstance(discrete_model, EfficientNet):
         discrete_model = nn.Sequential(discrete_model.features,
             discrete_model.avgpool, discrete_model.classifier)

@@ -1,28 +1,30 @@
+"""Attention Layer"""
 import torch
 nn = torch.nn
 F = nn.functional
 
 from inrnet.inn import polynomials, functional as inrF
 
-# class TokenAttn(nn.Module):
-#     # 
-#     def __init__(self, in_channels, out_channels, num_heads=1, spacing=.2):
-#         # in_ch is the output dimensions of the input INR (3 for RGB, 1 for occupancy net)
-#         # out_ch is the output dimensions of the output INR
-#         # spatial_dim is the coordinate dimensions (2 for SIREN, 6 for NeRF)
-#         super().__init__()
-#         self.Q = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
-#         self.K = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
-#         self.d_k = d_k
-#         self.V = DerivedINR(n_outputs=d_k)
-#         self.V_weights = nn.Parameter(torch.randn(V_dim, d_k))
-#         self.num_heads = num_heads
+class TokenAttn(nn.Module):
+    # 
+    def __init__(self, in_channels, out_channels, d_k=64, num_heads=1, spacing=.2):
+        # in_ch is the output dimensions of the input INR (3 for RGB, 1 for occupancy net)
+        # out_ch is the output dimensions of the output INR
+        # spatial_dim is the coordinate dimensions (2 for SIREN, 6 for NeRF)
+        super().__init__()
+        #self.Q = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
+        #self.K = polynomials.LegendreFilter(in_channels, d_k, radius=spacing, input_dims=spatial_dim)
+        self.d_k = d_k
+        # self.V = DerivedINR(n_outputs=d_k)
+        # self.V_weights = nn.Parameter(torch.randn(V_dim, d_k))
+        self.num_heads = num_heads
         
-#     def forward(self, inr):
-#         new_inr = inr.create_derived_inr()
-#         new_inr.set_integrator(inrF.conv, 'SplineConv', layer=self)
+    def forward(self, inr):
+        pass
+        # new_inr = inr.create_derived_inr()
+        # new_inr.set_integrator(inrF.tokenization, 'Tokenization', layer=self)
 #         new_inr.channels = self.out_channels
-#         return new_inr
+        # return new_inr
 
 #         Q_values = inr(self.Q_coords_to_sample) * self.Q_weights
 #         K_values = inr(self.K_coords_to_sample) * self.K_weights

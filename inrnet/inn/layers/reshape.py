@@ -1,3 +1,4 @@
+"""INR -> vector or vector -> INR Layer"""
 import pdb
 import torch
 nn = torch.nn

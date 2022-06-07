@@ -1,11 +1,18 @@
 import pdb
 import torch
+
+from inrnet.inn.inr import INRBatch
 nn=torch.nn
 
 from inrnet.inn import qmc
 ### Convolutions
 
+def tokenization(values, inr, layer):
+    """tokenization"""
+    return
+    
 def pos_enc(values, inr, layer):
+    """positional encoding"""
     coords = inr.sampled_coords.unsqueeze(-1)
     n = 2**torch.arange(layer.N, device=coords.device) * 2*torch.pi
     embeddings = torch.cat((torch.sin(coords*n), torch.cos(coords*n)), dim=1).flatten(1)
@@ -15,7 +22,9 @@ def pos_enc(values, inr, layer):
         return torch.cat((values, embeddings), dim=-1)
 
 def conv(values: torch.Tensor, # [B,N,c_in]
-    inr, layer: nn.Module):
+    inr: INRBatch, layer: nn.Module):
+    """continuous convolution"""
+    
     coords = inr.sampled_coords #[N,d]
     query_coords = _get_query_coords(inr, layer)
 

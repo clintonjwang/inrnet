@@ -1,5 +1,2 @@
 [run]
-omit = models/*,
-       fid.py,
-       train.py,
-       infer.py
+omit = models/*,fid.py,train.py,infer.py
