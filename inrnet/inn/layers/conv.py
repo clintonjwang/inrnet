@@ -114,7 +114,7 @@ class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, down_ratio=1.,
             input_dims=2, N_bins=0, groups=1, zero_at_bounds=False,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
-            dtype=torch.float):
+            dtype=torch.float, device='cuda'):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
@@ -155,7 +155,7 @@ class SplineConv(Conv):
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
         if N_bins > 0:
             self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=N_bins,
-                d=input_dims, bbox=bbox, dtype=dtype))
+                d=input_dims, bbox=bbox, dtype=dtype, device=device))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
         # self.Tx = nn.Parameter(tx)
@@ -215,7 +215,7 @@ class MLPConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(32,32), down_ratio=1.,
             input_dims=2, groups=1, padded_extrema=None, bias=False,
             mlp_type='standard', scale1=None, scale2=1,
-            dtype=torch.float, N_bins=64):
+            dtype=torch.float, N_bins=64, device='cuda'):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         if not hasattr(kernel_size, '__iter__'):
@@ -231,7 +231,7 @@ class MLPConv(Conv):
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
         if self.N_bins > 0:
             self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=self.N_bins,
-                d=input_dims, bbox=bbox, dtype=dtype))
+                d=input_dims, bbox=bbox, dtype=dtype, device=device))
             
         if scale1 is None:
             scale1 = (.5/K[0], .5/K[1])
