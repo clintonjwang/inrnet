@@ -17,10 +17,10 @@ def get_optimizer(model, args: dict):
     else:
         betas = (.9, .999)
     if opt_settings['type'].lower() == 'adamw':
-        return torch.optim.AdamW(model.parameters(), lr=opt_settings["learning_rate"],
+        return torch.optim.AdamW(model.parameters(), lr=opt_settings["learning rate"],
             weight_decay=args["optimizer"]["weight decay"], betas=betas)
     elif opt_settings['type'].lower() == 'adam':
-        return torch.optim.Adam(model.parameters(), lr=opt_settings["learning_rate"],
+        return torch.optim.Adam(model.parameters(), lr=opt_settings["learning rate"],
             weight_decay=args["optimizer"]["weight decay"], betas=betas)
     else:
         raise NotImplementedError

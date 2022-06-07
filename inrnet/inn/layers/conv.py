@@ -212,19 +212,19 @@ class SplineConv(Conv):
 
 
 class MLPConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(64,32), down_ratio=1.,
+    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(32,32), down_ratio=1.,
             input_dims=2, groups=1, padded_extrema=None, bias=False,
-            mlp_type='siren', scale1=None, scale2=30, scale3=1,
-            dtype=torch.float, N_bins=None):
+            mlp_type='standard', scale1=None, scale2=1,
+            dtype=torch.float, N_bins=64):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         if not hasattr(kernel_size, '__iter__'):
             kernel_size = (kernel_size, kernel_size)
         self.kernel_size = K = kernel_size
-        if N_bins is None:
-            self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
-        else:
-            self.N_bins = N_bins
+        # if N_bins is None:
+        #     self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
+        # else:
+        self.N_bins = N_bins
         self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
                         diffs[...,1].abs() < self.kernel_size[1]/2)
 
@@ -236,8 +236,8 @@ class MLPConv(Conv):
         if scale1 is None:
             scale1 = (.5/K[0], .5/K[1])
         self.register_buffer("scale1", torch.as_tensor(scale1, dtype=dtype))
+        # self.scale2 = scale2
         self.scale2 = scale2
-        self.scale3 = scale3
         self.mlp_type = mlp_type
         
         if padded_extrema is not None:
@@ -272,12 +272,12 @@ class MLPConv(Conv):
         return new_inr
 
     def interpolate_weights(self, xy):
-        if self.mlp_type == 'siren':
-            return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale2)).reshape(
-                xy.size(0), self.out_channels, self.group_size) * self.scale3
-        else:
-            return self.kernel(self.first(xy * self.scale1)).reshape(
-                xy.size(0), self.out_channels, self.group_size) * self.scale3
+        # if self.mlp_type == 'siren':
+        #     return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale3)).reshape(
+        #         xy.size(0), self.out_channels, self.group_size) * self.scale2
+        # else:
+        return self.kernel(self.first(xy * self.scale1)).reshape(
+            xy.size(0), self.out_channels, self.group_size) * self.scale2
 
 
 

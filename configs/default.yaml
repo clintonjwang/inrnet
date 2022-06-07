@@ -4,11 +4,7 @@ paths:
   temp dir: ~/code/inrnet/temp
 network:
   frozen: false
-  conv:
-    scale2: 30
-    mid_ch:
-    - 64
-    - 32
+  conv: {}
 optimizer:
   type: AdamW
   weight decay: 1e-3

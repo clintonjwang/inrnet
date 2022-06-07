@@ -34,12 +34,16 @@ def parse_args():
 
 def get_wandb_config():
     wandb_sweep_dict = {
-        'learning_rate': ['optimizer', 'learning_rate'],
+        'learning_rate': ['optimizer', 'learning rate'],
+        'batch_size': ['data loading', 'batch size'],
         'sample_type': ['data loading', 'sample type'],
+        'augment': ['data loading', 'augment'],
+        'weight_decay': ['optimizer', 'weight decay'],
+        'optimizer_type': ['optimizer', 'type'],
+        
         'kernel_size_0': ['network', 'conv', 'k0'],
         'kernel_size_1': ['network', 'conv', 'k1'],
         'kernel_size_2': ['network', 'conv', 'k2'],
-        'kernel_size_1': ['network', 'conv', 'k1'],
         'conv_mlp_type': ['network', 'conv', 'mlp_type'],
         'conv_N_bins': ['network', 'conv', 'N_bins'],
         'conv_N_ch': ['network', 'conv', 'mid_ch'],
@@ -64,7 +68,7 @@ def infer_missing_args(args):
     paths["job output dir"] = osp.join(paths["slurm output dir"], args["job_id"])
     paths["weights dir"] = osp.join(paths["job output dir"], "weights")
     for k in args["optimizer"]:
-        if "learning_rate" in k:
+        if "learning rate" in k:
             args["optimizer"][k] = float(args["optimizer"][k])
     args["optimizer"]["weight decay"] = float(args["optimizer"]["weight decay"])
 

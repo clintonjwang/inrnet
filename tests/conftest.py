@@ -3,6 +3,7 @@ import torch
 nn=torch.nn
 from inrnet import inn, args as args_module
 from inrnet.inn import point_set, qmc
+from inrnet.inn.nets.effnet import InrCls
 
 @pytest.fixture
 def qmc_2d_sequence256():
@@ -43,4 +44,8 @@ def inr16x16(C=1, dims=(16,16)):
         def forward(self, coords):
             return inr_values.to(dtype=coords.dtype, device=device)
     return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=len(dims), domain=(-1,1), device=device)
+
+@pytest.fixture
+def inr_classifier(in_ch=1, n_classes=4):
+    return InrCls(in_ch, n_classes)
 

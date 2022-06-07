@@ -2,7 +2,7 @@ parent: classify
 network:
   type: inr-effnet-s3
 data loading:
-  N: 1000
+  N: 5760
   augment: true
   batch size: 192
   subset: train
@@ -15,6 +15,6 @@ data loading:
   - 64
   - 64
 optimizer:
-  learning_rate: 1e-3
-  max steps: 3000
+  learning rate: 1e-3
+  max steps: 1000
 #N=9600 / bsz * 40 epochs
