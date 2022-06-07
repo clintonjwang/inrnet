@@ -9,7 +9,7 @@ def nn_model():
     return nn.Linear(1,1)
 
 def test_conversion(args):
-    assert isinstance(args['optimizer']['learning_rate'], float)
+    assert isinstance(args['optimizer']['learning rate'], float)
     assert isinstance(args['optimizer']['weight decay'], float)
 
 def test_optimizer(nn_model, args):
