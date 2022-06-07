@@ -2,7 +2,7 @@ parent: classify
 network:
   type: inr-effnet-s3
 data loading:
-  N: 5760
+  N: 1920
   augment: true
   batch size: 192
   subset: train

@@ -2,7 +2,7 @@
 
 [![main-workflow](https://github.com/clintonjwang/inrnet/actions/workflows/config.yml/badge.svg)](https://github.com/clintonjwang/inrnet/actions/workflows/config.yml)
 [![codecov](https://codecov.io/gh/clintonjwang/inrnet/branch/main/graph/badge.svg?token=IEFLBO4XHF)](https://codecov.io/gh/clintonjwang/inrnet)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/clintonjwang/inrnet/blob/main/LICENSE)
 
 ![INR-Nets learn directly from datasets of implicit neural representations](https://github.com/clintonjwang/inrnet/blob/main/teaser.png?raw=true)
 

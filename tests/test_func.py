@@ -17,6 +17,8 @@ def test_pos_enc(inr16x16, pos_enc_layer, qmc_2d_sequence256):
     assert embeddings.shape == (1,256,8)
 
 def test_conv(inr16x16, conv_layer, qmc_2d_sequence256):
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     inr16x16.sampled_coords = qmc_2d_sequence256
     values = torch.randn(1,256,1)
     with torch.no_grad():
