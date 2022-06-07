@@ -20,7 +20,7 @@ def args():
         'optimizer': {
             'type': 'AdamW',
             'beta1': .5,
-            'learning_rate': '1e-5',
+            'learning rate': '1e-5',
             'weight decay': '1e-3',
         },
     }
