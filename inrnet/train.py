@@ -6,15 +6,14 @@ import numpy as np
 from functools import partial
 
 from inrnet import args as args_module
-from inrnet.experiments.diffusion import train_diffusion_model
-from inrnet.experiments.depth import train_depth_model
+# from inrnet.experiments.diffusion import train_diffusion_model
+# from inrnet.experiments.depth import train_depth_model
 from inrnet.experiments.classify import train_classifier
 from inrnet.experiments.segment import train_segmenter
-from inrnet.experiments.generate import train_generator
-from inrnet.experiments.warp import train_warp
+# from inrnet.experiments.generate import train_generator
+# from inrnet.experiments.warp import train_warp
 
 def main():
-    """Entrypoint for training"""
     args = args_module.parse_args()
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
@@ -23,12 +22,12 @@ def main():
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
     method_dict = {
-        'diffusion': train_diffusion_model,
+        # 'diffusion': train_diffusion_model,
         'classify': train_classifier,
-        'depth': train_depth_model,
+        # 'depth': train_depth_model,
         'segment': train_segmenter,
-        'generate': train_generator,
-        'warp': train_warp,
+        # 'generate': train_generator,
+        # 'warp': train_warp,
     }
     method = method_dict[args["network"]["task"]]
     if args['sweep_id'] is not None:

@@ -24,6 +24,9 @@ def get_optimizer(model, args: dict):
             weight_decay=args["optimizer"]["weight decay"], betas=betas)
     else:
         raise NotImplementedError
+        
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 def imshow(img):
     if isinstance(img, torch.Tensor):

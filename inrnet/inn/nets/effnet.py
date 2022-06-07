@@ -12,7 +12,9 @@ class InrCls(nn.Module):
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
-        # kwargs.pop('mid_ch', None);
+        mid_ch = kwargs.pop('mid_ch', 64)
+        if not hasattr(mid_ch, '__iter__'):
+            mid_ch = (int(mid_ch), 32)
         # kwargs.pop('N_bins', None);
         # kwargs.pop('scale2', None);
         k0 = kwargs.pop('k0', .05)
@@ -24,6 +26,8 @@ class InrCls(nn.Module):
             inn.blocks.ResConv(C, kernel_size=(k1,k1), **kwargs),
             inn.ChannelMixer(C, C*2),
             inn.MaxPool(kernel_size=(.1,.1), down_ratio=.25),
+            inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
+            inn.ChannelMixer(C*2, C*2),
             inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]

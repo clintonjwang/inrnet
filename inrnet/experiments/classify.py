@@ -54,9 +54,9 @@ def train_classifier(args):
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        wandb.log({'train loss':loss.item(),
-            'top 3 acc': top3(pred_cls, labels).item(),
-            'top 1 acc': top1(pred_cls, labels).item(),
+        wandb.log({'train_loss':loss.item(),
+            'train_t3_acc': top3(pred_cls, labels).item(),
+            'train_t1_acc': top1(pred_cls, labels).item(),
         })
         if global_step % 100 == 0:
             torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
@@ -77,9 +77,9 @@ def train_classifier(args):
 
                 loss = loss_fxn(logits, labels)
                 pred_cls = logits.topk(k=3).indices
-                wandb.log({'val loss':loss.item(),
-                    'val top 3 acc': top3(pred_cls, labels).item(),
-                    'val top 1 acc': top1(pred_cls, labels).item(),
+                wandb.log({'val_loss':loss.item(),
+                    'val_t3_acc': top3(pred_cls, labels).item(),
+                    'val_t1_acc': top1(pred_cls, labels).item(),
                 }, step=global_step)
             
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))

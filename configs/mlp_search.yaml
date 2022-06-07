@@ -1,0 +1,16 @@
+# scale2:
+#   min: 1
+#   max: 60
+conv_N_bins:
+  distribution: q_log_uniform_values
+  min: 32
+  max: 2048
+conv_mlp_type:
+  distribution: categorical
+  values:
+  - siren
+  - standard
+conv_N_ch:
+  distribution: q_log_uniform_values
+  min: 16
+  max: 96

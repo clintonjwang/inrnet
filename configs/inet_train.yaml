@@ -9,7 +9,7 @@ data loading:
   dataset: inet12
   input channels: 3
   classes: 12
-  sample points: 1024
+  sample points: 4096
   sample type: rqmc
   image shape:
   - 64
