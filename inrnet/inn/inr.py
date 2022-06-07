@@ -1,3 +1,4 @@
+"""Class for minibatches of INRs"""
 import operator
 import pdb
 import torch
@@ -7,8 +8,8 @@ F=nn.functional
 from inrnet import util
 from inrnet.inn import point_set, qmc
 
-
 class INRBatch(nn.Module):
+    """Standard INR minibatch"""
     def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1), device='cuda'):
         super().__init__()
         self.input_dims = input_dims # input coord size
@@ -33,6 +34,7 @@ class INRBatch(nn.Module):
                 print("no parent")
                 return ev
         return ev
+
     def evaluator_iter(self):
         ev = self
         while True:
@@ -56,8 +58,7 @@ class INRBatch(nn.Module):
     def __add__(self, other):
         if isinstance(other, INRBatch):
             return SumINR(self, other)
-        else:
-            return self.create_modified_copy(lambda x: x+other)
+        return self.create_modified_copy(lambda x: x+other)
     def __iadd__(self, other):
         self.add_modification(lambda x: x+other)
         return self
@@ -65,8 +66,7 @@ class INRBatch(nn.Module):
     def __sub__(self, other):
         if isinstance(other, INRBatch):
             return SumINR(self, -other)
-        else:
-            return self.create_modified_copy(lambda x: x-other)
+        return self.create_modified_copy(lambda x: x-other)
     def __isub__(self, other):
         self.add_modification(lambda x: x-other)
         return self
@@ -74,8 +74,7 @@ class INRBatch(nn.Module):
     def __mul__(self, other):
         if isinstance(other, INRBatch):
             return MulINR(self, -other)
-        else:
-            return self.create_modified_copy(lambda x: x*other)
+        return self.create_modified_copy(lambda x: x*other)
     def __imul__(self, other):
         self.add_modification(lambda x: x*other)
         return self
@@ -83,8 +82,7 @@ class INRBatch(nn.Module):
     def __truediv__(self, other):
         if isinstance(other, INRBatch):
             return MulINR(self, 1/other)
-        else:
-            return self.create_modified_copy(lambda x: x/other)
+        return self.create_modified_copy(lambda x: x/other)
     def __itruediv__(self, other):
         self.add_modification(lambda x: x/other)
         return self
