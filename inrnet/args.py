@@ -44,6 +44,7 @@ def get_wandb_config():
         'kernel_size_0': ['network', 'conv', 'k0'],
         'kernel_size_1': ['network', 'conv', 'k1'],
         'kernel_size_2': ['network', 'conv', 'k2'],
+        'kernel_size_3': ['network', 'conv', 'k3'],
         'conv_mlp_type': ['network', 'conv', 'mlp_type'],
         'conv_N_bins': ['network', 'conv', 'N_bins'],
         'conv_N_ch': ['network', 'conv', 'mid_ch'],

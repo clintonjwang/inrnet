@@ -20,15 +20,17 @@ class InrCls(nn.Module):
         k0 = kwargs.pop('k0', .05)
         k1 = kwargs.pop('k1', .1)
         k2 = kwargs.pop('k2', .2)
+        k3 = kwargs.pop('k3', .3)
         self.layers = [
             inn.blocks.conv_norm_act(in_channels, C, kernel_size=(k0,k0), down_ratio=.25, **kwargs),
             inn.PositionalEncoding(N=C//4),
             inn.blocks.ResConv(C, kernel_size=(k1,k1), **kwargs),
             inn.ChannelMixer(C, C*2),
-            inn.MaxPool(kernel_size=(.1,.1), down_ratio=.25),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k2*.7,k2*.7), down_ratio=.5),
             inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
             inn.ChannelMixer(C*2, C*2),
-            inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k3*.7,k3*.7), down_ratio=.5),
+            inn.blocks.ResConv(C*2, kernel_size=(k3,k3), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]
         self.layers = nn.Sequential(*self.layers)
