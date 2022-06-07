@@ -8,6 +8,8 @@ from inrnet import jobs as job_mgmt
 from inrnet import inn, util
 
 def test_equivalence():
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     from inrnet.experiments import classify
     C = 32
     img_shape = h,w = 8,8
@@ -61,6 +63,8 @@ inrnet.models.convnext.mini_convnext()
 inrnet.inn.nets.convnext.translate_convnext_model((128,128))
 
 def test_equivalence_dummy():
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     C = 1
     img_shape = h,w = 16,16
     zz = torch.zeros(h*w, C)
@@ -104,6 +108,8 @@ def test_equivalence_dummy():
 
 
 def test_backprop():
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     job_mgmt.get_job_args("dep1")
     torch.autograd.set_detect_anomaly(True)
     model = torchvision.models.efficientnet_b0(pretrained=True)
@@ -136,6 +142,8 @@ def test_backprop():
 # train_depth_model(args)
 
 def test_layers():
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
     model = nn.Sequential(
@@ -152,6 +160,8 @@ def test_layers():
     new_inr(torch.randn(64,2).cuda()).sum().backward()
 
 def test_network():
+    if not torch.cuda.is_available():
+        pytest.skip('no cuda')
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
     model = inn.nets.Conv4(3,4).cuda().train()
