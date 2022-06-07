@@ -16,6 +16,7 @@ class InrCls(nn.Module):
         k1 = kwargs.pop('k1', .07)
         k2 = kwargs.pop('k2', .14)
         k3 = kwargs.pop('k3', .3)
+        posenc = kwargs.pop('posenc_order', 1)
         pe_scale = kwargs.pop('pe_scale', 1.)
         l1 = [
             inn.blocks.conv_norm_act(in_channels, C, kernel_size=(k0,k0), down_ratio=.25, **kwargs),
