@@ -46,5 +46,9 @@ def inr16x16(C=1, dims=(16,16)):
 
 @pytest.fixture
 def inr_classifier(in_ch=1, n_classes=4):
-    return InrCls(in_ch, n_classes)
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
+    return InrCls(in_ch, n_classes, device=device)
 

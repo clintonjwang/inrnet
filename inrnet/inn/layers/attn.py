@@ -1,8 +1,8 @@
-# import torch
-# nn = torch.nn
-# F = nn.functional
+import torch
+nn = torch.nn
+F = nn.functional
 
-# from inrnet.inn import polynomials, functional as inrF
+from inrnet.inn import polynomials, functional as inrF
 
 # class TokenAttn(nn.Module):
 #     # 
