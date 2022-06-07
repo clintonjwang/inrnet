@@ -21,10 +21,10 @@ class InrCls(nn.Module):
             inn.PositionalEncoding(N=C//4),
             inn.blocks.ResConv(C, kernel_size=(k1,k1), **kwargs),
             inn.ChannelMixer(C, C*2),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k2*.7,k2*.7), down_ratio=.5),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k2*.7,k2*.7), down_ratio=.5, **kwargs),
             inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
             inn.ChannelMixer(C*2, C*2),
-            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k3*.7,k3*.7), down_ratio=.5),
+            inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k3*.7,k3*.7), down_ratio=.5, **kwargs),
             inn.blocks.ResConv(C*2, kernel_size=(k3,k3), **kwargs),
             inn.GlobalAvgPoolSequence(out_layers),
         ]

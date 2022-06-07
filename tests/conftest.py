@@ -48,7 +48,8 @@ def inr16x16(C=1, dims=(16,16)):
 def inr_classifier(in_ch=1, n_classes=4):
     if torch.cuda.is_available():
         device = 'cuda'
+        return InrCls(in_ch, n_classes, device=device)
     else:
         device = 'cpu'
-    return InrCls(in_ch, n_classes, device=device)
+        return None
 
