@@ -8,5 +8,5 @@ kernel_size_2:
   min: .1
   max: .5
 kernel_size_3:
-  min: .1
-  max: .5
+  min: .2
+  max: .6

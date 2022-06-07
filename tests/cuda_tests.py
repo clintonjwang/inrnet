@@ -1,4 +1,4 @@
-import torch, pdb, torchvision
+import pytest, torch, pdb, torchvision
 nn=torch.nn
 F=nn.functional
 from time import time

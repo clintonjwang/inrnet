@@ -12,11 +12,6 @@ class InrCls(nn.Module):
             if hasattr(l, 'weight'):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
-        mid_ch = kwargs.pop('mid_ch', 64)
-        if not hasattr(mid_ch, '__iter__'):
-            mid_ch = (int(mid_ch), 32)
-        # kwargs.pop('N_bins', None);
-        # kwargs.pop('scale2', None);
         k0 = kwargs.pop('k0', .05)
         k1 = kwargs.pop('k1', .1)
         k2 = kwargs.pop('k2', .2)
