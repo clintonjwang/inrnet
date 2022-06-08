@@ -15,8 +15,6 @@ class PointValues(torch.Tensor):
         return self.size(-2)
     def channels(self):
         return self.size(-1)
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
     
 class PointSet(torch.Tensor):
     def N(self):
@@ -138,7 +136,7 @@ def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramb
         # bbox has form (x1,x2, y1,y2) in 2D
         out[:,0] = out[:,0] * (bbox[1]-bbox[0]) + bbox[0]
         out[:,1] = out[:,1] * (bbox[3]-bbox[2]) + bbox[2]
-    return PointSet(out)
+    return out.as_subclass(PointSet)
 
 
 # def linspace(domain, steps, c2f=False):

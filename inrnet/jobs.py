@@ -1,6 +1,6 @@
 import os
 import shutil
-import wandb, yaml
+import yaml
 osp = os.path
 
 from inrnet import ANALYSIS_DIR, RESULTS_DIR, util
