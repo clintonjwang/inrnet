@@ -7,10 +7,10 @@ he_init = nn.init.kaiming_uniform_
 
 from inrnet.inn import functional as inrF, polynomials
 
-def translate_conv1x1(conv):
+def translate_conv1x1(conv: nn.modules.conv._ConvNd):
     bias = conv.bias is not None
     layer = ChannelMixer(in_channels=conv.weight.size(1), out_channels=conv.weight.size(0), bias=bias)
-    layer.weight.data = conv.weight.data.squeeze(-1).squeeze(-1)
+    layer.weight.data = conv.weight.data.view(conv.weight.size(0), -1)
     if bias:
         layer.bias.data = conv.bias.data
     return layer

@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 import itertools
 
-from inrnet.inn.inr import INRBatch
+# from inrnet.inn.inr import INRBatch
 nn=torch.nn
 
 from inrnet.inn import qmc
@@ -14,7 +14,7 @@ class PointSet:
     def estimate_discrepancy():
         return NotImplemented
 
-def generate_sample_points(inr: INRBatch, dl_args: dict) -> torch.Tensor:
+def generate_sample_points(inr, dl_args: dict) -> torch.Tensor:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -30,7 +30,7 @@ def generate_sample_points(inr: INRBatch, dl_args: dict) -> torch.Tensor:
         coords = _generate_sample_points(inr, method=dl_args['sample type'], sample_size=dl_args["sample points"])
     return coords
 
-def _generate_sample_points(inr: INRBatch, method: Optional[str]=None,
+def _generate_sample_points(inr, method: Optional[str]=None,
         sample_size: Optional[int]=None,
         dims: Optional[tuple]=None, ordering: str='c2f') -> torch.Tensor:
     """Generates sample points for integrating along the INR

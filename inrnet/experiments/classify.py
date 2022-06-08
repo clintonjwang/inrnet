@@ -12,7 +12,7 @@ from inrnet import args as args_module, inn, util, jobs as job_mgmt
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 from inrnet.models.common import Conv2, Conv5
-from inrnet.inn.nets.effnet import InrCls
+from inrnet.inn.nets.classifier import InrCls
 
 def train_classifier(args):
     wandb.init(project="inrnet", job_type="train", name=args["job_id"],

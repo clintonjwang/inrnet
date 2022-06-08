@@ -1,4 +1,5 @@
 """Convolutional Layer"""
+from ctypes import Union
 import torch, pdb, math
 import numpy as np
 from functools import partial
@@ -8,7 +9,8 @@ F = nn.functional
 from inrnet.inn import qmc, functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
-def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k=3):
+def get_kernel_size(input_shape:tuple, extrema:tuple=((-1,1),(-1,1)),
+    k:Union[tuple,int]=3):
     h,w = input_shape
     if isinstance(k, int):
         k = (k,k)
@@ -18,7 +20,8 @@ def get_kernel_size(input_shape, extrema=((-1,1),(-1,1)), k=3):
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     return k[0] * spacing[0], k[1] * spacing[1]
 
-def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bounds=False, smoothing=.05, **kwargs): #h,w
+def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)),
+    smoothing=.05, **kwargs):
     # offset/grow so that the conv kernel goes a half pixel past the boundary
     h,w = input_shape # shape of input features/image
     out_, in_, k1, k2 = conv2d.weight.shape
@@ -27,10 +30,10 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
         raise ValueError('input shape too small')
     spacing = extrema_dists[0] / (h-1), extrema_dists[1] / (w-1)
     K = k1 * spacing[0], k2 * spacing[1]
-    if zero_at_bounds:
-        order = min(4,k1)
-    else:
-        order = min(3,k1-1)
+    # if zero_at_bounds:
+    #     order = min(4,k1)
+    # else:
+    order = min(3,k1-1)
 
     if k1 > 3:
         smoothing = 0.
@@ -60,7 +63,7 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)), zero_at_bound
         init_weights=conv2d.weight.detach().cpu().numpy()*k1*k2,
         # scale up weights since we divide by the number of grid points
         groups=conv2d.groups, shift=shift,
-        padded_extrema=padded_extrema, zero_at_bounds=zero_at_bounds,
+        padded_extrema=padded_extrema,
         # N_bins=0,
         N_bins=2**math.ceil(math.log2(k1*k2)+3), #4
         kernel_size=K, down_ratio=down_ratio, bias=bias, **kwargs)
@@ -113,7 +116,7 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
 
 class SplineConv(Conv):
     def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, down_ratio=1.,
-            input_dims=2, N_bins=0, groups=1, zero_at_bounds=False,
+            input_dims=2, N_bins=0, groups=1,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
             dtype=torch.float, device='cuda'):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
@@ -133,11 +136,11 @@ class SplineConv(Conv):
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
         x,y = (np.linspace(bbox[0]/h*(h-1), bbox[1]/h*(h-1), h),
                np.linspace(bbox[2]/w*(w-1), bbox[3]/w*(w-1), w))
-        if zero_at_bounds:
-            x = (bbox[0], *x, bbox[1])
-            y = (bbox[2], *y, bbox[3])
-            init_weights = np.pad(init_weights,((0,0),(0,0),(1,1),(1,1)))
-            # init_weights = F.pad(init_weights,(1,1,1,1))
+        # if zero_at_bounds:
+        #     x = (bbox[0], *x, bbox[1])
+        #     y = (bbox[2], *y, bbox[3])
+        #     init_weights = np.pad(init_weights,((0,0),(0,0),(1,1),(1,1)))
+        #     init_weights = F.pad(init_weights,(1,1,1,1))
 
         self.order = order
         C = []

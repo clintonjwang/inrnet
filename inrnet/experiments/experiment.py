@@ -1,5 +1,5 @@
 from typing import Optional, List
-import yaml, wandb, pdb
+import yaml, wandb
 
 from inrnet import CONFIG_DIR
 
@@ -66,16 +66,6 @@ def sweep_parameter(parameter_name, values):
             },
         }
     }
-    # name = 'learning_rate_sweep'
-    # sweep_config = {
-    #     "name": name,
-    #     "method": "grid",
-    #     "parameters": {
-    #         "learning_rate": {
-    #             "values": [1e-5, 1e-4, 1e-3, 1e-2],
-    #         },
-    #     }
-    # }
     sweep_id = wandb.sweep(sweep_config, project='inrnet')
     experiment = Experiment(name, sweeps=[sweep_id])
     return experiment

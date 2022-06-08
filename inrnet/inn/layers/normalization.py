@@ -1,4 +1,5 @@
 """Normalization Layer"""
+from typing import Optional
 import torch
 nn = torch.nn
 F = nn.functional
@@ -19,8 +20,22 @@ def translate_norm(norm):
 
 
 class ChannelNorm(nn.Module):
-    def __init__(self, channels=None, batchnorm=True, affine=True, momentum=0.1,
-            track_running_stats=True, eps=1e-5, device=None, dtype=torch.float):
+    def __init__(self, channels:Optional[int]=None, batchnorm:bool=True,
+            affine:bool=True, momentum:float=0.1,
+            track_running_stats:bool=True, eps:float=1e-5,
+            device=None, dtype=torch.float):
+        """Encompasses Batch Norm and Instance Norm
+
+        Args:
+            channels (_type_, optional): _description_. Defaults to None.
+            batchnorm (bool, optional): _description_. Defaults to True.
+            affine (bool, optional): _description_. Defaults to True.
+            momentum (float, optional): _description_. Defaults to 0.1.
+            track_running_stats (bool, optional): _description_. Defaults to True.
+            eps (_type_, optional): _description_. Defaults to 1e-5.
+            device (_type_, optional): _description_. Defaults to None.
+            dtype (_type_, optional): _description_. Defaults to torch.float.
+        """            
         super().__init__()
         factory_kwargs = {'device': device, 'dtype': dtype}
         self.momentum = momentum

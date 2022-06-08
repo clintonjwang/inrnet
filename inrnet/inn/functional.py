@@ -2,6 +2,7 @@ import pdb
 import torch
 
 from inrnet.inn.inr import INRBatch
+from inrnet.inn.layers.other import PositionalEncoding
 nn=torch.nn
 
 from inrnet.inn import qmc
@@ -11,10 +12,10 @@ def tokenization(values, inr, layer):
     """tokenization"""
     return
     
-def pos_enc(values, inr, layer):
+def pos_enc(values: torch.Tensor, inr: INRBatch, layer: PositionalEncoding):
     """positional encoding"""
     coords = inr.sampled_coords.unsqueeze(-1)
-    n = 2**torch.arange(layer.N, device=coords.device) * 2*torch.pi
+    n = 2**torch.arange(layer.N, device=coords.device) * 2*torch.pi * layer.scale
     embeddings = torch.cat((torch.sin(coords*n), torch.cos(coords*n)), dim=1).flatten(1)
     if layer.additive is True:
         return values + embeddings

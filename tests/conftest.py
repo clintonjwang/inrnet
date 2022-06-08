@@ -3,7 +3,7 @@ import torch
 nn=torch.nn
 from inrnet import inn, args as args_module
 from inrnet.inn import point_set, qmc
-from inrnet.inn.nets.effnet import InrCls
+from inrnet.inn.nets.classifier import InrCls
 
 @pytest.fixture
 def qmc_2d_sequence256():
