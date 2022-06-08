@@ -17,6 +17,6 @@ sbatch <<EOT
 
 cd /data/vision/polina/users/clintonw/code/inrnet/inrnet
 source .bashrc
-python fit_inr.py -j=$1 -c=$2 -s=$3
+python fit_inr.py -j=$1 -d=$2 -s=$3
 exit()
 EOT

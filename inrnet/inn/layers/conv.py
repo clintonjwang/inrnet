@@ -1,5 +1,4 @@
 """Convolutional Layer"""
-from ctypes import Union
 import torch, pdb, math
 import numpy as np
 from functools import partial
@@ -10,7 +9,7 @@ from inrnet.inn import qmc, functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
 def get_kernel_size(input_shape:tuple, extrema:tuple=((-1,1),(-1,1)),
-    k:Union[tuple,int]=3):
+    k: tuple | int = 3):
     h,w = input_shape
     if isinstance(k, int):
         k = (k,k)

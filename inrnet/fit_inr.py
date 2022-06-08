@@ -11,6 +11,7 @@ from inrnet.data import inet
 
 DATA_DIR = osp.expanduser("/data/vision/polina/scratch/clintonw/datasets/inrnet")
 
+
 def fit_siren_to_data(data, total_steps, **kwargs):
     if len(data.shape) == 3:
         return fit_siren_to_img(data, total_steps, **kwargs)
@@ -88,6 +89,7 @@ def train_inr(args, **kwargs):
 
 
 def main(args):
+    args = args_module.parse_args_fitting()
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
     torch.backends.cudnn.benchmark = True
@@ -202,5 +204,4 @@ def train_cityscapes(args):
 
 
 if __name__ == "__main__":
-    args = args_module.parse_args()
-    main(args)
+    main()

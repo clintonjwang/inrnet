@@ -11,11 +11,10 @@ from inrnet import CONFIG_DIR
 osp = os.path
 
 def parse_args():
-    """Command-line args"""
+    """Command-line args for train.sh, infer.sh and sweep.sh"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_name')
     parser.add_argument('-j', '--job_id', default="manual")
-    parser.add_argument('-s', '--start_ix', default=0, type=int)
     parser.add_argument('-t', '--target_job', default=None)
     parser.add_argument('-i', '--sweep_id', default=None)
     cmd_args = parser.parse_args()
@@ -30,6 +29,19 @@ def parse_args():
     for subdir in ("weights", "imgs", "plots"):
         os.makedirs(osp.join(paths["job output dir"], subdir))
     yaml.safe_dump(args, open(osp.join(paths["job output dir"], "config.yaml"), 'w'))
+    return args
+
+def parse_args_fitting():
+    """Command-line args for fit_inr.sh"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--dataset')
+    parser.add_argument('-j', '--job_id', default="manual")
+    parser.add_argument('-s', '--start_ix', default=0, type=int)
+    cmd_args = parser.parse_args()
+
+    args = yaml.load(open(CONFIG_DIR+'/fit_config.yaml', 'r'))[cmd_args.dataset]
+    args['data loading']['dataset'] = cmd_args.dataset
+    yaml.safe_dump(args, open(osp.join(args["paths"]["job output dir"], "config.yaml"), 'w'))
     return args
 
 def get_wandb_config():
