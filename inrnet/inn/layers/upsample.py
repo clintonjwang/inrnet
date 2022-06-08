@@ -3,7 +3,7 @@ import torch
 nn = torch.nn
 F = nn.functional
 
-from inrnet.inn import qmc
+from inrnet.inn import point_set
 
 def translate_upsample(layer, input_shape, extrema):
     h,w = input_shape
@@ -56,7 +56,7 @@ def get_new_coords(inr, layer):
     elif inr.sample_mode == 'masked':
         raise ValueError('could not find dropped coords')
     else:
-        new_coords = qmc.generate_quasirandom_sequence(n=N_in*layer.scale,
+        new_coords = point_set.generate_quasirandom_sequence(n=N_in*layer.scale,
             d=coords.size(1), like=coords)[N_in:]
     return new_coords
 

@@ -1,79 +1,10 @@
 """Quasi-Monte Carlo Method"""
-from scipy.stats import qmc
-import math
-import torch
-import numpy as np
-
-from inrnet.inn.point_set import PointSet
-nn=torch.nn
 
 # class QMCIntegrator:
 #     def __init__(self, integrand):
 #         self.integrand = integrand
 #     def __call__(self, point_set):
 #         return self.integrand(point_set.values).mean()
-
-def generate_masked_sample_points(mask: torch.Tensor, sample_size: int,
-    eps:float=1/32) -> PointSet:
-    """Generates a low discrepancy point set within a masked region.
-
-    Args:
-        mask (1,H,W): generated points must fall in this mask
-        sample_size (int): number of points to generate
-        eps (float, optional): _description_. Defaults to 1/32.
-
-    Returns:
-        tensor (N,d): sampled coordinates
-    """
-    mask = mask.squeeze()
-    if len(mask.shape) != 2:
-        raise NotImplementedError('2D only')
-
-    H,W = mask.shape
-    fraction = (mask.sum()/torch.numel(mask)).item()
-    coords = generate_quasirandom_sequence(d=2, n=int(sample_size/fraction * 1.2),
-                bbox=(eps,H-eps,eps,W-eps), scramble=True)
-    coo = torch.floor(coords).long()
-    bools = mask[coo[:,0], coo[:,1]]
-    coord_subset = coords[bools]
-    if coord_subset.size(0) < sample_size:
-        return generate_masked_sample_points(mask, int(sample_size*1.5))
-    return coord_subset[:sample_size]
-
-
-def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramble:bool=False,
-        like=None, dtype=torch.float, device="cuda") -> PointSet:
-    """Generates a low discrepancy point set.
-
-    Args:
-        n (int): number of points to generate.
-        d (int, optional): number of dimensions. Defaults to 2.
-        bbox (tuple, optional): edge of domain. Defaults to (-1,1,-1,1).
-        scramble (bool, optional): randomized QMC. Defaults to False.
-        like (_type_, optional): _description_. Defaults to None.
-        dtype (_type_, optional): _description_. Defaults to torch.float.
-        device (str, optional): _description_. Defaults to "cuda".
-
-    Returns:
-        PointSet (n,d): coordinates
-    """        
-    if math.log2(n) % 1 == 0:
-        sampler = qmc.Sobol(d=d, scramble=scramble)
-        sample = sampler.random_base2(m=int(math.log2(n)))
-    else:
-        sampler = qmc.Halton(d=d, scramble=scramble)
-        sample = sampler.random(n=n)
-    if like is None:
-        out = torch.as_tensor(sample, dtype=dtype, device=device)
-    else:
-        out = torch.as_tensor(sample, dtype=like.dtype, device=like.device)
-    if bbox is not None:
-        if d != 2:
-            raise NotImplementedError('2D only')
-        # bbox has form (x1,x2, y1,y2) in 2D
-        out[:,0] = out[:,0] * (bbox[1]-bbox[0]) + bbox[0]
-        out[:,1] = out[:,1] * (bbox[3]-bbox[2]) + bbox[2]
-    return PointSet(out)
 
 # def get_ball_volume(r, dims):
 #     return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims

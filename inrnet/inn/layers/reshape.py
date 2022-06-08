@@ -5,7 +5,6 @@ nn = torch.nn
 F = nn.functional
 
 from inrnet import inn
-from inrnet.inn import qmc
 
 def produce_inr(values, **kwargs):
     # values - (B,C,H,W)

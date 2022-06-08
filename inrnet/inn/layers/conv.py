@@ -9,7 +9,7 @@ from inrnet.inn.point_set import PointSet
 nn = torch.nn
 F = nn.functional
 
-from inrnet.inn import qmc, functional as inrF, polynomials
+from inrnet.inn import point_set, functional as inrF, polynomials
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
 def get_kernel_size(input_shape:tuple, extrema:tuple=((-1,1),(-1,1)),
@@ -170,7 +170,7 @@ class SplineConv(Conv):
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
         if N_bins > 0:
-            self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=N_bins,
+            self.register_buffer("sample_points", point_set.generate_quasirandom_sequence(n=N_bins,
                 d=input_dims, bbox=bbox, dtype=dtype, device=device))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
@@ -252,7 +252,7 @@ class MLPConv(Conv):
 
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
         if self.N_bins > 0:
-            self.register_buffer("sample_points", qmc.generate_quasirandom_sequence(n=self.N_bins,
+            self.register_buffer("sample_points", point_set.generate_quasirandom_sequence(n=self.N_bins,
                 d=input_dims, bbox=bbox, dtype=dtype, device=device))
             
         if scale1 is None:

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
 from inrnet import inn, jobs as job_mgmt, util
-from inrnet.inn import qmc
+from inrnet.inn import point_set
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 import inrnet.models.common
@@ -91,7 +91,7 @@ def train_segmenter(args):
             seg_inr = model(img_inr)
             if dl_args['sample type'] == 'masked':
                 seg_inr.change_sample_mode('masked')
-                coords = qmc.generate_masked_sample_points(mask=(segs.amax(1) == True),
+                coords = point_set.generate_masked_sample_points(mask=(segs.amax(1) == True),
                     sample_size=dl_args["sample points"])
                 seg_gt = get_seg_at_coords(segs, coords)
 
@@ -204,7 +204,7 @@ def test_inr_segmenter(args):
                 seg_inr = model(img_inr).eval()
                 if dl_args['sample type'] == 'masked':
                     seg_inr.change_sample_mode('masked')
-                    coords = qmc.generate_masked_sample_points(mask=(segs.amax(1) == True),
+                    coords = point_set.generate_masked_sample_points(mask=(segs.amax(1) == True),
                         sample_size=dl_args["sample points"])
                     seg_gt = get_seg_at_coords(segs, coords)
 

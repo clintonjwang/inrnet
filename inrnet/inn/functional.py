@@ -9,7 +9,7 @@ from inrnet.inn.layers.pooling import AvgPool, MaxPool
 from inrnet.inn.point_set import PointSet
 nn=torch.nn
 
-from inrnet.inn import qmc
+from inrnet.inn import point_set
 
 def tokenization(values: torch.Tensor, inr: INRBatch):
     """tokenization"""
@@ -112,7 +112,7 @@ def conv(values: torch.Tensor, # [B,N,c_in]
                     newVals.append(y.unsqueeze(1).matmul(W).squeeze(1).mean(0))
 
         else:
-            bin_centers = qmc.get_minNN_points_in_disk(radius=layer.radius, N=layer.N_bins)
+            bin_centers = point_set.get_minNN_points_in_disk(radius=layer.radius, N=layer.N_bins)
             Kh = layer.weight(bin_centers)
             with torch.no_grad():
                 bin_ixs = (Diffs.unsqueeze(0) - bin_centers.unsqueeze(1)).norm(dim=-1).min(0).indices # (N_points, d)

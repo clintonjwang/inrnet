@@ -1,13 +1,15 @@
 import pytest
 import torch
+
+from inrnet.inn import point_set
 nn=torch.nn
 from inrnet import inn, args as args_module
-from inrnet.inn import point_set, qmc
+from inrnet.inn import point_set
 from inrnet.inn.nets.classifier import InrCls
 
 @pytest.fixture
 def qmc_2d_sequence256():
-    return qmc.generate_quasirandom_sequence(d=2, n=256, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
+    return point_set.generate_quasirandom_sequence(d=2, n=256, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
 
 @pytest.fixture
 def args():
