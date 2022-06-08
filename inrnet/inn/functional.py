@@ -1,14 +1,17 @@
+"""Functions"""
 import pdb
+from typing import Callable, Optional
 import torch
 
 from inrnet.inn.inr import INRBatch
 from inrnet.inn.layers.other import PositionalEncoding
+from inrnet.inn.layers.pooling import AvgPool, MaxPool
+from inrnet.inn.point_set import PointSet
 nn=torch.nn
 
 from inrnet.inn import qmc
-### Convolutions
 
-def tokenization(values, inr, layer):
+def tokenization(values: torch.Tensor, inr: INRBatch):
     """tokenization"""
     return
     
@@ -36,7 +39,6 @@ def conv(values: torch.Tensor, # [B,N,c_in]
     padding_ratio = layer.kernel_intersection_ratio(query_coords)
     # if hasattr(layer, 'mask_tracker'):
     #     layer.mask_tracker = mask.sum(1).detach().cpu()
-    # scaling factor
 
     # if layer.dropout > 0 and (inr.training and layer.training):
     #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
@@ -151,11 +153,24 @@ def _cluster_diffs(x, layer, tol=.005, sample_mode=None):
 
     return cl, c
 
-def avg_pool(values, inr, layer, query_coords=None):
+def avg_pool(values: torch.Tensor, inr: INRBatch, layer: AvgPool,
+    query_coords: Optional[PointSet]=None) -> torch.Tensor:
+    """Average Pooling
+
+    Args:
+        values (torch.Tensor): _description_
+        inr (INRBatch): _description_
+        layer (AvgPool): _description_
+        query_coords (Optional[PointSet], optional): _description_. Defaults to None.
+
+    Returns:
+        torch.Tensor: _description_
+    """
     pool_fxn = lambda x: x.mean(dim=2)
     return pool(pool_fxn, values, inr, layer, query_coords=query_coords)
 
-def max_pool(values, inr, layer, query_coords=None):
+def max_pool(values: torch.Tensor, inr: INRBatch, layer: MaxPool,
+    query_coords: Optional[PointSet]=None):
     def pool_fxn(x):
         n = x.size(1)
         m = x.amax(1)
@@ -164,7 +179,8 @@ def max_pool(values, inr, layer, query_coords=None):
         return torch.where(m<0, m, m * (n+1)/(n-1) * 3/5)
     return pool(pool_fxn, values, inr, layer, query_coords=query_coords)
 
-def pool(pool_fxn, values, inr, layer, query_coords=None):
+def pool(pool_fxn: Callable, values: torch.Tensor, inr: INRBatch, layer: MaxPool,
+    query_coords: Optional[PointSet]=None):
     coords = inr.sampled_coords
     query_coords = _get_query_coords(inr, layer)
 

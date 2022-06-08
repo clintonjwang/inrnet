@@ -1,7 +1,11 @@
 """Convolutional Layer"""
+from typing import Optional
 import torch, pdb, math
 import numpy as np
 from functools import partial
+from inrnet.inn.inr import INRBatch
+
+from inrnet.inn.point_set import PointSet
 nn = torch.nn
 F = nn.functional
 
@@ -74,7 +78,8 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)),
 
 
 class Conv(nn.Module):
-    def __init__(self, in_channels, out_channels, input_dims=2, down_ratio=1., groups=1, bias=False, dtype=torch.float):
+    def __init__(self, in_channels:int, out_channels:int, input_dims:int=2,
+        down_ratio:float=1., groups:int=1, bias:bool=False, dtype=torch.float):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -88,7 +93,15 @@ class Conv(nn.Module):
         else:
             self.bias = None
 
-    def kernel_intersection_ratio(self, query_coords):
+    def kernel_intersection_ratio(self, query_coords: PointSet):
+        """Returns a factor by which to scale the outputs in case of zero-padding
+
+        Args:
+            query_coords (PointSet): points at which to obtain a scaling factor
+
+        Returns:
+            None or torch.Tensor: scaling factor
+        """
         if not hasattr(self, 'padded_extrema'):
             return
         dist_to_boundary = (query_coords.unsqueeze(1) - self.padded_extrema.T.unsqueeze(0)).abs().amin(dim=1)
@@ -174,10 +187,10 @@ class SplineConv(Conv):
         new_inr.channels = self.out_channels
         return new_inr
 
-    def interpolate_weights(self, xy):
+    def interpolate_weights(self, coord_diffs):
         w_oi = []
-        X = xy[:,0].unsqueeze(1)
-        Y = xy[:,1].unsqueeze(1)
+        X = coord_diffs[:,0].unsqueeze(1)
+        Y = coord_diffs[:,1].unsqueeze(1)
         px = py = self.order
 
         values, kx = (self.Tx<=X).min(dim=-1)
@@ -211,14 +224,19 @@ class SplineConv(Conv):
             
             w_oi.append(D[:,px,py])
 
-        return torch.stack(w_oi).view(xy.size(0), self.out_channels, self.group_size)
+        return torch.stack(w_oi).view(coord_diffs.size(0), self.out_channels, self.group_size)
 
 
 class MLPConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, mid_ch=(32,32), down_ratio=1.,
-            input_dims=2, groups=1, padded_extrema=None, bias=False,
-            mlp_type='standard', scale1=None, scale2=1,
-            dtype=torch.float, N_bins=64, device='cuda'):
+    def __init__(self, in_channels: int, out_channels: int,
+            kernel_size: float | tuple,
+            mid_ch: tuple | int = (32,32),
+            down_ratio: float=1.,
+            input_dims: int=2, groups: int=1, padded_extrema: Optional[tuple]=None,
+            bias: bool=False,
+            mlp_type: str='standard', scale1=None, scale2=1,
+            N_bins: int=64,
+            dtype=torch.float, device='cuda'):
         super().__init__(in_channels, out_channels, input_dims=input_dims,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         if not hasattr(kernel_size, '__iter__'):
@@ -228,8 +246,9 @@ class MLPConv(Conv):
         #     self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
         # else:
         self.N_bins = N_bins
-        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
-                        diffs[...,1].abs() < self.kernel_size[1]/2)
+        self.diffs_in_support = lambda diffs: (
+                diffs[...,0].abs() < self.kernel_size[0]/2) * (
+                diffs[...,1].abs() < self.kernel_size[1]/2)
 
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
         if self.N_bins > 0:
@@ -264,23 +283,23 @@ class MLPConv(Conv):
             nn.init.kaiming_uniform_(self.kernel[k].weight)
             self.kernel[k].bias.data.zero_()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"""MLPConv(in_channels={self.in_channels}, out_channels={
         self.out_channels}, kernel_size={np.round(self.kernel_size, decimals=3)}, bias={self.bias is not None})"""
 
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.conv, 'MLPConv', layer=self)
         new_inr.channels = self.out_channels
         return new_inr
 
-    def interpolate_weights(self, xy):
+    def interpolate_weights(self, coord_diffs: PointSet) -> torch.Tensor:
         # if self.mlp_type == 'siren':
-        #     return self.kernel(torch.sin(self.first(xy*self.scale1) * self.scale3)).reshape(
-        #         xy.size(0), self.out_channels, self.group_size) * self.scale2
+        #     return self.kernel(torch.sin(self.first(coord_diffs*self.scale1) * self.scale3)).reshape(
+        #         coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2
         # else:
-        return self.kernel(self.first(xy * self.scale1)).reshape(
-            xy.size(0), self.out_channels, self.group_size) * self.scale2
+        return self.kernel(self.first(coord_diffs * self.scale1)).reshape(
+            coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2
 
 
 
@@ -338,7 +357,6 @@ class BallConv(Conv):
         new_inr.channels = self.out_channels
         return new_inr
         
-
 class Reshape(nn.Module):
     def __init__(self, *dims):
         super().__init__()

@@ -3,25 +3,9 @@ from scipy.stats import qmc
 import math
 import torch
 import numpy as np
-nn=torch.nn
 
-class Integrator:
-    """Estimates an integral"""
-    def __init__(self, integrand, name, inr=None, layer=None, **kwargs):
-        self.function = integrand
-        self.name = name
-        self.inr = inr
-        self.layer = layer
-        self.kwargs = kwargs
-    def __repr__(self):
-        return self.name
-    def __call__(self, values, *args):
-        kwargs = self.kwargs.copy()
-        if self.inr is not None:
-            kwargs['inr'] = self.inr
-        if self.layer is not None:
-            kwargs['layer'] = self.layer
-        return self.function(values, *args, **kwargs)
+from inrnet.inn.point_set import PointSet
+nn=torch.nn
 
 # class QMCIntegrator:
 #     def __init__(self, integrand):
@@ -29,8 +13,8 @@ class Integrator:
 #     def __call__(self, point_set):
 #         return self.integrand(point_set.values).mean()
 
-def generate_masked_sample_points(mask:torch.Tensor, sample_size:int,
-    eps:float=1/32) -> torch.Tensor:
+def generate_masked_sample_points(mask: torch.Tensor, sample_size: int,
+    eps:float=1/32) -> PointSet:
     """Generates a low discrepancy point set within a masked region.
 
     Args:
@@ -58,7 +42,7 @@ def generate_masked_sample_points(mask:torch.Tensor, sample_size:int,
 
 
 def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramble:bool=False,
-        like=None, dtype=torch.float, device="cuda") -> torch.Tensor:
+        like=None, dtype=torch.float, device="cuda") -> PointSet:
     """Generates a low discrepancy point set.
 
     Args:
@@ -71,7 +55,7 @@ def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramb
         device (str, optional): _description_. Defaults to "cuda".
 
     Returns:
-        torch.Tensor (n,d): coordinates
+        PointSet (n,d): coordinates
     """        
     if math.log2(n) % 1 == 0:
         sampler = qmc.Sobol(d=d, scramble=scramble)
@@ -89,42 +73,42 @@ def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramb
         # bbox has form (x1,x2, y1,y2) in 2D
         out[:,0] = out[:,0] * (bbox[1]-bbox[0]) + bbox[0]
         out[:,1] = out[:,1] * (bbox[3]-bbox[2]) + bbox[2]
-    return out
+    return PointSet(out)
 
-def get_ball_volume(r, dims):
-    return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims
+# def get_ball_volume(r, dims):
+#     return ((2.*math.pi**(dims/2.))/(dims*math.gamma(dims/2.)))*r**dims
 
-def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
-    x = coords[...,0] / spacing[0]
-    y = coords[...,1] / spacing[1]
-    x -= x.min()
-    y -= y.min()
-    bin_ixs = torch.floor(torch.stack((x,y), dim=-1) + 1e-4).int()
-    bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
-    bins = torch.unique(bin_ixs)
-    matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
-    points_per_bin = tuple(matches.sum(1))
-    if random:
-        surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
-    else:
-        surviving_indices = [x[0] for x in torch.where(matches)[1].split(points_per_bin)]
-        # def select_topleft(indices):
-        #     return indices[torch.min(coords[indices,0] + coords[indices,1]*.1, dim=0).indices.item()]
-        # surviving_indices = [select_topleft(x) for x in torch.where(matches)[1].split(points_per_bin)]
+# def subsample_points_by_grid(coords, spacing, input_dims=2, random=False):
+#     x = coords[...,0] / spacing[0]
+#     y = coords[...,1] / spacing[1]
+#     x -= x.min()
+#     y -= y.min()
+#     bin_ixs = torch.floor(torch.stack((x,y), dim=-1) + 1e-4).int()
+#     bin_ixs = bin_ixs[:,0]*int(3/spacing[1]) + bin_ixs[:,1] # TODO: adapt for larger domains, d
+#     bins = torch.unique(bin_ixs)
+#     matches = bin_ixs.unsqueeze(0) == bins.unsqueeze(1) # (bin, point)
+#     points_per_bin = tuple(matches.sum(1))
+#     if random:
+#         surviving_indices = [x[np.random.randint(0,len(x))] for x in torch.where(matches)[1].split(points_per_bin)]
+#     else:
+#         surviving_indices = [x[0] for x in torch.where(matches)[1].split(points_per_bin)]
+#         # def select_topleft(indices):
+#         #     return indices[torch.min(coords[indices,0] + coords[indices,1]*.1, dim=0).indices.item()]
+#         # surviving_indices = [select_topleft(x) for x in torch.where(matches)[1].split(points_per_bin)]
 
-    return coords[surviving_indices,:]
+#     return coords[surviving_indices,:]
 
 
-def interpolate(query_coords, observed_coords, values):
-    if query_coords.size(0) == 0:
-        return values.new_zeros(0, values.size(1))
+# def interpolate(query_coords, observed_coords, values):
+#     if query_coords.size(0) == 0:
+#         return values.new_zeros(0, values.size(1))
 
-    dists = (query_coords.unsqueeze(0) - observed_coords.unsqueeze(1)).norm(dim=-1)
-    r, indices = dists.topk(3, dim=0, largest=False)
-    q = (1/r).unsqueeze(-1)
-    Q = q.sum(0)
-    sv = (values[indices[0]] * q[0] + values[indices[1]] * q[1] + values[indices[2]] * q[2])/Q
-    return sv
+#     dists = (query_coords.unsqueeze(0) - observed_coords.unsqueeze(1)).norm(dim=-1)
+#     r, indices = dists.topk(3, dim=0, largest=False)
+#     q = (1/r).unsqueeze(-1)
+#     Q = q.sum(0)
+#     sv = (values[indices[0]] * q[0] + values[indices[1]] * q[1] + values[indices[2]] * q[2])/Q
+#     return sv
 
 # def interpolate_weights_single_channel(xy, tx,ty,c, order=2):
 #     W = []

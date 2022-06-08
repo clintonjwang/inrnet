@@ -1,7 +1,0 @@
-network:
-  type: SIREN
-data loading:
-  interval: 64
-  end_ix: 1600
-optimizer:
-  steps: 2000

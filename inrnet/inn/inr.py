@@ -1,12 +1,12 @@
 """Class for minibatches of INRs"""
 import operator
 import pdb
+from typing import Callable
 import torch
 nn=torch.nn
 F=nn.functional
 
 from inrnet import util
-from inrnet.inn import point_set, qmc
 
 class INRBatch(nn.Module):
     """Standard INR minibatch"""
@@ -115,7 +115,7 @@ class INRBatch(nn.Module):
     #         raise NotImplementedError("invalid method: "+method)
 
     def set_integrator(self, function, name, layer=None, **kwargs):
-        self.integrator = qmc.Integrator(function, name, inr=self, layer=layer, **kwargs)
+        self.integrator = Integrator(function, name, inr=self, layer=layer, **kwargs)
 
     def add_modification(self, modification):
         self.sampled_coords = torch.empty(0)
@@ -220,7 +220,7 @@ class INRBatch(nn.Module):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = point_set.meshgrid_coords(H,W, device=self.device)
+            xy_grid = util.meshgrid_coords(H,W, device=self.device)
             output = self.forward(xy_grid)
             output = util.realign_values(output, inr=self)
             output = output.reshape(output.size(0),H,W,-1)
@@ -247,7 +247,7 @@ class BlackBoxINR(INRBatch):
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = point_set.meshgrid_coords(H,W, c2f=False, device=self.device)
+            xy_grid = util.meshgrid_coords(H,W, c2f=False, device=self.device)
             output = self.forward(xy_grid)
             output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':
@@ -349,13 +349,13 @@ def set_difference(x,y):
     return uniques[counts == 1]
 
 class MergeINR(INRBatch):
-    def __init__(self, inr1, inr2, channels, merge_function):
+    def __init__(self, inr1, inr2, channels, merge_function, interpolator=None):
         domain = merge_domains(inr1.domain, inr2.domain)
         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
         self.inr1 = inr1
         self.evaluator = self.inr2 = inr2
         self.merge_function = merge_function
-        self.interpolator = qmc.interpolate
+        self.interpolator = interpolator
 
     def merge_coords(self, values1, values2):
         x = self.inr1.sampled_coords
@@ -438,3 +438,22 @@ class CatINR(MergeINR):
 
 #     def _forward(self, coords):
 #         return torch.split(self.inr1(coords))
+
+class Integrator:
+    """Computes the output of an INR parameterized by a layer requiring integration"""
+    def __init__(self, integrand: Callable, name: str, inr: INRBatch | None = None,
+        layer: nn.Module | None = None, **kwargs):
+        self.function = integrand
+        self.name = name
+        self.inr = inr
+        self.layer = layer
+        self.kwargs = kwargs
+    def __repr__(self):
+        return self.name
+    def __call__(self, values, *args):
+        kwargs = self.kwargs.copy()
+        if self.inr is not None:
+            kwargs['inr'] = self.inr
+        if self.layer is not None:
+            kwargs['layer'] = self.layer
+        return self.function(values, *args, **kwargs)

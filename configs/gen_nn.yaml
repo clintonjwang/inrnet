@@ -1,7 +1,0 @@
-parent: gen_train
-network:
-  type: wgan
-data loading:
-  batch size: 64
-optimizer:
-  learning rate: 1e-4

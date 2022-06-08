@@ -1,8 +1,0 @@
-network:
-  type: SIREN
-data loading:
-  end_ix: 1000
-  dataset: oasis
-  subset: train
-optimizer:
-  max steps: 2000
