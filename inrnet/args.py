@@ -41,6 +41,8 @@ def parse_args_fitting():
 
     args = yaml.load(open(CONFIG_DIR+'/fit_config.yaml', 'r'))[cmd_args.dataset]
     args['data loading']['dataset'] = cmd_args.dataset
+    for param in ["job_id", 'start_ix']:
+        args[param] = getattr(cmd_args, param)
     yaml.safe_dump(args, open(osp.join(args["paths"]["job output dir"], "config.yaml"), 'w'))
     return args
 
@@ -117,7 +119,7 @@ def args_from_file(path, cmd_args=None):
         raise ValueError(f"bad config_name {cmd_args.config_name}")
 
     if cmd_args is not None:
-        for param in ["job_id", "config_name", "start_ix", 'target_job', 'sweep_id']:
+        for param in ["job_id", "config_name", 'target_job', 'sweep_id']:
             args[param] = getattr(cmd_args, param)
 
     while "parent" in args:

@@ -1,15 +1,10 @@
 """Point set"""
-import torch
-from typing import Optional
 from scipy.stats import qmc
 import math
 import torch
 nn=torch.nn
-import numpy as np
 
 from inrnet.inn.inr import INRBatch
-nn=torch.nn
-
 from inrnet import util
 from inrnet.inn import point_set
 
@@ -31,7 +26,7 @@ class PointSet(torch.Tensor):
     # def estimate_discrepancy():
     #     return NotImplemented
 
-def generate_sample_points(inr: INRBatch, dl_args: dict) -> torch.Tensor:
+def generate_sample_points(inr: INRBatch, dl_args: dict) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -47,9 +42,9 @@ def generate_sample_points(inr: INRBatch, dl_args: dict) -> torch.Tensor:
         coords = _generate_sample_points(inr, method=dl_args['sample type'], sample_size=dl_args["sample points"])
     return coords
 
-def _generate_sample_points(inr: INRBatch, method: Optional[str]=None,
-        sample_size: Optional[int]=None,
-        dims: Optional[tuple]=None, ordering: str='c2f') -> PointSet:
+def _generate_sample_points(inr: INRBatch, method: str | None =None,
+        sample_size: int | None = None,
+        dims: tuple | None =None, ordering: str='c2f') -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -126,12 +121,12 @@ def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramb
 
     Returns:
         PointSet (n,d): coordinates
-    """        
+    """
     if math.log2(n) % 1 == 0:
-        sampler = point_set.Sobol(d=d, scramble=scramble)
+        sampler = qmc.Sobol(d=d, scramble=scramble)
         sample = sampler.random_base2(m=int(math.log2(n)))
     else:
-        sampler = point_set.Halton(d=d, scramble=scramble)
+        sampler = qmc.Halton(d=d, scramble=scramble)
         sample = sampler.random(n=n)
     if like is None:
         out = torch.as_tensor(sample, dtype=dtype, device=device)
