@@ -11,7 +11,9 @@ try:
 except ModuleNotFoundError:
     SqueezeExcitation = EfficientNet = MBConv = Fire = None
 
-def translate_discrete_model(discrete_model, input_shape, extrema=((-1,1),(-1,1))):
+def translate_discrete_model(discrete_model: nn.Module,
+    input_shape: tuple,
+    extrema: tuple = ((-1,1),(-1,1))):
     if isinstance(discrete_model, EfficientNet):
         discrete_model = nn.Sequential(discrete_model.features,
             discrete_model.avgpool, discrete_model.classifier)
@@ -76,7 +78,7 @@ def translate_sequential_layer(layers, current_shape, extrema):
     return cont_sequence, current_shape, extrema
 
 
-def translate_simple_layer(layer):
+def translate_simple_layer(layer: nn.Module):
     if layer.__class__ in (nn.ReLU, nn.LeakyReLU, nn.SiLU, nn.GELU):
         return inn.translate_activation(layer)
 
