@@ -4,7 +4,7 @@ import math
 import torch
 nn=torch.nn
 
-from inrnet.inn.inr import INRBatch
+# from inrnet.inn.inr import INRBatch
 from inrnet import util
 from inrnet.inn import point_set
 
@@ -24,7 +24,7 @@ class PointSet(torch.Tensor):
     # def estimate_discrepancy():
     #     return NotImplemented
 
-def generate_sample_points(inr: INRBatch, dl_args: dict) -> PointSet:
+def generate_sample_points(inr, dl_args: dict) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -40,7 +40,7 @@ def generate_sample_points(inr: INRBatch, dl_args: dict) -> PointSet:
         coords = _generate_sample_points(inr, method=dl_args['sample type'], sample_size=dl_args["sample points"])
     return coords
 
-def _generate_sample_points(inr: INRBatch, method: str | None =None,
+def _generate_sample_points(inr, method: str | None =None,
         sample_size: int | None = None,
         dims: tuple | None =None, ordering: str='c2f') -> PointSet:
     """Generates sample points for integrating along the INR
