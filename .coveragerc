@@ -1,6 +1,6 @@
 [run]
 omit = 
-    models/*
-    fid.py
-    train.py
-    infer.py
+    inrnet/models/*
+    inrnet/fid.py
+    inrnet/train.py
+    inrnet/infer.py

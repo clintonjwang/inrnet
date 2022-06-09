@@ -1,12 +1,13 @@
 """Point set"""
+import typing
 from scipy.stats import qmc
 import math
 import torch
 nn=torch.nn
 
-# from inrnet.inn.inr import INRBatch
+if typing.TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 from inrnet import util
-from inrnet.inn import point_set
 
 class PointValues(torch.Tensor):
     def batch_size(self):
@@ -24,7 +25,7 @@ class PointSet(torch.Tensor):
     # def estimate_discrepancy():
     #     return NotImplemented
 
-def generate_sample_points(inr, dl_args: dict) -> PointSet:
+def generate_sample_points(inr: INRBatch, dl_args: dict) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -40,7 +41,7 @@ def generate_sample_points(inr, dl_args: dict) -> PointSet:
         coords = _generate_sample_points(inr, method=dl_args['sample type'], sample_size=dl_args["sample points"])
     return coords
 
-def _generate_sample_points(inr, method: str | None =None,
+def _generate_sample_points(inr: INRBatch, method: str | None =None,
         sample_size: int | None = None,
         dims: tuple | None =None, ordering: str='c2f') -> PointSet:
     """Generates sample points for integrating along the INR
@@ -64,12 +65,12 @@ def _generate_sample_points(inr, method: str | None =None,
         return util.meshgrid_coords(*dims, c2f=(ordering=='c2f'))
 
     elif method == "shrunk":
-        coords = point_set.generate_quasirandom_sequence(d=inr.input_dims, n=sample_size,
+        coords = generate_quasirandom_sequence(d=inr.input_dims, n=sample_size,
             bbox=(*inr.domain, *inr.domain), scramble=(method=='rqmc'))
         return coords * coords.abs()
 
     elif method in ("qmc", 'rqmc'):
-        return point_set.generate_quasirandom_sequence(d=inr.input_dims, n=sample_size,
+        return generate_quasirandom_sequence(d=inr.input_dims, n=sample_size,
             bbox=(*inr.domain, *inr.domain), scramble=(method=='rqmc'))
 
     else:
