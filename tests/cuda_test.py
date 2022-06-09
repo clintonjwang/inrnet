@@ -6,11 +6,11 @@ import numpy as np
 
 from inrnet import jobs as job_mgmt
 from inrnet import inn, util
+from inrnet.experiments import classify
 
 def test_equivalence():
     if not torch.cuda.is_available():
         pytest.skip('no cuda')
-    from inrnet.experiments import classify
     C = 32
     img_shape = h,w = 8,8
     zz = torch.randn(h*w, C)

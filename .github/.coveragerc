@@ -4,3 +4,5 @@ omit =
     inrnet/fid.py
     inrnet/train.py
     inrnet/infer.py
+    inrnet/pretrain.py
+    inrnet/analyze.py

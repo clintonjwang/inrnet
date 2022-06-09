@@ -1,18 +1,21 @@
 import torch
+
+from inrnet.inn.inr import INRBatch
+from inrnet.inn.point_set import PointSet
 nn = torch.nn
 F = nn.functional
 
 from inrnet import inn
 
-def CrossEntropy(N=128):
+def CrossEntropy(N: torch.int16=128):
     ce = nn.CrossEntropyLoss()
-    def ce_loss(pred, class_ix):
+    def ce_loss(pred: INRBatch, class_ix: torch.Tensor):
         coords = pred.generate_sample_points(sample_size=N)
         return ce(pred(coords), class_ix)
     return ce_loss
 
-def L1_dist_inr(N=128):
-    def l1_qmc(pred,target):
+def L1_dist_inr(N: int=128):
+    def l1_qmc(pred: INRBatch, target: INRBatch):
         coords = target.generate_sample_points(sample_size=N)
         return (pred(coords)-target(coords)).abs().mean()
     return l1_qmc
@@ -23,13 +26,13 @@ def L1_dist_inr(N=128):
 #         coords = target.generate_sample_points(sample_size=N)
 #         return (pred(coords)-target(coords)).abs().mean()
 
-def l2_dist_inr(N=128):
-    def l2_qmc(pred,target):
+def L2_dist_inr(N: int=128):
+    def l2_qmc(pred: INRBatch, target: INRBatch):
         coords = target.generate_sample_points(sample_size=N)
         return (pred(coords)-target(coords)).pow(2).mean()
     return l2_qmc
 
-def L1_dist(inr, gt_values, coords):
+def L1_dist(inr, gt_values, coords: PointSet):
     pred = inr(coords)
     #pred = util.realign_values(pred, coords_gt=coords, inr=inr)
     return (pred-gt_values).abs().mean()
@@ -37,7 +40,7 @@ def L1_dist(inr, gt_values, coords):
 def mse_loss(pred,target):
     return (pred-target).pow(2).flatten(start_dim=1).mean(1)
 
-def adv_loss_fxns(loss_settings):
+def adv_loss_fxns(loss_settings: dict):
     if "WGAN" in loss_settings["adversarial loss type"]:
         G_fxn = lambda fake_logit: -fake_logit.squeeze()
         D_fxn = lambda fake_logit, true_logit: (fake_logit - true_logit).squeeze()
@@ -50,7 +53,8 @@ def adv_loss_fxns(loss_settings):
     else:
         raise NotImplementedError
 
-def gradient_penalty(real_img, generated_img, D):
+def gradient_penalty(real_img: torch.Tensor, generated_img: torch.Tensor,
+    D: nn.Module):
     B = real_img.size(0)
     alpha = torch.rand(B, 1, 1, 1, device='cuda')
     interp_img = nn.Parameter(alpha*real_img + (1-alpha)*generated_img.detach())
@@ -62,7 +66,8 @@ def gradient_penalty(real_img, generated_img, D):
     grads_norm = torch.sqrt(torch.sum(grads ** 2, dim=1) + 1e-12)
     return (grads_norm - 1) ** 2
 
-def gradient_penalty_inr(coords, real_inr, generated_inr, D):
+def gradient_penalty_inr(coords: PointSet, real_inr: INRBatch,
+    generated_inr: INRBatch, D: nn.Module):
     real_img = real_inr.cached_outputs
     generated_img = generated_inr.cached_outputs
     B = real_img.size(0)
