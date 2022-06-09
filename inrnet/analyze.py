@@ -12,8 +12,6 @@ from inrnet import inn
 from inrnet.data import inet
 from inrnet.experiments.classify import load_model_from_job
 
-
-
 def analyze_interpolate_grid_to_qmc():
     from scipy.spatial.distance import cdist
     from scipy.optimize import linear_sum_assignment

@@ -4,6 +4,7 @@ temp
 inrnet/wandb
 *.pt
 .coverage
+differentiable_volumetric_rendering/
 
 __pycache__/
 *.pyc

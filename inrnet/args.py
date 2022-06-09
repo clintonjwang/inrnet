@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('-j', '--job_id', default="manual")
     parser.add_argument('-t', '--target_job', default=None)
     parser.add_argument('-i', '--sweep_id', default=None)
+    parser.add_argument('-w', '--no_wandb', action='store_true')
     cmd_args = parser.parse_args()
 
     config_name = cmd_args.job_id if cmd_args.config_name is None else cmd_args.config_name
@@ -119,7 +120,7 @@ def args_from_file(path, cmd_args=None):
         raise ValueError(f"bad config_name {cmd_args.config_name}")
 
     if cmd_args is not None:
-        for param in ["job_id", "config_name", 'target_job', 'sweep_id']:
+        for param in ["job_id", "config_name", 'target_job', 'sweep_id', 'no_wandb']:
             args[param] = getattr(cmd_args, param)
 
     while "parent" in args:

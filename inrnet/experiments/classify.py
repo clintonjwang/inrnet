@@ -15,9 +15,10 @@ from inrnet.models.common import Conv2, Conv5
 from inrnet.inn.nets.classifier import InrCls
 
 def train_classifier(args):
-    wandb.init(project="inrnet", job_type="train", name=args["job_id"],
-        config=wandb.helper.parse_config(args, exclude=['job_id', 'start_ix']))#, 'paths'],
-    args = args_module.get_wandb_config()
+    if not args['no_wandb']:
+        wandb.init(project="inrnet", job_type="train", name=args["job_id"],
+            config=wandb.helper.parse_config(args, exclude=['job_id']))
+        args = args_module.get_wandb_config()
     paths = args["paths"]
     dl_args = args["data loading"]
     data_loader = dataloader.get_inr_dataloader(dl_args)
@@ -30,12 +31,11 @@ def train_classifier(args):
     model = load_pretrained_model(args).cuda()
     optimizer = util.get_optimizer(model, args)
     
-    if hasattr(model, 'layers'):
-        wandb.watch(model.layers[0][0])
-        wandb.watch(model.layers[2][0])
-    else:
-        wandb.watch(model[0][0])
-        wandb.watch(model[2][0])
+    if not args['no_wandb']:
+        if hasattr(model, 'layers'):
+            wandb.watch(model.layers[0][0], log_freq=300)
+        else:
+            wandb.watch(model[0][0], log_freq=300)
         
     for img_inr, labels in data_loader:
         global_step += 1
@@ -54,10 +54,10 @@ def train_classifier(args):
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
-        wandb.log({'train_loss':loss.item(),
-            'train_t3_acc': top3(pred_cls, labels).item(),
-            'train_t1_acc': top1(pred_cls, labels).item(),
-        })
+        log({'train_loss':loss.item(),
+                'train_t3_acc': top3(pred_cls, labels).item(),
+                'train_t1_acc': top1(pred_cls, labels).item(),
+            }, use_wandb=not args['no_wandb'])
         if global_step % 100 == 0:
             torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
         if global_step >= args["optimizer"]["max steps"]:
@@ -77,10 +77,10 @@ def train_classifier(args):
 
                 loss = loss_fxn(logits, labels)
                 pred_cls = logits.topk(k=3).indices
-                wandb.log({'val_loss':loss.item(),
-                    'val_t3_acc': top3(pred_cls, labels).item(),
-                    'val_t1_acc': top1(pred_cls, labels).item(),
-                }, step=global_step)
+                log({'val_loss':loss.item(),
+                        'val_t3_acc': top3(pred_cls, labels).item(),
+                        'val_t1_acc': top1(pred_cls, labels).item(),
+                    }, step=global_step, use_wandb=not args['no_wandb'])
             
     torch.save(model.state_dict(), osp.join(paths["weights dir"], "final.pth"))
 
@@ -113,8 +113,11 @@ def test_inr_classifier(args):
 
     torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
 
-
-
+def log(variable, *args, use_wandb=True, **kwargs):
+    if use_wandb:
+        wandb.log(variable, *args, **kwargs)
+    else:
+        print(variable)
 
 # import pandas as pd
 

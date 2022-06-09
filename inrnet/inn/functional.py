@@ -11,9 +11,13 @@ nn=torch.nn
 
 from inrnet.inn import point_set
 
+def change_sample_density(values: torch.Tensor, inr: INRBatch, layer):
+    coords = inr.sampled_coords
+    return coords
+
 def tokenization(values: torch.Tensor, inr: INRBatch):
     """tokenization"""
-    return
+    return values
     
 def pos_enc(values: torch.Tensor, inr: INRBatch, layer: PositionalEncoding):
     """positional encoding"""
