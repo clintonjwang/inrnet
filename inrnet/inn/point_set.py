@@ -1,4 +1,5 @@
 """Point set"""
+from __future__ import annotations
 import typing
 from scipy.stats import qmc
 import math

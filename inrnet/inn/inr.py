@@ -292,18 +292,22 @@ class BlackBoxINR(INRBatch):
 
 
 class CondINR(INRBatch):
-    def __init__(self, channels, cond_integrator=False, input_dims=2, domain=(-1,1)):
+    def __init__(self, channels: int, cond_integrator=False,
+        input_dims: int=2, domain: Tuple[int]=(-1,1)):
         super().__init__(channels, input_dims, domain)
         self.cond_integrator = cond_integrator
-    def create_derived_inr(self):
+
+    def create_derived_inr(self) -> INRBatch:
         new_inr = CondINR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
         new_inr.evaluator = self
         return new_inr
-    def create_conditional_inr(self):
+
+    def create_conditional_inr(self) -> INRBatch:
         new_inr = CondINR(cond_integrator=True, channels=self.channels, input_dims=self.input_dims, domain=self.domain)
         new_inr.evaluator = self
         return new_inr
-    def forward(self, coords, condition):
+
+    def forward(self, coords: PointSet, condition: Callable) -> PointValues:
         if self.detached:
             if hasattr(self, "cached_outputs"):
                 return self.cached_outputs.detach()
@@ -311,7 +315,8 @@ class CondINR(INRBatch):
                 return self._forward(coords, condition)
         else:
             return self._forward(coords, condition)
-    def _forward(self, coords, condition):
+
+    def _forward(self, coords: PointSet, condition: Callable) -> PointValues:
         if hasattr(self, "cached_outputs"):
             return self.cached_outputs
         if isinstance(self.evaluator, CondINR):
@@ -336,7 +341,7 @@ class CondINR(INRBatch):
 def merge_domains(d1, d2):
     return (max(d1[0], d2[0]), min(d1[1], d2[1]))
     
-def set_difference(x,y):
+def set_difference(x, y):
     combined = torch.cat((x, y))
     uniques, counts = combined.unique(return_counts=True)
     return uniques[counts == 1]
