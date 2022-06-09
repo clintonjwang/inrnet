@@ -1,7 +1,7 @@
 """Class for minibatches of INRs"""
 import operator
 import pdb
-from typing import Callable
+from typing import Callable, Tuple
 import torch
 nn=torch.nn
 F=nn.functional
@@ -10,14 +10,21 @@ from inrnet import util
 
 class INRBatch(nn.Module):
     """Standard INR minibatch"""
-    def __init__(self, channels, sample_size=256, input_dims=2, domain=(-1,1), device='cuda'):
+    def __init__(self, channels: int,
+        input_dims: int=2, domain: Tuple[int]=(-1,1), device='cuda'):
+        """
+        Args:
+            channels (int): output size
+            input_dims (int, optional): input coord size. Defaults to 2.
+            domain (Tuple[int], optional): _description_. Defaults to (-1,1).
+            device (str, optional): Defaults to 'cuda'.
+        """        
         super().__init__()
-        self.input_dims = input_dims # input coord size
-        self.channels = channels # output size
+        self.input_dims = input_dims
+        self.channels = channels
         self.domain = domain
         self.modifiers = [] # in-place/pointwise modifiers
         self.integrator = None # operators requiring integration
-        self.sample_size = sample_size
         self.detached = False
         self.sample_mode = 'qmc'
         self.caching_enabled = True
@@ -96,23 +103,6 @@ class INRBatch(nn.Module):
             return CatINR(self, other)
         else:
             return self.create_modified_copy(lambda x: torch.cat(x,other))
-
-    # def generate_sample_points(self, method="qmc", sample_size=None, dims=None, ordering='c2f'):
-    #     if sample_size is None:
-    #         sample_size = self.sample_size
-    #     if method == "grid" or self.sample_mode == 'grid':
-    #         if dims is None:
-    #             raise ValueError("declare dims or turn off grid mode")
-    #         return point_set.meshgrid_coords(*dims, c2f=ordering=='c2f')
-    #     elif method == "shrunk" or self.sample_mode == 'shrunk':
-    #         coords = qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
-    #             bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
-    #         return coords * coords.abs()
-    #     elif method in ("qmc", 'rqmc'):
-    #         return qmc.generate_quasirandom_sequence(d=self.input_dims, n=sample_size,
-    #             bbox=(*self.domain, *self.domain), scramble=(method=='rqmc'))
-    #     else:
-    #         raise NotImplementedError("invalid method: "+method)
 
     def set_integrator(self, function, name, layer=None, **kwargs):
         self.integrator = Integrator(function, name, inr=self, layer=layer, **kwargs)
@@ -299,8 +289,8 @@ class BlackBoxINR(INRBatch):
 
 
 class CondINR(INRBatch):
-    def __init__(self, channels, cond_integrator=False, sample_size=256, input_dims=2, domain=(-1,1)):
-        super().__init__(channels, sample_size, input_dims, domain)
+    def __init__(self, channels, cond_integrator=False, input_dims=2, domain=(-1,1)):
+        super().__init__(channels, input_dims, domain)
         self.cond_integrator = cond_integrator
     def create_derived_inr(self):
         new_inr = CondINR(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
@@ -350,8 +340,8 @@ def set_difference(x,y):
 
 class MergeINR(INRBatch):
     def __init__(self, inr1, inr2, channels, merge_function, interpolator=None):
-        domain = merge_domains(inr1.domain, inr2.domain)
-        super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
+        super().__init__(channels=channels, input_dims=inr1.input_dims,
+            domain=merge_domains(inr1.domain, inr2.domain))
         self.inr1 = inr1
         self.evaluator = self.inr2 = inr2
         self.merge_function = merge_function
@@ -427,17 +417,17 @@ class CatINR(MergeINR):
             merge_function=lambda x,y:torch.cat((x,y),dim=-1))
 
 
-# class SplitINR(INRBatch):
-#     # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
-#     def __init__(self, inr, split_channel, merge_function):
-#         super().__init__(channels=channels, input_dims=inr1.input_dims, domain=domain)
-#         self.inr1 = inr1
-#         self.channels1 = split_channel
-#         self.channels2 = inr1.channels - split_channel
-#         raise NotImplementedError('splitinr')
+class SplitINR(INRBatch):
+    # splits an INR into 2 INRs, one of split_channel and one of c_out - split_channel
+    def __init__(self, inr, split_channel, channels, merge_function, domain):
+        super().__init__(channels=channels, input_dims=inr.input_dims, domain=domain)
+        self.inr = inr
+        self.channels1 = split_channel
+        self.channels2 = inr.channels - split_channel
+        raise NotImplementedError('splitinr')
 
-#     def _forward(self, coords):
-#         return torch.split(self.inr1(coords))
+    def _forward(self, coords):
+        return torch.split(self.inr1(coords))
 
 class Integrator:
     """Computes the output of an INR parameterized by a layer requiring integration"""

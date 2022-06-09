@@ -14,7 +14,7 @@ from inrnet.inn import point_set
 from inrnet.models.common import Conv2, Conv5
 from inrnet.inn.nets.classifier import InrCls
 
-def train_classifier(args):
+def train_classifier(args: dict) -> None:
     if not args['no_wandb']:
         wandb.init(project="inrnet", job_type="train", name=args["job_id"],
             config=wandb.helper.parse_config(args, exclude=['job_id']))
@@ -113,7 +113,7 @@ def test_inr_classifier(args):
 
     torch.save((top1, top3), osp.join(paths["job output dir"], "stats.pt"))
 
-def log(variable, *args, use_wandb=True, **kwargs):
+def log(variable, *args, use_wandb=True, **kwargs) -> None:
     if use_wandb:
         wandb.log(variable, *args, **kwargs)
     else:

@@ -3,7 +3,7 @@ import torch
 nn = torch.nn
 F = nn.functional
 
-def translate_activation(layer):
+def translate_activation(layer: nn.Module) -> nn.Module:
     if isinstance(layer, nn.ReLU):
         layer = ReLU()
     elif isinstance(layer, nn.LeakyReLU):
