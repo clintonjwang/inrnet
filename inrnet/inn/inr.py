@@ -1,8 +1,11 @@
 """Class for minibatches of INRs"""
+from __future__ import annotations
 import operator
 import pdb
 from typing import Callable, Tuple
 import torch
+
+from inrnet.inn.point_set import PointSet, PointValues
 nn=torch.nn
 F=nn.functional
 
@@ -107,13 +110,13 @@ class INRBatch(nn.Module):
     def set_integrator(self, function, name, layer=None, **kwargs):
         self.integrator = Integrator(function, name, inr=self, layer=layer, **kwargs)
 
-    def add_modification(self, modification):
+    def add_modification(self, modification) -> None:
         self.sampled_coords = torch.empty(0)
         self.modifiers.append(modification)
         # test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
         # self.channels = test_output.size(1)
 
-    def create_modified_copy(self, modification):
+    def create_modified_copy(self, modification: Callable) -> INRBatch:
         new_inr = self.create_derived_inr()
         new_inr.add_modification(modification)
         return new_inr
@@ -127,38 +130,38 @@ class INRBatch(nn.Module):
         new_inr.evaluator = self
         return new_inr
 
-    def pow(self, n, inplace=False):
+    def pow(self, n, inplace=False) -> INRBatch:
         if inplace:
             self.add_modification(lambda x: x.pow(n))
             return self
         else:
             return self.create_modified_copy(lambda x: x.pow(n))
 
-    def sqrt(self, inplace=False):
+    def sqrt(self, inplace=False) -> INRBatch:
         if inplace:
             self.add_modification(torch.sqrt)
             return self
         return self.create_modified_copy(torch.sqrt)
 
-    def log(self, inplace=False):
+    def log(self, inplace=False) -> INRBatch:
         if inplace:
             self.add_modification(torch.log)
             return self
         return self.create_modified_copy(torch.log)
 
-    def sigmoid(self, inplace=False):
+    def sigmoid(self, inplace=False) -> INRBatch:
         if inplace:
             self.add_modification(torch.sigmoid)
             return self
         return self.create_modified_copy(torch.sigmoid)
 
-    def softmax(self, inplace=False):
+    def softmax(self, inplace=False) -> INRBatch:
         if inplace:
             self.add_modification(lambda x: torch.softmax(x,dim=-1))
             return self
         return self.create_modified_copy(lambda x: torch.softmax(x,dim=-1))
 
-    def matmul(self, other, inplace=False):
+    def matmul(self, other, inplace=False) -> INRBatch:
         if isinstance(other, INRBatch):
             return MatMulINR(self, other)
         elif inplace:
@@ -217,7 +220,7 @@ class INRBatch(nn.Module):
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
-            return output.permute(0,3,1,2).to(dtype=dtype)
+            return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
 
 
 
@@ -235,7 +238,7 @@ class BlackBoxINR(INRBatch):
     def __repr__(self):
         return f"""BlackBoxINR(batch_size={len(self.evaluator)}, channels={self.channels}, modifiers={self.modifiers})"""
 
-    def produce_images(self, H,W, dtype=torch.float):
+    def produce_images(self, H:int,W:int, dtype=torch.float):
         with torch.no_grad():
             xy_grid = util.meshgrid_coords(H,W, c2f=False, device=self.device)
             output = self.forward(xy_grid)
@@ -243,9 +246,9 @@ class BlackBoxINR(INRBatch):
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
-            return output.permute(0,3,1,2).to(dtype=dtype)
+            return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
 
-    def add_transforms(self, spatial=None, intensity=None):
+    def add_transforms(self, spatial=None, intensity=None) -> None:
         if spatial is not None:
             if not hasattr(spatial, '__iter__'):
                 spatial = [spatial]
@@ -255,7 +258,7 @@ class BlackBoxINR(INRBatch):
                 intensity = [intensity]
             self.intensity_transforms += intensity
 
-    def forward(self, coords):
+    def forward(self, coords: PointSet) -> PointValues:
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
         with torch.no_grad():
@@ -265,7 +268,7 @@ class BlackBoxINR(INRBatch):
             out = []
             for inr in self.evaluator:
                 out.append(inr(coords))
-            out = torch.stack(out, dim=0)
+            out = torch.stack(out, dim=0).as_subclass(PointValues)
             if len(out.shape) == 4:
                 out.squeeze_(0)
                 if len(out.shape) == 4:
@@ -277,12 +280,12 @@ class BlackBoxINR(INRBatch):
         self.cached_outputs = out
         return out
 
-    def forward_with_grad(self, coords):
+    def forward_with_grad(self, coords: PointSet) -> PointValues:
         self.sampled_coords = coords
         out = []
         for inr in self.evaluator:
             out.append(inr(coords))
-        out = torch.stack(out, dim=0)
+        out = torch.stack(out, dim=0).as_subclass(PointValues)
         for m in self.modifiers:
             out = m(out)
         return out
@@ -339,7 +342,8 @@ def set_difference(x,y):
     return uniques[counts == 1]
 
 class MergeINR(INRBatch):
-    def __init__(self, inr1, inr2, channels, merge_function, interpolator=None):
+    def __init__(self, inr1: INRBatch, inr2: INRBatch, channels: int,
+        merge_function: Callable, interpolator=None):
         super().__init__(channels=channels, input_dims=inr1.input_dims,
             domain=merge_domains(inr1.domain, inr2.domain))
         self.inr1 = inr1
@@ -347,7 +351,7 @@ class MergeINR(INRBatch):
         self.merge_function = merge_function
         self.interpolator = interpolator
 
-    def merge_coords(self, values1, values2):
+    def merge_coords(self, values1: PointValues, values2: PointValues):
         x = self.inr1.sampled_coords
         y = self.inr2.sampled_coords
         if len(x) == len(y):
@@ -382,7 +386,7 @@ class MergeINR(INRBatch):
         
         return torch.cat((merged_outs, values1[extra_x], values2[extra_y]), dim=0)
 
-    def _forward(self, coords):
+    def _forward(self, coords: PointSet):
         if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
             return self.cached_outputs
         out1 = self.inr1(coords)
@@ -397,7 +401,7 @@ class MergeINR(INRBatch):
         self.cached_outputs = out
         return out
 
-    def change_sample_mode(self, mode='grid'):
+    def change_sample_mode(self, mode: str='grid'):
         self.sample_mode = mode
         self.inr1.change_sample_mode(mode=mode)
         self.inr2.change_sample_mode(mode=mode)

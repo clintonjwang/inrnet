@@ -6,7 +6,7 @@ import torch
 from inrnet.inn.inr import INRBatch
 from inrnet.inn.layers.other import PositionalEncoding
 from inrnet.inn.layers.pooling import AvgPool, MaxPool
-from inrnet.inn.point_set import PointSet
+from inrnet.inn.point_set import PointSet, PointValues
 nn=torch.nn
 
 from inrnet.inn import point_set
@@ -15,11 +15,11 @@ def change_sample_density(values: torch.Tensor, inr: INRBatch, layer):
     coords = inr.sampled_coords
     return coords
 
-def tokenization(values: torch.Tensor, inr: INRBatch):
+def tokenization(values: PointValues, inr: INRBatch):
     """tokenization"""
     return values
     
-def pos_enc(values: torch.Tensor, inr: INRBatch, layer: PositionalEncoding):
+def pos_enc(values: PointValues, inr: INRBatch, layer: PositionalEncoding):
     """positional encoding"""
     coords = inr.sampled_coords.unsqueeze(-1)
     n = 2**torch.arange(layer.N, device=coords.device) * 2*torch.pi * layer.scale
@@ -29,8 +29,8 @@ def pos_enc(values: torch.Tensor, inr: INRBatch, layer: PositionalEncoding):
     else:
         return torch.cat((values, embeddings), dim=-1)
 
-def conv(values: torch.Tensor, # [B,N,c_in]
-    inr: INRBatch, layer: nn.Module):
+def conv(values: PointValues, # [B,N,c_in]
+    inr: INRBatch, layer: nn.Module) -> PointValues:
     """continuous convolution"""
     
     coords = inr.sampled_coords #[N,d]
@@ -136,7 +136,7 @@ def conv(values: torch.Tensor, # [B,N,c_in]
 
     if layer.bias is not None:
         newVals = newVals + layer.bias
-    return newVals
+    return newVals.as_subclass(PointValues)
 
 
 def _cluster_diffs(x, layer, tol=.005, sample_mode=None):
