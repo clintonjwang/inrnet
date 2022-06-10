@@ -289,7 +289,12 @@ class MLPConv(Conv):
 
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.conv, 'MLPConv', layer=self)
+        kwargs = dict(out_channels=self.out_channels, N_bins=self.N_bins,
+                    groups=self.groups, bias=self.bias)
+        if hasattr(self, 'sample_points'):
+            kwargs['sample_points'] = self.sample_points
+        new_inr.set_integrator(inrF.conv, 'MLPConv',
+            coord_to_weights=self.interpolate_weights, **kwargs)
         new_inr.channels = self.out_channels
         return new_inr
 

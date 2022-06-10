@@ -16,16 +16,17 @@ def test_pos_enc(inr16x16, pos_enc_layer, qmc_2d_sequence256):
 
 
 @pytest.fixture
-def conv_layer():
+def conv_layer1to1():
     if torch.cuda.is_available():
         return inn.MLPConv(1,1, kernel_size=(.1,.1))
     else:
         return None
 
 @requirescuda
-def test_conv(inr16x16, conv_layer, qmc_2d_sequence256):
+def test_conv(inr16x16, qmc_2d_sequence256):
     inr16x16.sampled_coords = qmc_2d_sequence256
     values = torch.randn(1,256,1)
     with torch.no_grad():
-        out = inrF.conv(values, inr16x16, conv_layer)
+        raise NotImplementedError
+        out = inrF.conv(values, inr16x16)
     assert out.shape == (1,256,1)

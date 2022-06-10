@@ -1,6 +1,8 @@
 """Normalization Layer"""
 from typing import Optional
 import torch
+
+from inrnet.inn.inr import INRBatch
 nn = torch.nn
 F = nn.functional
 
@@ -51,10 +53,48 @@ class ChannelNorm(nn.Module):
     def __repr__(self):
         return f"ChannelNorm(batch={self.batchnorm}, affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
 
+    def inst_normalize(self, values, inr: INRBatch):
+        if hasattr(self, "running_mean") and not (inr.training and self.training):
+            mean = self.running_mean
+            var = self.running_var
+        else:
+            mean = values.mean(1, keepdim=True)
+            var = values.pow(2).mean(1, keepdim=True) - mean.pow(2)
+            if hasattr(self, "running_mean"):
+                with torch.no_grad():
+                    self.running_mean = self.momentum * self.running_mean + (1-self.momentum) * mean.mean()
+                    self.running_var = self.momentum * self.running_var + (1-self.momentum) * var.mean()
+                mean = self.running_mean
+                var = self.running_var
+                
+        return self.normalize(values, mean, var)
+
+    def batch_normalize(self, values, inr: INRBatch):
+        if hasattr(self, "running_mean") and not (inr.training and self.training):
+            mean = self.running_mean
+            var = self.running_var
+        else:
+            mean = values.mean(dim=(0,1))
+            var = values.pow(2).mean(dim=(0,1)) - mean.pow(2)
+            if hasattr(self, "running_mean"):
+                with torch.no_grad():
+                    self.running_mean = self.momentum * self.running_mean + (1-self.momentum) * mean
+                    self.running_var = self.momentum * self.running_var + (1-self.momentum) * var
+                mean = self.running_mean
+                var = self.running_var
+
+        return self.normalize(values, mean, var)
+
+    def normalize(self, values, mean, var):
+        if hasattr(self, "weight"):
+            return (values - mean)/(var.sqrt() + self.eps) * self.weight + self.bias
+        else:
+            return (values - mean)/(var.sqrt() + self.eps)
+
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         if self.batchnorm:
-            new_inr.set_integrator(inrF.batch_normalize, 'BatchNorm', layer=self)
+            new_inr.set_integrator(self.batch_normalize, 'BatchNorm')
         else:
-            new_inr.set_integrator(inrF.inst_normalize, 'InstanceNorm', layer=self)
+            new_inr.set_integrator(self.inst_normalize, 'InstanceNorm')
         return new_inr

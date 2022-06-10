@@ -140,6 +140,18 @@ def generate_quasirandom_sequence(n:int, d:int=2, bbox:tuple=(-1,1,-1,1), scramb
         out[:,1] = out[:,1] * (bbox[3]-bbox[2]) + bbox[2]
     return out.as_subclass(PointSet)
 
+def get_low_discrepancy_sequence_ball(N, radius=1., eps=0., dtype=torch.float, device="cuda"):
+    # what we really want is a Voronoi partition that minimizes the
+    # difference between the smallest and largest cell volumes, and includes (0,0)
+    #
+    # Fibonacci lattice
+    # http://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/#more-3069
+    indices = torch.arange(0, N).to(device=device, dtype=dtype) + eps
+    R = radius*(indices/(N-1+2*eps)).sqrt() * torch.sigmoid(torch.tensor(N).pow(.4))
+    # shrink radius by some amount to increase Voronoi cells of outer points
+    theta = torch.pi * (1 + 5**0.5) * indices
+    return torch.stack((R*torch.cos(theta), R*torch.sin(theta)), dim=1)
+
 
 # def linspace(domain, steps, c2f=False):
 #     standard_order = torch.linspace(*domain, steps=steps)

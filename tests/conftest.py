@@ -4,7 +4,6 @@ import torch
 from inrnet.inn import point_set
 nn=torch.nn
 from inrnet import inn, args as args_module
-from inrnet.inn import point_set
 from inrnet.inn.nets.classifier import InrCls
 
 requirescuda = pytest.mark.skipif(
@@ -33,10 +32,33 @@ def args():
     args_module.infer_missing_args(args)
     return args
 
+@pytest.fixture
+def point_set2d():
+    # points at (.5,.5) and (-.5,-.5)
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
+    x = torch.tensor(((.5,.5), (-.5,-.5)), device=device)
+    return x.as_subclass(point_set.PointSet)
+
 
 @pytest.fixture
-def inr16x16(C=1, dims=(16,16)):
-    inr_values = torch.zeros(dims[0]*dims[1], C)
+def inr2(C=3):
+    inr_values = torch.zeros(2, C)
+    inr_values[0,0] = 1
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
+    class dummy_inr(nn.Module):
+        def forward(self, coords):
+            return inr_values.to(dtype=coords.dtype, device=device)
+    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1), device=device)
+
+@pytest.fixture
+def inr256(C=1):
+    inr_values = torch.zeros(256, C)
     inr_values[0,:] = 1
     inr_values[-4,:] = 1
     inr_values[-2,:] = 2
@@ -48,7 +70,7 @@ def inr16x16(C=1, dims=(16,16)):
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return inr_values.to(dtype=coords.dtype, device=device)
-    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=len(dims), domain=(-1,1), device=device)
+    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1), device=device)
 
 @pytest.fixture
 def inr_classifier(in_ch=1, n_classes=4):

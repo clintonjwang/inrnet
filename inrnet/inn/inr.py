@@ -21,7 +21,7 @@ class INRBatch(nn.Module):
             input_dims (int, optional): input coord size. Defaults to 2.
             domain (Tuple[int], optional): _description_. Defaults to (-1,1).
             device (str, optional): Defaults to 'cuda'.
-        """        
+        """
         super().__init__()
         self.input_dims = input_dims
         self.channels = channels

@@ -1,3 +1,6 @@
+from conftest import requirescuda
+requirescuda
+
 import pytest, torch, pdb, torchvision
 nn=torch.nn
 F=nn.functional
@@ -7,11 +10,11 @@ import numpy as np
 from inrnet import jobs as job_mgmt
 from inrnet import inn, util
 from inrnet.experiments import classify
-from conftest import requirescuda
+
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 
-@requirescuda
+
 def test_equivalence():
     C = 32
     img_shape = h,w = 8,8
@@ -56,7 +59,6 @@ def test_equivalence():
     # pdb.set_trace()
 
 
-@requirescuda
 def test_equivalence_dummy():
     C = 1
     img_shape = h,w = 16,16
@@ -100,7 +102,6 @@ def test_equivalence_dummy():
     pdb.set_trace()
 
 
-@requirescuda
 def test_backprop():
     job_mgmt.get_job_args("dep1")
     torch.autograd.set_detect_anomaly(True)
@@ -133,7 +134,6 @@ def test_backprop():
 # args = job_mgmt.get_job_args("dep1")
 # train_depth_model(args)
 
-@requirescuda
 def test_layers():
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
@@ -150,7 +150,6 @@ def test_layers():
         assert shape == (64,4), f"shape is {shape}"
     new_inr(torch.randn(64,2).cuda()).sum().backward()
 
-@requirescuda
 def test_network():
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
