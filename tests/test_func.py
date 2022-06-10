@@ -2,6 +2,8 @@ import pytest, torch
 from inrnet import inn
 from inrnet.inn import functional as inrF
 
+from conftest import requirescuda
+
 @pytest.fixture
 def pos_enc_layer():
     return inn.PositionalEncoding(N=2, additive=True)
@@ -20,9 +22,8 @@ def conv_layer():
     else:
         return None
 
+@requirescuda
 def test_conv(inr16x16, conv_layer, qmc_2d_sequence256):
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     inr16x16.sampled_coords = qmc_2d_sequence256
     values = torch.randn(1,256,1)
     with torch.no_grad():

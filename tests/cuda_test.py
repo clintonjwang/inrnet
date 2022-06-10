@@ -7,10 +7,13 @@ import numpy as np
 from inrnet import jobs as job_mgmt
 from inrnet import inn, util
 from inrnet.experiments import classify
+from conftest import requirescuda
+import inrnet.inn.nets.convnext
+import inrnet.models.convnext
 
+
+@requirescuda
 def test_equivalence():
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     C = 32
     img_shape = h,w = 8,8
     zz = torch.randn(h*w, C)
@@ -21,6 +24,9 @@ def test_equivalence():
     # loader = get_inr_loader_for_cityscapes(1, 'train', img_shape)
     # for inr,_ in loader:
     #     break
+    # inrnet.models.convnext.mini_convnext()
+    # inrnet.inn.nets.convnext.translate_convnext_model((128,128))
+
     with torch.no_grad():
         # model = torchvision.models.efficientnet_b0(pretrained=True)
         model = classify.load_model_from_job('inet_nn_train')
@@ -42,29 +48,17 @@ def test_equivalence():
         x = inr.produce_images(h,w)
         y = discrete_model(x)
 
-    if y.shape != out.shape:
-        print('shape mismatch')
-        pdb.set_trace()
-    if not torch.allclose(y, out, rtol=.2, atol=.2):
-        print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max().item())
-        print((y-out).abs().mean().item(), y.abs().mean().item(), out.abs().mean().item())
-        pdb.set_trace()
-    print("success")
-    pdb.set_trace()
-
-test_equivalence()
-print("success")
+    assert y.shape != out.shape
+    # print('shape mismatch')
+    # pdb.set_trace()
+    assert torch.allclose(y, out, rtol=.2, atol=.2)
+    # print('value mismatch:', np.nanmax((2*(y-out)/(out+y)).abs().cpu().numpy()), (y-out).abs().max().item())
+    # print((y-out).abs().mean().item(), y.abs().mean().item(), out.abs().mean().item())
+    # pdb.set_trace()
 
 
-import inrnet.inn.nets.convnext
-import inrnet.models.convnext
-
-inrnet.models.convnext.mini_convnext()
-inrnet.inn.nets.convnext.translate_convnext_model((128,128))
-
+@requirescuda
 def test_equivalence_dummy():
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     C = 1
     img_shape = h,w = 16,16
     zz = torch.zeros(h*w, C)
@@ -107,9 +101,8 @@ def test_equivalence_dummy():
     pdb.set_trace()
 
 
+@requirescuda
 def test_backprop():
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     job_mgmt.get_job_args("dep1")
     torch.autograd.set_detect_anomaly(True)
     model = torchvision.models.efficientnet_b0(pretrained=True)
@@ -141,9 +134,8 @@ def test_backprop():
 # args = job_mgmt.get_job_args("dep1")
 # train_depth_model(args)
 
+@requirescuda
 def test_layers():
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
     model = nn.Sequential(
@@ -159,9 +151,8 @@ def test_layers():
         assert shape == (64,4), f"shape is {shape}"
     new_inr(torch.randn(64,2).cuda()).sum().backward()
 
+@requirescuda
 def test_network():
-    if not torch.cuda.is_available():
-        pytest.skip('no cuda')
     siren = nn.Linear(2,3).cuda()
     inr = inn.BlackBoxINR(siren, channels=3, input_dims=2).cuda()
     model = inn.nets.Conv4(3,4).cuda().train()

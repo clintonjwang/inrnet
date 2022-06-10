@@ -7,6 +7,10 @@ from inrnet import inn, args as args_module
 from inrnet.inn import point_set
 from inrnet.inn.nets.classifier import InrCls
 
+requirescuda = pytest.mark.skipif(
+    not torch.cuda.is_available(), reason='requires cuda'
+)
+
 @pytest.fixture
 def qmc_2d_sequence256():
     return point_set.generate_quasirandom_sequence(d=2, n=256, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
