@@ -11,7 +11,6 @@ from conftest import requirescuda
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 
-
 @requirescuda
 def test_equivalence():
     C = 32

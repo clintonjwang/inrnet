@@ -225,28 +225,27 @@ def max_pool_kernel(values, inr, layer, query_coords=None):
 
 ### Integrations over I
 
-def inner_product(values, inr, layer):
+def inner_product(values: PointValues, inr: INRBatch, layer) -> torch.Tensor:
     W_ij = layer.m_ij(inr.sampled_coords) #(B,d) -> (B,cin,cout)
     if layer.normalized:
         out = values.unsqueeze(1).matmul(torch.softmax(W_ij, dim=-1)).squeeze(1)
     else:
         out = values.unsqueeze(1).matmul(W_ij).squeeze(1)
     if hasattr(layer, "b_j"):
-        return out + layer.b_j
-    else:
-        return out
+        out = out + layer.b_j
+    return out
 
-def global_avg_pool(values):
+def global_avg_pool(values: PointValues) -> torch.Tensor:
     return values.mean(0, keepdim=True)
 
-def adaptive_avg_pool(values, inr, layer):
+def adaptive_avg_pool(values: PointValues, inr: INRBatch, layer) -> torch.Tensor:
     coords = inr.sampled_coords
     Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
     mask = layer.norm(Diffs) < layer.radius 
     Y = values[torch.where(mask)[1]]
     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
-def _get_query_coords(inr, layer):
+def _get_query_coords(inr: INRBatch, layer: nn.Module) -> PointSet:
     coords = inr.sampled_coords
     if layer.down_ratio != 1 and layer.down_ratio != 0:
         if layer.down_ratio > 1: 

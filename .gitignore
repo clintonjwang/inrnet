@@ -6,6 +6,7 @@ inrnet/wandb
 .coverage
 differentiable_volumetric_rendering/
 StyleNeRF/
+.pytest_cache/
 
 __pycache__/
 *.pyc
