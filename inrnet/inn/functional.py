@@ -87,13 +87,12 @@ def conv(values: PointValues, # [B,N,c_in]
                 for ix,y in enumerate(Ysplit):
                     newVals.append(torch.einsum('bni,ni->bi',y,Wsplit[ix])/y.size(1))
             else:
-                raise NotImplementedError('groups')
                 # if g is num groups, each i/g channels produces o/g channels, then concat
                 w_og = coord_to_weights(-bin_centers)
                 n,o,i_g = w_og.shape
-                g = layer.num_groups
+                g = groups
                 o_g = o//g
-                Wsplit = w_og.view(n, o_g,g, i_g).index_select(dim=0, index=bin_ixs).split(lens)
+                Wsplit = w_og.view(n, o_g, g, i_g).index_select(dim=0, index=bin_ixs).split(lens)
                 for ix,y in enumerate(Ysplit):
                     newVals.append(torch.einsum('bnig,nogi->bog', y.reshape(-1, n, i_g, g),
                         Wsplit[ix]).flatten(1)/n)
@@ -278,8 +277,5 @@ def _get_query_coords(inr: INRBatch, down_ratio: float) -> PointSet:
     return query_coords
 
 
-def normalize(values, mean, var, weight=None, bias=None, eps=1e-5):
-    if weight is not None:
-        return (values - mean)/(var.sqrt() + eps) * weight + bias
-    else:
-        return (values - mean)/(var.sqrt() + eps)
+def normalize(values: PointValues, mean, var, eps=1e-5):
+    return (values - mean)/(var.sqrt() + eps)

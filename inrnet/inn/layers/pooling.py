@@ -51,13 +51,13 @@ class KernelPool(nn.Module):
 class AvgPool(KernelPool):
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.avg_pool, 'AvgPool', support=self.support, down_ratio=self.down_ratio)
+        new_inr.add_integrator(inrF.avg_pool, 'AvgPool', support=self.support, down_ratio=self.down_ratio)
         return new_inr
 
 class MaxPool(KernelPool):
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.max_pool, 'MaxPool', support=self.support, down_ratio=self.down_ratio)
+        new_inr.add_integrator(inrF.max_pool, 'MaxPool', support=self.support, down_ratio=self.down_ratio)
         return new_inr
 
 class NeighborPooling(nn.Module):
@@ -71,12 +71,12 @@ class AvgPoolNeighbor(NeighborPooling):
     #Average Pooling layer which pools the k nearest neighbors 
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
+        new_inr.add_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
 
 class MaxPoolNeighbor(NeighborPooling):
     #Max Pooling layer which pools the k nearest neighbors 
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.set_integrator(inrF.max_pool, 'MaxPoolkNN', layer=self)
+        new_inr.add_integrator(inrF.max_pool, 'MaxPoolkNN', layer=self)
         return new_inr

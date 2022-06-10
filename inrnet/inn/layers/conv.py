@@ -293,7 +293,7 @@ class MLPConv(Conv):
                     groups=self.groups, bias=self.bias)
         if hasattr(self, 'sample_points'):
             kwargs['sample_points'] = self.sample_points
-        new_inr.set_integrator(inrF.conv, 'MLPConv',
+        new_inr.add_integrator(inrF.conv, 'MLPConv',
             coord_to_weights=self.interpolate_weights, **kwargs)
         new_inr.channels = self.out_channels
         return new_inr

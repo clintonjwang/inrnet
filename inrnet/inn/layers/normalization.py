@@ -3,6 +3,7 @@ from typing import Optional
 import torch
 
 from inrnet.inn.inr import INRBatch
+from inrnet.inn.point_set import PointValues
 nn = torch.nn
 F = nn.functional
 
@@ -66,7 +67,7 @@ class ChannelNorm(nn.Module):
                     self.running_var = self.momentum * self.running_var + (1-self.momentum) * var.mean()
                 mean = self.running_mean
                 var = self.running_var
-                
+
         return self.normalize(values, mean, var)
 
     def batch_normalize(self, values, inr: INRBatch):
@@ -85,7 +86,7 @@ class ChannelNorm(nn.Module):
 
         return self.normalize(values, mean, var)
 
-    def normalize(self, values, mean, var):
+    def normalize(self, values: PointValues, mean: torch.Tensor, var: torch.Tensor):
         if hasattr(self, "weight"):
             return (values - mean)/(var.sqrt() + self.eps) * self.weight + self.bias
         else:

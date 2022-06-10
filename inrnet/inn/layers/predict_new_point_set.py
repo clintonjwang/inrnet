@@ -14,5 +14,5 @@ class SampleDensityLayer(nn.Module):
         return f"""PredictLayer()"""
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
-        new_inr.integrator = partial(inrF.change_sample_density, inr=new_inr, layer=self)
+        new_inr.add_integrator(inrF.change_sample_density)
         return new_inr
