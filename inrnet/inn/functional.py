@@ -235,17 +235,34 @@ def inner_product(values: PointValues, inr: INRBatch, layer) -> torch.Tensor:
         out = out + layer.b_j
     return out
 
-def global_avg_pool(values: PointValues) -> torch.Tensor:
-    return values.mean(0, keepdim=True)
+# def global_avg_pool(values: PointValues) -> torch.Tensor:
+#     """Collapses spatial coordinate (not in use)
 
-def adaptive_avg_pool(values: PointValues, inr: INRBatch, layer) -> torch.Tensor:
-    coords = inr.sampled_coords
-    Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
-    mask = layer.norm(Diffs) < layer.radius 
-    Y = values[torch.where(mask)[1]]
-    return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
+#     Args:
+#         values (PointValues): has shape (N,d) or (B,N,d)
+
+#     Returns:
+#         torch.Tensor: has shape (B,1,d)
+#     """
+#     return values.mean(-2, keepdim=True)
+
+# def adaptive_avg_pool(values: PointValues, inr: INRBatch, layer) -> torch.Tensor:
+#     coords = inr.sampled_coords
+#     Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
+#     mask = layer.norm(Diffs) < layer.radius 
+#     Y = values[torch.where(mask)[1]]
+#     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
 
 def _get_query_coords(inr: INRBatch, layer: nn.Module) -> PointSet:
+    """Get coordinates for the output INR of this layer
+
+    Args:
+        inr (INRBatch): input INR
+        layer (nn.Module): layer
+
+    Returns:
+        PointSet: coordinates of output INR
+    """    
     coords = inr.sampled_coords
     if layer.down_ratio != 1 and layer.down_ratio != 0:
         if layer.down_ratio > 1: 

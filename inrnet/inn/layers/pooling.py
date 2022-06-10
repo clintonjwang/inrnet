@@ -1,6 +1,8 @@
 """Pooling Layer"""
 from functools import partial
 import torch
+
+from inrnet.inn.inr import INRBatch
 nn = torch.nn
 F = nn.functional
 
@@ -32,8 +34,6 @@ def translate_pool(layer, input_shape, extrema):
     # return MaxPoolKernel(kernel_size=k, down_ratio=s, shift=shift), out_shape, new_extrema
 
 
-
-
 class AvgPool(nn.Module):
     def __init__(self, kernel_size, down_ratio=.25, shift=(0,0)):
         super().__init__()
@@ -45,7 +45,7 @@ class AvgPool(nn.Module):
         self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
                         diffs[...,1].abs() < self.kernel_size[1]/2)
 
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
@@ -56,7 +56,7 @@ class AvgPoolNeighbor(nn.Module):
         self.num_neighbors = k
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
@@ -71,7 +71,7 @@ class AvgPoolBall(nn.Module):
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
         self.diffs_in_support = lambda diffs: self.norm(diffs) < self.radius
         
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.avg_pool, 'AvgPool', layer=self)
         return new_inr
@@ -87,7 +87,7 @@ class MaxPool(nn.Module):
         self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
                         diffs[...,1].abs() < self.kernel_size[1]/2)
 
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.max_pool, 'MaxPool', layer=self)
         return new_inr
@@ -98,7 +98,7 @@ class MaxPoolNeighbor(nn.Module):
         self.num_neighbors = k
         self.down_ratio = down_ratio
         self.register_buffer('shift', torch.tensor(shift))
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.max_pool, 'MaxPoolkNN', layer=self)
         return new_inr
@@ -113,7 +113,7 @@ class MaxPoolBall(nn.Module):
         self.norm = partial(torch.linalg.norm, ord=p_norm, dim=-1)
         self.diffs_in_support = lambda diffs: self.norm(diffs) < self.radius
         
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.set_integrator(inrF.max_pool, 'MaxPoolBall', layer=self)
         return new_inr
