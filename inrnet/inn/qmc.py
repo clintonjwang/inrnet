@@ -76,15 +76,3 @@
 #         W.append(D[px,py])
 #     return torch.stack(w_oi)
 
-
-# def get_minNN_points_in_disk(N, radius=1., eps=0., dtype=torch.float, device="cuda"):
-#     # what we really want is a Voronoi partition that minimizes the
-#     # difference between the smallest and largest cell volumes, and includes (0,0)
-#     #
-#     # Fibonacci lattice
-#     # http://extremelearning.com.au/how-to-evenly-distribute-points-on-a-sphere-more-effectively-than-the-canonical-fibonacci-lattice/#more-3069
-#     indices = torch.arange(0, N).to(device=device, dtype=dtype) + eps
-#     R = radius*(indices/(N-1+2*eps)).sqrt() * torch.sigmoid(torch.tensor(N).pow(.4))
-#     # shrink radius by some amount to increase Voronoi cells of outer points
-#     theta = torch.pi * (1 + 5**0.5) * indices
-#     return torch.stack((R*torch.cos(theta), R*torch.sin(theta)), dim=1)
