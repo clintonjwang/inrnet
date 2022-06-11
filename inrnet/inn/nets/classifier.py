@@ -9,11 +9,6 @@ F = nn.functional
 class InrCls(VectorValuedINRNet):
     def __init__(self, in_channels, out_dims, C=64, **kwargs):
         super().__init__()
-        out_layers = nn.Sequential(nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))
-        for l in out_layers:
-            if hasattr(l, 'weight'):
-                nn.init.kaiming_uniform_(l.weight)
-                nn.init.zeros_(l.bias)
         k0 = kwargs.pop('k0', .04)
         k1 = kwargs.pop('k1', .07)
         k2 = kwargs.pop('k2', .14)
@@ -44,6 +39,14 @@ class InrCls(VectorValuedINRNet):
             l3.append(inn.PositionalEncoding(N=C//2, scale=pe_scale))
         elif posenc == 4:
             l4.append(inn.PositionalEncoding(N=C//2, scale=pe_scale))
+            
+        out_layers = nn.Sequential(nn.Linear(C*2, 128),
+            nn.ReLU(inplace=True), nn.Linear(128, out_dims))
+        for l in out_layers:
+            if hasattr(l, 'weight'):
+                nn.init.kaiming_uniform_(l.weight)
+                nn.init.zeros_(l.bias)
+                
         self.layers = [
             *l1, *l2, *l3, *l4,
             inn.GlobalAvgPoolSequence(out_layers),

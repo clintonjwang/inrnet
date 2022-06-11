@@ -17,18 +17,15 @@ from inrnet import util
 class INRBatch(nn.Module):
     """Standard INR minibatch"""
     def __init__(self, channels: int|None,
-        domain: Support,
-        input_dims: int=2,
+        domain: Support|None=None,
         device='cuda'):
         """
         Args:
             channels (int): output size
-            input_dims (int, optional): input coord size. Defaults to 2.
-            domain (Support, optional): INR support.
+            domain (Support, optional): INR domain.
             device (str, optional): Defaults to 'cuda'.
         """
         super().__init__()
-        self.input_dims = input_dims
         self.channels = channels
         self.domain = domain
         self.detached = False

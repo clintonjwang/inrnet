@@ -5,6 +5,7 @@ import torch
 from graphlib import TopologicalSorter
 
 from inrnet.inn.point_set import PointSet, PointValues
+from inrnet.inn.support import Support
 
 if typing.TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
@@ -13,7 +14,13 @@ nn = torch.nn
 from inrnet import inn, util
 
 class INRNet(nn.Module):
-    def __init__(self, domain=(-1,1), sample_mode='qmc', sample_size=256):
+    def __init__(self, domain: Support|None=None,
+        sample_mode='qmc', sample_size=256, layers=None):
+        """
+        Args:
+            domain (Support, optional): domain of valid INRs.
+            device (str, optional): Defaults to 'cuda'.
+        """
         super().__init__()
         self.domain = domain
         self.sample_mode = sample_mode
@@ -21,8 +28,21 @@ class INRNet(nn.Module):
         self.layers = {}
         self.parents = {}
         self.children = {}
-        self.current_layer = None
-        self.output_layer = None
+        if layers is None:
+            self.output_layer = self.current_layer = None
+        else:
+            assert isinstance(layers, tuple) or isinstance(layers, list)
+            prev_name = None
+            for layer in layers:
+                if name is None:
+                    name = layer.name+".0"
+                while name in self.layers:
+                    name = util.increment_name(name)
+                self.layers[name] = layer
+                if prev_name is not None:
+                    self.parents[name] = [prev_name]
+                self.children = {}
+            self.output_layer = self.current_layer = layer
 
     @property
     def volume(self):

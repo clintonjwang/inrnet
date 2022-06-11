@@ -1,7 +1,10 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import torch
 from typing import Callable
 import operator, pdb
-from inrnet.inn.inr import INRBatch
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 
 from inrnet.inn.point_set import PointSet, PointValues
 nn=torch.nn

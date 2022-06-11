@@ -1,7 +1,9 @@
-import torch
-
-from inrnet.inn.inr import INRBatch
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 from inrnet.inn.point_set import PointValues
+import torch
 nn = torch.nn
 F = nn.functional
 from inrnet.inn import functional as inrF

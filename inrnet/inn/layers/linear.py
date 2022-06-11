@@ -1,12 +1,13 @@
 """1x1 Conv Layer"""
+from __future__ import annotations
 from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 import torch
 nn = torch.nn
 F = nn.functional
 from functools import partial
 he_init = nn.init.kaiming_uniform_
-if TYPE_CHECKING:
-    from inrnet.inn.inr import INRBatch
 
 from inrnet.inn import functional as inrF, polynomials
 
