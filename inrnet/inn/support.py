@@ -14,7 +14,6 @@ class BoundingBox(Support):
             x[...,0] > self.ranges[0][0]) * (x[...,0].abs() < self.ranges[0][0]) * (
             x[...,1] > self.ranges[1][0]) * (x[...,1].abs() < self.ranges[1][0]
         )
-
     
 class Orthotope(Support):
     def __init__(self, dims: tuple[float], grid_shift: tuple[float]=(0,0)):

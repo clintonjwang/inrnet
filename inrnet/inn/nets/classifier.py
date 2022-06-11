@@ -1,10 +1,12 @@
 from inrnet import inn
 
 import torch
+
+from inrnet.inn.nets.inrnet import INRNet, VectorValuedINRNet
 nn = torch.nn
 F = nn.functional
 
-class InrCls(nn.Module):
+class InrCls(VectorValuedINRNet):
     def __init__(self, in_channels, out_dims, C=64, **kwargs):
         super().__init__()
         out_layers = nn.Sequential(nn.Linear(C*2, 128), nn.ReLU(inplace=True), nn.Linear(128, out_dims))

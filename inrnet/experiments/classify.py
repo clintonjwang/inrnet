@@ -37,14 +37,16 @@ def train_classifier(args: dict) -> None:
         else:
             wandb.watch(model[0][0], log_freq=300)
         
+    if args["network"]['type'].startswith('inr'):
+        model.set_sample_mode(dl_args['sample type'])
+
     for img_inr, labels in data_loader:
+        model.train()
         global_step += 1
 
         if args["network"]['type'].startswith('inr'):
-            logit_fxn = model(img_inr)
-            logit_fxn.change_sample_mode(dl_args['sample type'])
-            coords = point_set.generate_sample_points(logit_fxn, dl_args)
-            logits = logit_fxn(coords)
+            coords = model.generate_sample_points(dl_args)
+            logits = model(img_inr, coords)
         else:
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img)
@@ -55,9 +57,10 @@ def train_classifier(args: dict) -> None:
         loss.backward()
         optimizer.step()
         log({'train_loss':loss.item(),
-                'train_t3_acc': top3(pred_cls, labels).item(),
-                'train_t1_acc': top1(pred_cls, labels).item(),
-            }, use_wandb=not args['no_wandb'])
+            'train_t3_acc': top3(pred_cls, labels).item(),
+            'train_t1_acc': top1(pred_cls, labels).item(),
+        }, use_wandb=not args['no_wandb'])
+        
         if global_step % 100 == 0:
             torch.save(model.state_dict(), osp.join(paths["weights dir"], "best.pth"))
         if global_step >= args["optimizer"]["max steps"]:
@@ -66,10 +69,9 @@ def train_classifier(args: dict) -> None:
             with torch.no_grad():
                 img_inr, labels = next(val_data_loader)
                 if args["network"]['type'].startswith('inr'):
-                    logit_fxn = model(img_inr).eval()
-                    logit_fxn.change_sample_mode(dl_args['sample type'])
-                    coords = point_set.generate_sample_points(logit_fxn, dl_args)
-                    logits = logit_fxn(coords)
+                    model.eval()
+                    coords = model.generate_sample_points(dl_args)
+                    logits = model(img_inr, coords)
 
                 else:
                     img = img_inr.produce_images(*dl_args['image shape'])

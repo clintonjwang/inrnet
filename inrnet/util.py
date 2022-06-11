@@ -1,4 +1,5 @@
 import os, itertools
+from typing import Any
 import torch
 import numpy as np
 osp = os.path
@@ -9,6 +10,12 @@ import seaborn as sns
 
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
+
+def append_to_list_dict(dictionary: dict[Any, list], key, value):
+    if key in dictionary:
+        dictionary[key].append(value)
+    else:
+        dictionary[key] = [value]
 
 def increment_name(name: str):
     ix = name.rfind('.')+1
