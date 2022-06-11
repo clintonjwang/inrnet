@@ -1,9 +1,12 @@
 """1x1 Conv Layer"""
+from typing import TYPE_CHECKING
 import torch
 nn = torch.nn
 F = nn.functional
 from functools import partial
 he_init = nn.init.kaiming_uniform_
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 
 from inrnet.inn import functional as inrF, polynomials
 
@@ -32,7 +35,7 @@ class ChannelMixer(nn.Module):
             out_channels={self.out_channels}, bias={hasattr(self, 'bias')}, 
             normalized={self.normalized})"""
 
-    def forward(self, inr):
+    def forward(self, inr: INRBatch) -> INRBatch:
         if self.normalized:
             out = inr.matmul(torch.softmax(self.weight.T, dim=-1))
         else:

@@ -4,7 +4,8 @@ import operator
 import pdb
 from typing import Callable, Tuple
 import torch
-from inrnet.inn.base_inr import INRBase, INRBatch
+from inrnet.inn.base_inr import INRBase, Integrator
+from inrnet.inn.nets.inrnet import INRNet
 
 from inrnet.inn.point_set import PointSet, PointValues
 nn=torch.nn
@@ -14,6 +15,36 @@ from inrnet import util
 
 class INRBatch(INRBase):
     """Standard INR minibatch"""
+    def __init__(self, channels: int,
+        input_dims: int=2, domain: Tuple[int]=(-1,1),
+        sample_mode='qmc', device='cuda'):
+        super().__init__(channels, input_dims, domain, sample_mode, device)
+        self.inet = INRNet()
+        
+    def forward(self, coords: PointSet) -> PointValues:
+        if self.detached:
+            if hasattr(self, "cached_outputs"):
+                return self.cached_outputs.detach()
+            with torch.no_grad():
+                return self._forward(coords)
+        return self._forward(coords)
+
+    def _forward(self, coords: PointSet) -> PointValues:
+        if hasattr(self, "cached_outputs"):
+            return self.cached_outputs
+
+        out = self.inet(coords)
+        self.sampled_coords = self.inet.sampled_coords
+        if hasattr(self.inet, 'dropped_coords'):
+            self.dropped_coords = self.inet.dropped_coords
+        
+        self.inet(out)
+        for m in self.modifiers:
+            out = m(out)
+        if self.caching_enabled:
+            self.cached_outputs = out
+        return out
+
     def __neg__(self):
         self.add_modification(lambda x: -x)
         return self
@@ -60,14 +91,6 @@ class INRBatch(INRBase):
         else:
             return self.create_modified_copy(lambda x: torch.cat(x,other))
 
-    def add_integrator(self, function, name, layer=None, **kwargs):
-        self.compute_graph.add_node('integrator', Integrator(function, name, layer=layer, **kwargs))
-
-    def add_modification(self, modification) -> None:
-        self.compute_graph.add_node('modifier', modification)
-        # test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
-        # self.channels = test_output.size(1)
-
     def create_modified_copy(self, modification: Callable) -> INRBatch:
         new_inr = self.create_derived_inr()
         new_inr.add_modification(modification)
@@ -81,7 +104,7 @@ class INRBatch(INRBase):
         new_inr.evaluator = self
         return new_inr
 
-class BlackBoxINR(INRBatch):
+class BlackBoxINR(INRBase):
     """
     Wrapper for arbitrary INR architectures (SIREN, NeRF, etc.).
     Not batched - this generates each INR one at a time, then concats them.
@@ -294,19 +317,3 @@ class SplitINR(INRBatch):
 
     def _forward(self, coords):
         return torch.split(self.inr1(coords))
-
-class Integrator:
-    """Computes the output of an INR parameterized by a layer requiring integration"""
-    def __init__(self, integrand: Callable, name: str,
-        layer: nn.Module | None = None, **kwargs):
-        self.function = integrand
-        self.name = name
-        self.layer = layer
-        self.kwargs = kwargs
-    def __repr__(self):
-        return self.name
-    def __call__(self, inr: INRBatch, *args):
-        kwargs = self.kwargs.copy()
-        if self.layer is not None:
-            kwargs['layer'] = self.layer
-        return self.function(inr, *args, **kwargs)

@@ -1,12 +1,9 @@
 """Class for minibatches of INRs"""
 from __future__ import annotations
-import operator
-import pdb
 from typing import Callable, Tuple
 import torch
-from inrnet.inn.nets.inrnet import INRNet
 
-from inrnet.inn.point_set import PointSet, PointValues
+from inrnet.inn.point_set import PointValues
 nn=torch.nn
 F=nn.functional
 
@@ -34,7 +31,6 @@ class INRBase(nn.Module):
         self.sample_mode = sample_mode
         self.caching_enabled = True
         self.device = device
-        self.compute_graph = INRNet()
         if not isinstance(domain, tuple):
             raise NotImplementedError("domain must be an n-cube")
 
@@ -67,67 +63,10 @@ class INRBase(nn.Module):
     def __neg__(self):
         self.add_modification(lambda x: -x)
         return self
-
-    def add_integrator(self, function, name, layer=None, **kwargs):
-        self.compute_graph.add_node('integrator', Integrator(function, name, layer=layer, **kwargs))
-
-    def add_modification(self, modification) -> None:
-        self.compute_graph.add_node('modifier', modification)
+    def add_layer(self, modification) -> None:
+        self.compute_graph.add_layer('modifier', modification)
         # test_output = modification(torch.randn(1,self.channels).cuda()) #.double()
         # self.channels = test_output.size(1)
-
-    def create_modified_copy(self, modification: Callable) -> INRBatch:
-        new_inr = self.create_derived_inr()
-        new_inr.add_modification(modification)
-        return new_inr
-    def create_derived_inr(self):
-        new_inr = INRBatch(channels=self.channels, input_dims=self.input_dims, domain=self.domain)
-        new_inr.evaluator = self
-        return new_inr
-    def create_conditional_inr(self):
-        new_inr = CondINR(cond_integrator=True, channels=self.channels, input_dims=self.input_dims, domain=self.domain)
-        new_inr.evaluator = self
-        return new_inr
-
-    def pow(self, n, inplace=False) -> INRBatch:
-        if inplace:
-            self.add_modification(lambda x: x.pow(n))
-            return self
-        else:
-            return self.create_modified_copy(lambda x: x.pow(n))
-
-    def sqrt(self, inplace=False) -> INRBatch:
-        if inplace:
-            self.add_modification(torch.sqrt)
-            return self
-        return self.create_modified_copy(torch.sqrt)
-
-    def log(self, inplace=False) -> INRBatch:
-        if inplace:
-            self.add_modification(torch.log)
-            return self
-        return self.create_modified_copy(torch.log)
-
-    def sigmoid(self, inplace=False) -> INRBatch:
-        if inplace:
-            self.add_modification(torch.sigmoid)
-            return self
-        return self.create_modified_copy(torch.sigmoid)
-
-    def softmax(self, inplace=False) -> INRBatch:
-        if inplace:
-            self.add_modification(lambda x: torch.softmax(x,dim=-1))
-            return self
-        return self.create_modified_copy(lambda x: torch.softmax(x,dim=-1))
-
-    def matmul(self, other, inplace=False) -> INRBatch:
-        if isinstance(other, INRBatch):
-            return MatMulINR(self, other)
-        elif inplace:
-            self.add_modification(lambda x: torch.matmul(x,other))
-            return self
-        else:
-            return self.create_modified_copy(lambda x: torch.matmul(x,other))
 
     def __repr__(self):
         ret = repr(self.evaluator)
@@ -141,34 +80,6 @@ class INRBase(nn.Module):
     def detach(self):
         self.detached = True
         return self
-
-    def forward(self, coords):
-        if self.detached:
-            if hasattr(self, "cached_outputs"):
-                return self.cached_outputs.detach()
-            with torch.no_grad():
-                return self._forward(coords)
-        return self._forward(coords)
-
-    def _forward(self, coords):
-        if hasattr(self, "cached_outputs"):
-            return self.cached_outputs
-
-        out = self.evaluator(coords)
-        # try:
-        self.sampled_coords = self.evaluator.sampled_coords
-        if hasattr(self.evaluator, 'dropped_coords'):
-            self.dropped_coords = self.evaluator.dropped_coords
-        # except AttributeError:
-        #     self.sampled_coords = self.origin.sampled_coords
-        
-        if self.integrator is not None:
-            out = self.integrator(out)
-        for m in self.modifiers:
-            out = m(out)
-        if self.caching_enabled:
-            self.cached_outputs = out
-        return out
 
     def produce_images(self, H,W, dtype=torch.float):
         with torch.no_grad():

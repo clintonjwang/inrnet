@@ -10,6 +10,11 @@ import seaborn as sns
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=1, upper=99, b_min=0, b_max=255, clip=True, dtype=np.uint8)
 rescale_noclip = mtr.ScaleIntensityRangePercentiles(lower=0, upper=100, b_min=0, b_max=255, clip=False, dtype=np.uint8)
 
+def increment_name(name: str):
+    ix = name.rfind('.')+1
+    num = int(name[ix:])
+    return name[:ix]+str(num+1)
+
 def meshgrid(*tensors, indexing='ij') -> torch.Tensor:
     try:
         return torch.meshgrid(*tensors, indexing=indexing)

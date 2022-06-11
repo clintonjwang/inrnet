@@ -1,15 +1,26 @@
+from __future__ import annotations
+import typing
 import numpy as np
 import torch
+from graphlib import TopologicalSorter
+
+from inrnet.inn.point_set import PointSet
+
+if typing.TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 nn = torch.nn
 
-from inrnet import inn
+from inrnet import inn, util
 
 class INRNet(nn.Module):
-    def __init__(self, inputs='INR', outputs='R', domain=(-1,1), sample_mode='qmc', sample_size=256):
+    def __init__(self, sequential, domain=(-1,1), sample_mode='qmc', sample_size=256):
         super().__init__()
         self.domain = domain
         self.sample_mode = sample_mode
         self.sample_size = sample_size
+        self.current_layer = None
+        self.sequential = sequential
+        # self.layers = {}
 
     @property
     def volume(self):
@@ -17,7 +28,26 @@ class INRNet(nn.Module):
             return (self.domain[1] - self.domain[0])**self.input_dims
         else:
             return np.prod([d[1]-d[0] for d in self.domain])
-            
+
+    def append_layer(self, layer):
+        name = layer.name+".0"
+        while name in self.layers:
+            name = util.increment_name(name)
+        if self.current_layer is not None:
+            self.layers[self.current_layer]['successors'].append(name)
+        self.layers[name] = {'layer': layer, 'successors': []}
+        self.current_layer = name
+
+    # def insert_layer(self, layer, predecessor):
+    #     self.current_layer = predecessor
+    #     self.layers['successors']
+    #     self.append_layer(layer)
+
+    def forward(self, inr: INRBatch, coords: PointSet|None=None):
+        return self.sequential(inr)
+        # ts = TopologicalSorter(graph)
+        # layer_order = tuple(ts.static_order())
+
             
 def freeze_layer_types(inrnet, classes=(inn.ChannelMixer, inn.ChannelNorm)):
     for m in inrnet:

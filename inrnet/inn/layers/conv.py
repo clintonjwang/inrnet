@@ -1,9 +1,11 @@
 """Convolutional Layer"""
-from typing import Optional
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import torch, pdb, math
 import numpy as np
 from functools import partial
-from inrnet.inn.inr import INRBatch
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
 
 from inrnet.inn.point_set import PointSet
 nn = torch.nn
@@ -232,7 +234,7 @@ class MLPConv(Conv):
             kernel_size: float | tuple,
             mid_ch: tuple | int = (32,32),
             down_ratio: float=1.,
-            input_dims: int=2, groups: int=1, padded_extrema: Optional[tuple]=None,
+            input_dims: int=2, groups: int=1, padded_extrema: tuple|None=None,
             bias: bool=False,
             mlp_type: str='standard', scale1=None, scale2=1,
             N_bins: int=64,
