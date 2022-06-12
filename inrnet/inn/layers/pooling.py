@@ -3,7 +3,7 @@ from functools import partial
 import torch
 
 from inrnet.inn.inr import INRBatch
-from inrnet.inn.support import Orthotope, Support
+from inrnet.inn.support import BoundingBox, Support
 nn = torch.nn
 F = nn.functional
 
@@ -28,7 +28,7 @@ def translate_pool(layer, input_shape, extrema):
         layer_type = AvgPool
     else:
         raise NotImplementedError
-    return layer_type(support=Orthotope(dims=(k,k), grid_shift=grid_shift),
+    return layer_type(support=BoundingBox.from_orthotope(dims=(k,k), grid_shift=grid_shift),
                 down_ratio=(1/layer.stride)**2), out_shape, new_extrema
     # if isinstance(layer.kernel_size, int):
     #     k = layer.kernel_size**2
@@ -58,25 +58,4 @@ class MaxPool(KernelPool):
     def forward(self, inr: INRBatch) -> INRBatch:
         new_inr = inr.create_derived_inr()
         new_inr.add_integrator(inrF.max_pool, 'MaxPool', support=self.support, down_ratio=self.down_ratio)
-        return new_inr
-
-class NeighborPooling(nn.Module):
-    def __init__(self, k, down_ratio=1., shift=(0,0)):
-        super().__init__()
-        self.num_neighbors = k
-        self.down_ratio = down_ratio
-        self.register_buffer('shift', torch.tensor(shift))
-
-class AvgPoolNeighbor(NeighborPooling):
-    #Average Pooling layer which pools the k nearest neighbors 
-    def forward(self, inr: INRBatch) -> INRBatch:
-        new_inr = inr.create_derived_inr()
-        new_inr.add_integrator(inrF.avg_pool, 'AvgPool', layer=self)
-        return new_inr
-
-class MaxPoolNeighbor(NeighborPooling):
-    #Max Pooling layer which pools the k nearest neighbors 
-    def forward(self, inr: INRBatch) -> INRBatch:
-        new_inr = inr.create_derived_inr()
-        new_inr.add_integrator(inrF.max_pool, 'MaxPoolkNN', layer=self)
         return new_inr

@@ -1,13 +1,13 @@
 """Functions"""
-import pdb
-from typing import Callable, Optional
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from inrnet.inn.inr import INRBatch
+    from inrnet.inn.point_set import PointSet, PointValues
+    from inrnet.inn.support import Support
+from typing import Callable
 import torch
 Tensor = torch.Tensor
-
-from inrnet.inn.inr import INRBatch
-from inrnet.inn.layers.other import PositionalEncoding
-from inrnet.inn.point_set import PointSet, PointValues
-from inrnet.inn.support import Support
 nn=torch.nn
 
 def change_sample_density(values: PointValues, inr: INRBatch):

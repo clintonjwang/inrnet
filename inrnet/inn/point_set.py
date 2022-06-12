@@ -1,15 +1,10 @@
 """Point set"""
-from __future__ import annotations
-import typing
+from inrnet.inn.support import Support
 from scipy.stats import qmc
 import math
 import torch
 
-from inrnet.inn.support import Support
 nn=torch.nn
-
-if typing.TYPE_CHECKING:
-    from inrnet.inn.inr import INRBatch
 from inrnet import util
 
 class PointValues(torch.Tensor):

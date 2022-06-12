@@ -1,8 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from inrnet.inn.point_set import PointSet
+
 from math import gamma
 import numpy as np
 import torch
-
-from inrnet.inn.point_set import PointSet
 
 class Support:
     def in_support(self, x: torch.Tensor) -> torch.Tensor:
