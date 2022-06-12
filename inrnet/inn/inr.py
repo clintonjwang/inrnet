@@ -138,17 +138,18 @@ class INRBatch(nn.Module):
 
 
 class DiscretizedINR(INRBatch):
-    """INR represented as its points and point values"""
     def __init__(self, points: PointSet, values: PointValues,
         domain: Support|None=None):
-        """
+        """INR represented as its points and values at those points
+
         Args:
-            channels (int): output size
+            points (PointSet): _description_
+            values (PointValues): _description_
             domain (Support, optional): INR domain.
         """
         super().__init__()
-        self.points = points
-        self.values = values
+        self.register_buffer('points', points)
+        self.register_buffer('values', values)
         self.domain = domain
 
     def copy_with_transform(self, modification: Callable, name: str) -> DiscretizedINR:
@@ -183,7 +184,7 @@ class DiscretizedINR(INRBatch):
         return self
 
     def __truediv__(self, other):
-        if isinstance(other, INRBatch):
+        if isinstance(other, DiscretizedINR):
             return self.copy_with_transform(lambda x: x / other.values)
         return self.copy_with_transform(lambda x: x / other)
     def __itruediv__(self, other):

@@ -59,13 +59,13 @@ class ChannelNorm(nn.Module):
     def __repr__(self):
         return f"ChannelNorm(batch={self.batchnorm}, affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
 
-    def inst_normalize(self, values, inr: DiscretizedINR) -> DiscretizedINR:
-        if hasattr(self, "running_mean") and not (inr.training and self.training):
+    def inst_normalize(self, inr: DiscretizedINR) -> DiscretizedINR:
+        if hasattr(self, "running_mean") and not self.training:
             mean = self.running_mean
             var = self.running_var
         else:
-            mean = values.mean(1, keepdim=True)
-            var = values.pow(2).mean(1, keepdim=True) - mean.pow(2)
+            mean = inr.values.mean(1, keepdim=True)
+            var = inr.values.pow(2).mean(1, keepdim=True) - mean.pow(2)
             if hasattr(self, "running_mean"):
                 with torch.no_grad():
                     self.running_mean = self.momentum * self.running_mean + (1-self.momentum) * mean.mean()
@@ -73,15 +73,15 @@ class ChannelNorm(nn.Module):
                 mean = self.running_mean
                 var = self.running_var
 
-        return self.normalize(values, mean, var)
+        return self.normalize(inr.values, mean, var)
 
-    def batch_normalize(self, values, inr: DiscretizedINR) -> DiscretizedINR:
-        if hasattr(self, "running_mean") and not (inr.training and self.training):
+    def batch_normalize(self, inr: DiscretizedINR) -> DiscretizedINR:
+        if hasattr(self, "running_mean") and not self.training:
             mean = self.running_mean
             var = self.running_var
         else:
-            mean = values.mean(dim=(0,1))
-            var = values.pow(2).mean(dim=(0,1)) - mean.pow(2)
+            mean = inr.values.mean(dim=(0,1))
+            var = inr.values.pow(2).mean(dim=(0,1)) - mean.pow(2)
             if hasattr(self, "running_mean"):
                 with torch.no_grad():
                     self.running_mean = self.momentum * self.running_mean + (1-self.momentum) * mean
@@ -89,7 +89,7 @@ class ChannelNorm(nn.Module):
                 mean = self.running_mean
                 var = self.running_var
 
-        return self.normalize(values, mean, var)
+        return self.normalize(inr.values, mean, var)
 
     def normalize(self, values: PointValues, mean: torch.Tensor, var: torch.Tensor):
         if hasattr(self, "weight"):
@@ -98,9 +98,7 @@ class ChannelNorm(nn.Module):
             return (values - mean)/(var.sqrt() + self.eps)
 
     def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
-        new_inr = inr.create_derived_inr()
         if self.batchnorm:
-            self.batch_normalize(new_inr)
+            return self.batch_normalize(inr)
         else:
-            self.inst_normalize(new_inr)
-        return new_inr
+            return self.inst_normalize(inr)
