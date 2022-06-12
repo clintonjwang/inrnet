@@ -1,4 +1,5 @@
 """Normalization Layer"""
+import pdb
 from typing import Optional
 import torch
 
@@ -73,7 +74,8 @@ class ChannelNorm(nn.Module):
                 mean = self.running_mean
                 var = self.running_var
 
-        return self.normalize(inr.values, mean, var)
+        inr.values = self.normalize(inr.values, mean, var)
+        return inr
 
     def batch_normalize(self, inr: DiscretizedINR) -> DiscretizedINR:
         if hasattr(self, "running_mean") and not self.training:
@@ -89,9 +91,10 @@ class ChannelNorm(nn.Module):
                 mean = self.running_mean
                 var = self.running_var
 
-        return self.normalize(inr.values, mean, var)
+        inr.values = self.normalize(inr.values, mean, var)
+        return inr
 
-    def normalize(self, values: PointValues, mean: torch.Tensor, var: torch.Tensor):
+    def normalize(self, values: PointValues, mean: torch.Tensor, var: torch.Tensor) -> PointValues:
         if hasattr(self, "weight"):
             return (values - mean)/(var.sqrt() + self.eps) * self.weight + self.bias
         else:

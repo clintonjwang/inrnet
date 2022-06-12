@@ -2,6 +2,7 @@ import pytest
 import torch
 
 from inrnet.inn import point_set
+from inrnet.inn.support import BoundingBox
 nn=torch.nn
 from inrnet import inn, args as args_module
 from inrnet.inn.nets.classifier import InrCls
@@ -54,7 +55,8 @@ def inr2(C=3):
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return inr_values.to(dtype=coords.dtype, device=device)
-    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1), device=device)
+    return inn.BlackBoxINR([dummy_inr()], channels=C,
+            domain=BoundingBox((-1,1),(-1,1)), device=device)
 
 @pytest.fixture
 def inr256(C=1):
@@ -70,14 +72,15 @@ def inr256(C=1):
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return inr_values.to(dtype=coords.dtype, device=device)
-    return inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1), device=device)
+    return inn.BlackBoxINR([dummy_inr()], channels=C,
+            domain=BoundingBox((-1,1),(-1,1)), device=device)
 
-@pytest.fixture
-def inr_classifier(in_ch=1, n_classes=4):
-    if torch.cuda.is_available():
-        device = 'cuda'
-        return InrCls(in_ch, n_classes, device=device)
-    else:
-        device = 'cpu'
-        return None
-
+# @pytest.fixture
+# def inr_classifier(in_ch=1, n_classes=4):
+#     if torch.cuda.is_available():
+#         device = 'cuda'
+#         sampler = 
+#         return InrCls(in_ch, n_classes, sampler, device=device)
+#     else:
+#         device = 'cpu'
+#         return None

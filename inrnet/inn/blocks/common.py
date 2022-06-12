@@ -1,4 +1,6 @@
 import torch
+
+from inrnet.inn.support import BoundingBox
 nn = torch.nn
 F = nn.functional
 
@@ -6,8 +8,9 @@ from inrnet import inn
 
 def conv_norm_act(in_, out_, kernel_size=(.1,.1), **kwargs):
     act_layer = inn.get_activation_layer(kwargs.pop("activation", "swish"))
-    cv = inn.MLPConv(in_, out_, kernel_size=kernel_size, **kwargs)
-    cv.mask_tracker = True
+    kernel_support = BoundingBox.from_orthotope(dims=kernel_size)
+    cv = inn.MLPConv(in_, out_, kernel_support=kernel_support, **kwargs)
+    # cv.mask_tracker = True
     return nn.Sequential(cv,
         inn.ChannelNorm(out_),
         act_layer,

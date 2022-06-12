@@ -5,6 +5,7 @@ import operator
 import pdb
 from typing import Callable
 import torch
+from inrnet.inn import point_set
 from inrnet.inn.layers.merge import MergeLayer
 from inrnet.inn.layers.other import PointWiseFunction
 from inrnet.inn.point_set import PointSet, PointValues
@@ -30,7 +31,6 @@ class INRBatch(nn.Module):
         self.domain = domain
         self.detached = False
         self.device = device
-        self.layer = None
 
     def forward(self, coords: PointSet) -> PointValues:
         return NotImplemented
@@ -40,22 +40,22 @@ class INRBatch(nn.Module):
 
 
 class DiscretizedINR(INRBatch):
-    def __init__(self, coords: PointSet, values: PointValues,
-        domain: Support|None=None):
+    def __init__(self, coords: PointSet, values: PointValues, domain: Support|None=None):
         """INR represented as its points and values at those points
 
         Args:
-            coords (PointSet): _description_
-            values (PointValues): _description_
+            coords (PointSet): coordinates of sample points
+            values (PointValues): values of sample points
             domain (Support, optional): INR domain.
         """
-        super().__init__()
+        super().__init__(channels=values.size(-1), domain=domain)
         self.register_buffer('coords', coords)
         self.register_buffer('values', values)
-        self.domain = domain
-
-    def copy_with_transform(self, modification: Callable, name: str) -> DiscretizedINR:
-        return DiscretizedINR(self.coords, modification(self.values), domain=self.domain)
+    
+    def copy_with_transform(self, modification: Callable) -> DiscretizedINR:
+        inr = self.create_derived_inr()
+        inr.values = modification(self.values)
+        return inr
 
     def __neg__(self):
         self.values = -self.values
@@ -95,6 +95,10 @@ class DiscretizedINR(INRBatch):
     def __rtruediv__(self, other):
         return self.copy_with_transform(lambda x: other/x)
     
+    def matmul(self, other):
+        if isinstance(other, DiscretizedINR):
+            return self.copy_with_transform(lambda x: x.matmul(other.values))
+        return self.copy_with_transform(lambda x: x.matmul(other))
 
 
 
@@ -114,13 +118,13 @@ class BlackBoxINR(INRBatch):
 
     def produce_images(self, H:int,W:int, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = util.meshgrid_coords(H,W, c2f=False, device=self.device)
+            xy_grid = point_set.meshgrid_coords(H,W, c2f=False, device=self.device)
             output = self.forward(xy_grid)
             output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
-            return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
+            return output.permute(0,3,1,2).to(dtype=dtype)#.as_subclass(PointValues)
 
     def add_transforms(self, spatial=None, intensity=None) -> None:
         if spatial is not None:
@@ -133,16 +137,16 @@ class BlackBoxINR(INRBatch):
             self.intensity_transforms += intensity
 
     def forward(self, coords: PointSet) -> PointValues:
-        if hasattr(self, "cached_outputs") and self.sampled_coords.shape == coords.shape and torch.allclose(self.sampled_coords, coords):
+        if hasattr(self, "cached_outputs") and self.coords.shape == coords.shape and torch.allclose(self.coords, coords):
             return self.cached_outputs
         with torch.no_grad():
             for tx in self.spatial_transforms:
                 coords = tx(coords)
-            self.sampled_coords = coords
+            self.coords = coords
             out = []
             for inr in self.evaluator:
                 out.append(inr(coords))
-            out = torch.stack(out, dim=0).as_subclass(PointValues)
+            out = torch.stack(out, dim=0)#.as_subclass(PointValues)
             if len(out.shape) == 4:
                 out.squeeze_(0)
                 if len(out.shape) == 4:
@@ -153,9 +157,9 @@ class BlackBoxINR(INRBatch):
         return out
 
     def forward_with_grad(self, coords: PointSet) -> PointValues:
-        self.sampled_coords = coords
+        self.coords = coords
         out = []
         for inr in self.evaluator:
             out.append(inr(coords))
-        out = torch.stack(out, dim=0).as_subclass(PointValues)
+        out = torch.stack(out, dim=0)#.as_subclass(PointValues)
         return out

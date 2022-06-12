@@ -33,5 +33,5 @@ class PositionalEncoding(nn.Module):
         return f"""PositionalEncoding(N={self.N})"""
 
     def forward(self, inr: INRBatch) -> INRBatch:
-        inr.add_integrator(inrF.pos_enc, 'PositionalEncoding', layer=self)
-        return inr
+        return inrF.pos_enc(inr=inr, N=self.N, additive=self.additive,
+                scale=self.scale)

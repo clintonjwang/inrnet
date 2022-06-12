@@ -1,4 +1,5 @@
 from conftest import requirescuda
+from inrnet.inn import point_set
 requirescuda
 
 import pytest, torch, pdb, torchvision
@@ -13,9 +14,6 @@ from inrnet.experiments import classify
 
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
-
-# def fit_inr():
-
 
 def test_equivalence():
     C = 32
@@ -86,7 +84,7 @@ def test_equivalence_dummy():
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
         y = discrete_model(x)
 
-        coords = util.meshgrid_coords(h,w)
+        coords = point_set.meshgrid_coords(h,w)
         out_inr = InrNet.cuda()(inr)
         out_inr.toggle_grid_mode(True)
         out = out_inr.eval()(coords)
@@ -124,7 +122,7 @@ def test_backprop():
     InrNet.weight.data.zero_()
     optim = torch.optim.Adam(InrNet.parameters(), lr=.01)
 
-    coords = util.meshgrid_coords(h,w)
+    coords = point_set.meshgrid_coords(h,w)
     for _ in range(5):
         out_inr = InrNet(inr)
         out = out_inr(coords)

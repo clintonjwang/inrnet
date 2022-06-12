@@ -1,10 +1,11 @@
 """Functions"""
 from __future__ import annotations
+import pdb
 from typing import TYPE_CHECKING
 
+from inrnet.inn.point_set import PointSet, PointValues
 if TYPE_CHECKING:
     from inrnet.inn.inr import DiscretizedINR
-    from inrnet.inn.point_set import PointSet, PointValues
     from inrnet.inn.support import Support
 from typing import Callable
 import torch
@@ -31,21 +32,19 @@ def pos_enc(inr: DiscretizedINR, N: int,
         inr.values = torch.cat((inr.values, embeddings), dim=-1)
     return inr
 
-def conv(# [B,N,c_in]
-    inr: DiscretizedINR, out_channels: int,
+def conv(inr: DiscretizedINR, out_channels: int,
     coord_to_weights: Callable[[PointSet], Tensor],
-    support: Support, down_ratio: float,
+    kernel_support: Support, down_ratio: float,
     N_bins: int=0, groups: int=1,
     grid_points=None, qmc_points=None,
     bias: Tensor|None=None) -> PointValues:
     """Continuous convolution
 
     Args:
-        values (PointValues): _description_
         inr (DiscretizedINR): input INR
         out_channels (int): _description_
         coord_to_weights (Callable[[PointSet], Tensor]): _description_
-        support (Support): _description_
+        kernel_support (Support): _description_
         down_ratio (float): _description_
         N_bins (int, optional): _description_. Defaults to 0.
         groups (int, optional): _description_. Defaults to 1.
@@ -57,15 +56,12 @@ def conv(# [B,N,c_in]
         PointValues: _description_
     """
     
-    coords = inr.coords #[N,d]
     query_coords = _get_query_coords(inr, down_ratio)
     in_channels = inr.channels
 
-    if inr.sample_mode == 'grid' and hasattr(support, 'grid_shift'):
-        query_coords = query_coords + support.grid_shift
-    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    mask = support.in_support(Diffs)
-    padding_ratio = support.kernel_intersection_ratio(query_coords)
+    Diffs = query_coords.unsqueeze(1) - inr.coords.unsqueeze(0)
+    mask = kernel_support.in_support(Diffs)
+    # padding_ratio = kernel_support.kernel_intersection_ratio(query_coords)
     # if hasattr(layer, 'mask_tracker'):
     #     layer.mask_tracker = mask.sum(1).detach().cpu()
 
@@ -77,10 +73,10 @@ def conv(# [B,N,c_in]
     Ysplit = Y.split(lens, dim=1) # list of values at neighborhood points
     newVals = []
 
-    if inr.sample_mode == 'grid' or N_bins != 0:
+    if inr.coords.sample_mode == 'grid' or N_bins != 0:
         ## group similar displacements
         bin_ixs, bin_centers = _cluster_points(Diffs, grid_points=grid_points, qmc_points=qmc_points,
-            sample_mode=inr.sample_mode)
+            sample_mode=inr.coords.sample_mode)
 
         if groups != 1:
             if groups == out_channels and groups == in_channels:
@@ -130,12 +126,13 @@ def conv(# [B,N,c_in]
                 #     newVals.append(y.unsqueeze(1).matmul(w_oi).squeeze(1).mean(0))
         
     newVals = torch.stack(newVals, dim=1) #[B,N,c_out]
-    if padding_ratio is not None:
-        newVals *= padding_ratio.unsqueeze(-1)
+    # if padding_ratio is not None:
+    #     newVals *= padding_ratio.unsqueeze(-1)
 
     if bias is not None:
         newVals = newVals + bias
-    inr.values = newVals.as_subclass(PointValues)
+    inr.values = newVals#.as_subclass(PointValues)
+    inr.coords = query_coords
     return inr
 
 
@@ -204,19 +201,19 @@ def _get_query_coords(inr: DiscretizedINR, down_ratio: float) -> PointSet:
     Returns:
         PointSet: coordinates of output INR
     """    
-    coords = inr.coords
     if down_ratio != 1 and down_ratio != 0:
         if down_ratio > 1: 
             down_ratio = 1/down_ratio
-        N = round(coords.size(0)*down_ratio)
-        if inr.sample_mode != 'qmc':
-            if not hasattr(inr, 'dropped_coords'):
-                inr.dropped_coords = coords[N:]
-            else:
-                inr.dropped_coords = torch.cat((coords[N:], inr.dropped_coords), dim=0)
-        inr.coords = query_coords = coords[:N]
+        N = round(inr.coords.size(0)*down_ratio)
+        # if inr.sample_mode != 'qmc':
+        #     if not hasattr(inr, 'dropped_coords'):
+        #         inr.dropped_coords = inr.coords[N:]
+        #     else:
+        #         inr.dropped_coords = torch.cat((inr.coords[N:], inr.dropped_coords), dim=0)
+        query_coords = inr.coords[:N]
+        query_coords.sample_mode = inr.coords.sample_mode
     else:
-        query_coords = coords
+        query_coords = inr.coords
     return query_coords
 
 

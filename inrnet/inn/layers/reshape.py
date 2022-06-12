@@ -1,6 +1,8 @@
 """INR -> vector or vector -> INR Layer"""
 import pdb
 import torch
+
+from inrnet.inn.inr import DiscretizedINR
 nn = torch.nn
 F = nn.functional
 
@@ -50,17 +52,14 @@ class GlobalAvgPoolSequence(nn.Module):
     def __init__(self, layers):
         super().__init__()
         self.layers = layers
-    def forward(self, inr):
-        vvf = inr.create_derived_inr()
-        vvf.integrator = inn.Integrator(GAPseq, 'GlobalPoolSeq', layer=self, inr=inr)
-        return vvf
+    def forward(self, inr: DiscretizedINR) -> torch.Tensor:
+        if inr.training:
+            self.train()
+        else:
+            self.eval()
 
-def GAPseq(values, layer, inr):
-    if inr.training:
-        layer.train()
-    else:
-        layer.eval()
-    return layer.layers(values.mean(1).float())
+        return self.layers(inr.values.mean(1).float())
+
     
 class AdaptiveAvgPoolSequence(nn.Module):
     def __init__(self, output_size, layers, extrema=((-1,1),(-1,1))):
@@ -68,41 +67,38 @@ class AdaptiveAvgPoolSequence(nn.Module):
         self.output_size = output_size
         self.layers = layers
         self.extrema = extrema
-    def forward(self, inr):
-        vvf = inr.create_derived_inr()
-        vvf.integrator = inn.Integrator(AAPseq, 'AdaptivePoolSeq', layer=self, inr=inr)
-        return vvf
-
-def AAPseq(values, layer, inr, eps=1e-6):
-    coords = inr.sampled_coords
-    if inr.training:
-        layer.train()
-    else:
-        layer.eval()
-    h,w = layer.output_size
-    if layer.extrema is None:
-        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
-            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
-
-    Tx = torch.linspace(layer.extrema[0][0]-eps, layer.extrema[0][1]+eps, steps=h+1, device=coords.device)
-    Ty = torch.linspace(layer.extrema[1][0]-eps, layer.extrema[1][1]+eps, steps=w+1, device=coords.device)
-
-    X = coords[:,0].unsqueeze(1)
-    Y = coords[:,1].unsqueeze(1)
-
-    v, kx = (Tx<=X).min(dim=-1)
-    if not v.max() == False:
-        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
-            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
-        return AAPseq(values, layer, inr)
-
-    v, ky = (Ty<=Y).min(dim=-1)
-    if not v.max() == False:
-        layer.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
-            (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
-        return AAPseq(values, layer, inr)
         
-    bins = kx-1 + (ky-1)*h
-    out = torch.cat([values[:,bins==b].mean(1) for b in range(h*w)], dim=1)
-    return layer.layers(out)
-    
+    def forward(self, inr: DiscretizedINR, eps=1e-6) -> torch.Tensor:
+        if inr.training:
+            self.train()
+        else:
+            self.eval()
+
+        coords = inr.coords
+        h,w = self.output_size
+        if self.extrema is None:
+            self.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+                (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
+
+        Tx = torch.linspace(self.extrema[0][0]-eps, self.extrema[0][1]+eps, steps=h+1, device=coords.device)
+        Ty = torch.linspace(self.extrema[1][0]-eps, self.extrema[1][1]+eps, steps=w+1, device=coords.device)
+
+        X = coords[:,0].unsqueeze(1)
+        Y = coords[:,1].unsqueeze(1)
+
+        v, kx = (Tx<=X).min(dim=-1)
+        if not v.max() == False:
+            self.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+                (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
+            return self.forward(inr)
+
+        v, ky = (Ty<=Y).min(dim=-1)
+        if not v.max() == False:
+            self.extrema = ((coords[:,0].min()-1e-3, coords[:,0].max()+1e-3),
+                (coords[:,1].min()-1e-3, coords[:,1].max()+1e-3))
+            return self.forward(inr)
+            
+        bins = kx-1 + (ky-1)*h
+        out = torch.cat([inr.values[:,bins==b].mean(1) for b in range(h*w)], dim=1)
+        return self.layers(out)
+        

@@ -30,28 +30,38 @@ class BoundingBox(Support):
         self.bounds = bounds
         self.dimensionality = len(bounds)
         assert len(bounds) == 2 and len(bounds[0]) == 2
-    
+        
+    def __str__(self):
+        return 'BoundingBox'
+    def __repr__(self):
+        return f'BoundingBox({self.bounds})'
+
     @classmethod
-    def from_orthotope(cls, dims: tuple[float], center: tuple[float]=(0,0)):
+    def from_orthotope(cls, dims: tuple[float], center: tuple[float]|None=None):
         """Alternative constructor by specifying shape and center.
 
         Args:
             dims (tuple[float]): Dimensions.
             center (tuple[int], optional): center of the kernel. Defaults to (0,0).
         """
-        bounds = [(dims[ix][0] + center[0],
-            dims[ix][0] + center[1]) for ix in range(len(dims))]
+        if center is None:
+            center = [0] * len(dims)
+        bounds = [(-dims[ix]/2 + center[ix], dims[ix]/2 + center[ix]) for \
+                                            ix in range(len(dims))]
         return cls(bounds)
+
+    @property
+    def shape(self):
+        return [b[1]-b[0] for b in self.bounds]
+    @property
+    def volume(self):
+        return np.prod(self.shape)
 
     def in_support(self, x: torch.Tensor) -> torch.Tensor:
         return (
             x[...,0] > self.bounds[0][0]) * (x[...,0] < self.bounds[0][1]) * (
             x[...,1] > self.bounds[1][0]) * (x[...,1] < self.bounds[1][1]
         )
-
-    @property
-    def volume(self):
-        return np.prod([r[1]-r[0] for r in self.ranges])
 
 class Ball(Support):
     def __init__(self, radius: float, p_norm: str="inf",
@@ -66,6 +76,11 @@ class Ball(Support):
         self.radius = radius
         self.p_norm = p_norm
         self.dimensionality = dimensionality
+
+    def __str__(self):
+        return 'Ball'
+    def __repr__(self):
+        return f'Ball({self.radius})'
 
     def in_support(self, x: torch.Tensor) -> torch.Tensor:
         return torch.linalg.norm(x, ord=self.p_norm, dim=-1) < self.radius

@@ -29,8 +29,10 @@ class INRNet(nn.Module):
     def __getitem__(self, ix):
         return self.layers[ix]
 
-    def sample_inr(self, inr: INRBatch) -> DiscretizedINR:
-        coords = generate_sample_points(domain=inr.domain, sampler=self.sampler)
+    def sample_inr(self, inr: INRBatch, sampler=None) -> DiscretizedINR:
+        if sampler is None:
+            sampler = self.sampler
+        coords = generate_sample_points(domain=inr.domain, sampler=sampler)
         return DiscretizedINR(coords, values=inr(coords), domain=inr.domain)
         
     def forward(self, inr: INRBatch) -> DiscretizedINR|torch.Tensor:
@@ -39,18 +41,16 @@ class INRNet(nn.Module):
 
     def produce_images(self, inr: INRBatch, H,W, dtype=torch.float):
         with torch.no_grad():
-            xy_grid = util.meshgrid_coords(H,W, device=self.device)
-            coords = generate_sample_points(domain=inr.domain, sampler={
+            d_inr = self.sample_inr(inr, sampler={
                 'sample type': 'grid', 'dims': (H,W),
             })
-            d_inr = DiscretizedINR(coords, values=inr(coords), domain=inr.domain)
             out_inr = self.layers(d_inr)
             output = util.sort_inr(out_inr).values
             output = output.reshape(output.size(0),H,W,-1)
         if dtype == 'numpy':
             return output.squeeze(-1).cpu().float().numpy()
         else:
-            return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
+            return output.permute(0,3,1,2).to(dtype=dtype)#.as_subclass(PointValues)
 
 def freeze_layer_types(inrnet, classes=(inn.ChannelMixer, inn.ChannelNorm)):
     for m in inrnet:

@@ -1,6 +1,8 @@
 """Convolutional Layer"""
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
+from inrnet.inn.support import BoundingBox, Support
 if TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 import torch, pdb, math
@@ -81,12 +83,13 @@ def translate_conv2d(conv2d, input_shape, extrema=((-1,1),(-1,1)),
 
 
 class Conv(nn.Module):
-    def __init__(self, in_channels:int, out_channels:int, input_dims:int=2,
+    def __init__(self, in_channels:int, out_channels:int, kernel_support:Support,
         down_ratio:float=1., groups:int=1, bias:bool=False, dtype=torch.float):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.input_dims = input_dims
+        self.kernel_support = kernel_support
+        assert isinstance(kernel_support, BoundingBox)
         self.down_ratio = down_ratio
         self.groups = groups
         self.group_size = self.in_channels // self.groups
@@ -95,6 +98,10 @@ class Conv(nn.Module):
             self.bias = nn.Parameter(torch.zeros(out_channels, dtype=dtype))
         else:
             self.bias = None
+
+    @property
+    def kernel_size(self):
+        return self.kernel_support.shape
 
     def kernel_intersection_ratio(self, query_coords: PointSet):
         """Returns a factor by which to scale the outputs in case of zero-padding
@@ -113,6 +120,77 @@ class Conv(nn.Module):
             self.kernel_size[1] - F.relu(k[1] - dist_to_boundary[:,1])) / self.kernel_size[0] / self.kernel_size[1]
         return padding_ratio
 
+class MLPConv(Conv):
+    def __init__(self, in_channels: int, out_channels: int,
+            kernel_support: Support,
+            mid_ch: tuple | int = (32,32),
+            down_ratio: float=1.,
+            groups: int=1, padded_extrema: tuple|None=None,
+            bias: bool=False,
+            mlp_type: str='standard', scale1=None, scale2=1,
+            N_bins: int=64,
+            dtype=torch.float, device='cuda'):
+        super().__init__(in_channels, out_channels, kernel_support=kernel_support,
+            down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
+        self.N_bins = N_bins
+        input_dims = kernel_support.dimensionality
+        # if N_bins is None:
+        #     self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
+        # else:
+        if self.N_bins > 0:
+            self.register_buffer("qmc_points", point_set.gen_LD_seq_bbox(n=self.N_bins,
+                bbox=kernel_support.bounds, dtype=dtype, device=device))
+            
+        if scale1 is None:
+            scale1 = [.5/k for k in kernel_support.shape]
+        self.register_buffer("scale1", torch.as_tensor(scale1, dtype=dtype))
+        self.scale2 = scale2
+        self.mlp_type = mlp_type
+        
+        if padded_extrema is not None:
+            self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
+        if isinstance(mid_ch, int):
+            mid_ch = [mid_ch]
+
+        # layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
+        # for ix in range(1,len(mid_ch)):
+        #     layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
+        # self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
+
+        self.first = nn.Linear(input_dims, mid_ch[0])
+        self.first.weight.data.uniform_(-1/input_dims, 1/input_dims)
+        layers = []
+        for ix in range(1,len(mid_ch)):
+            layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.ReLU(inplace=True)]
+        self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
+
+        for k in range(0,len(self.kernel),2):
+            nn.init.kaiming_uniform_(self.kernel[k].weight)
+            self.kernel[k].bias.data.zero_()
+
+    def __repr__(self) -> str:
+        return f"""MLPConv(in_channels={self.in_channels}, out_channels={
+        self.out_channels}, support={self.support}, bias={self.bias is not None})"""
+
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
+        kwargs = dict(coord_to_weights=self.interpolate_weights,
+            out_channels=self.out_channels,
+            kernel_support=self.kernel_support,
+            down_ratio=self.down_ratio,
+            N_bins=self.N_bins, groups=self.groups,
+            bias=self.bias)
+        if hasattr(self, 'qmc_points'):
+            kwargs['qmc_points'] = self.qmc_points
+        return inrF.conv(inr, **kwargs)
+
+    def interpolate_weights(self, coord_diffs: PointSet) -> torch.Tensor:
+        # if self.mlp_type == 'siren':
+        #     return self.kernel(torch.sin(self.first(coord_diffs*self.scale1) * self.scale3)).reshape(
+        #         coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2
+        # else:
+        return self.kernel(self.first(coord_diffs * self.scale1)).reshape(
+            coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2
+
 
 def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float):
     # K = dims of the entire B spline surface
@@ -130,25 +208,21 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
 
 
 class SplineConv(Conv):
-    def __init__(self, in_channels, out_channels, kernel_size, init_weights, order=2, down_ratio=1.,
-            input_dims=2, N_bins=0, groups=1,
+    def __init__(self, in_channels, out_channels, kernel_support: Support,
+            init_weights, order=2, down_ratio=1.,
+            N_bins=0, groups=1,
             padded_extrema=None, bias=False, smoothing=0., shift=(0,0),
             dtype=torch.float, device='cuda'):
-        super().__init__(in_channels, out_channels, input_dims=input_dims,
+        super().__init__(in_channels, out_channels, kernel_support=kernel_support,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
-        if not hasattr(kernel_size, '__iter__'):
-            kernel_size = (kernel_size, kernel_size)
-        self.kernel_size = K = kernel_size
         if padded_extrema is not None:
             self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         self.register_buffer('shift', torch.tensor(shift, dtype=dtype))
-        self.diffs_in_support = lambda diffs: (diffs[...,0].abs() < self.kernel_size[0]/2) * (
-                        diffs[...,1].abs() < self.kernel_size[1]/2)
 
         # fit pretrained kernel with b-spline
         h,w = init_weights.shape[2:]
-        bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
+        bbox = kernel_support.bounds
         x,y = (np.linspace(bbox[0][0]/h*(h-1), bbox[0][1]/h*(h-1), h),
                np.linspace(bbox[1][0]/w*(w-1), bbox[1][1]/w*(w-1), w))
         # if zero_at_bounds:
@@ -173,8 +247,8 @@ class SplineConv(Conv):
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
         if N_bins > 0:
-            self.register_buffer("sample_points", point_set.gen_LD_seq_bbox(n=N_bins,
-                d=input_dims, bbox=bbox, dtype=dtype, device=device))
+            self.register_buffer("qmc_points", point_set.gen_LD_seq_bbox(n=N_bins,
+                bbox=bbox, dtype=dtype, device=device))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
         # self.Tx = nn.Parameter(tx)
@@ -229,80 +303,3 @@ class SplineConv(Conv):
 
         return torch.stack(w_oi).view(coord_diffs.size(0), self.out_channels, self.group_size)
 
-
-class MLPConv(Conv):
-    def __init__(self, in_channels: int, out_channels: int,
-            kernel_size: float | tuple,
-            mid_ch: tuple | int = (32,32),
-            down_ratio: float=1.,
-            input_dims: int=2, groups: int=1, padded_extrema: tuple|None=None,
-            bias: bool=False,
-            mlp_type: str='standard', scale1=None, scale2=1,
-            N_bins: int=64,
-            dtype=torch.float, device='cuda'):
-        super().__init__(in_channels, out_channels, input_dims=input_dims,
-            down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
-        if not hasattr(kernel_size, '__iter__'):
-            kernel_size = (kernel_size, kernel_size)
-        self.kernel_size = K = kernel_size
-        # if N_bins is None:
-        #     self.N_bins = 2**math.ceil(math.log2(K[0])+12) #2**math.ceil(math.log2(1/K[0]/K[1])+4)
-        # else:
-        self.N_bins = N_bins
-        self.diffs_in_support = lambda diffs: (
-                diffs[...,0].abs() < self.kernel_size[0]/2) * (
-                diffs[...,1].abs() < self.kernel_size[1]/2)
-
-        bbox = ((-K[0]/2, K[0]/2), (-K[1]/2, K[1]/2))
-        if self.N_bins > 0:
-            self.register_buffer("sample_points", point_set.gen_LD_seq_bbox(n=self.N_bins,
-                bbox=bbox, dtype=dtype, device=device))
-            
-        if scale1 is None:
-            scale1 = (.5/K[0], .5/K[1])
-        self.register_buffer("scale1", torch.as_tensor(scale1, dtype=dtype))
-        # self.scale2 = scale2
-        self.scale2 = scale2
-        self.mlp_type = mlp_type
-        
-        if padded_extrema is not None:
-            self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
-        if isinstance(mid_ch, int):
-            mid_ch = [mid_ch]
-
-        # layers = [nn.Linear(input_dims, mid_ch[0]), nn.LeakyReLU(inplace=True)]
-        # for ix in range(1,len(mid_ch)):
-        #     layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.LeakyReLU(inplace=True)]
-        # self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
-
-        self.first = nn.Linear(input_dims, mid_ch[0])
-        self.first.weight.data.uniform_(-1/input_dims, 1/input_dims)
-        layers = []
-        for ix in range(1,len(mid_ch)):
-            layers += [nn.Linear(mid_ch[ix-1], mid_ch[ix]), nn.ReLU(inplace=True)]
-        self.kernel = nn.Sequential(*layers, nn.Linear(mid_ch[-1], out_channels * self.group_size))
-
-        for k in range(0,len(self.kernel),2):
-            nn.init.kaiming_uniform_(self.kernel[k].weight)
-            self.kernel[k].bias.data.zero_()
-
-    def __repr__(self) -> str:
-        return f"""MLPConv(in_channels={self.in_channels}, out_channels={
-        self.out_channels}, kernel_size={np.round(self.kernel_size, decimals=3)}, bias={self.bias is not None})"""
-
-    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
-        new_inr = inr.create_derived_inr()
-        kwargs = dict(out_channels=self.out_channels, N_bins=self.N_bins,
-                    groups=self.groups, bias=self.bias)
-        if hasattr(self, 'sample_points'):
-            kwargs['sample_points'] = self.sample_points
-        inrF.conv('MLPConv', coord_to_weights=self.interpolate_weights, **kwargs)
-        return new_inr
-
-    def interpolate_weights(self, coord_diffs: PointSet) -> torch.Tensor:
-        # if self.mlp_type == 'siren':
-        #     return self.kernel(torch.sin(self.first(coord_diffs*self.scale1) * self.scale3)).reshape(
-        #         coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2
-        # else:
-        return self.kernel(self.first(coord_diffs * self.scale1)).reshape(
-            coord_diffs.size(0), self.out_channels, self.group_size) * self.scale2

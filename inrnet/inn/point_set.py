@@ -1,4 +1,7 @@
 """Point set"""
+import itertools
+
+import numpy as np
 from inrnet.inn.support import BoundingBox, Support
 from scipy.stats import qmc
 import math
@@ -6,13 +9,14 @@ import torch
 nn=torch.nn
 from inrnet import util
 
-class PointValues(torch.Tensor):
-    def batch_size(self):
-        return self.size(0)
-    def N(self):
-        return self.size(-2)
-    def channels(self):
-        return self.size(-1)
+PointValues = torch.Tensor
+# class PointValues(torch.Tensor):
+#     def batch_size(self):
+#         return self.size(0)
+#     def N(self):
+#         return self.size(-2)
+#     def channels(self):
+#         return self.size(-1)
     
 class PointSet(torch.Tensor):
     def N(self):
@@ -21,7 +25,6 @@ class PointSet(torch.Tensor):
         return self.size(-1)
     # def estimate_discrepancy():
     #     return NotImplemented
-
 
 def get_sampler_from_args(dl_args, c2f:bool=True):
     if dl_args['sample type'] == 'grid':
@@ -45,22 +48,25 @@ def generate_sample_points(domain: Support, sampler: dict) -> PointSet:
 
     if method == "grid":
         assert 'dims' in sampler and 'c2f' in sampler
-        return util.meshgrid_coords(*sampler['dims'], c2f=sampler['c2f'])
+        coords = meshgrid_coords(*sampler['dims'], c2f=sampler['c2f'])
 
     elif method == "shrunk":
         assert 'dims' in sampler
         coords = gen_LD_seq_bbox(
             n=sampler['sample points'],
             bbox=domain.bounds, scramble=True)
-        return coords * coords.abs()
+        coords = coords * coords.abs()
 
     elif method in ("qmc", 'rqmc'):
-        return gen_LD_seq_bbox(
+        coords = gen_LD_seq_bbox(
             n=sampler['sample points'],
             bbox=domain.bounds, scramble=(method=='rqmc'))
 
     else:
         raise NotImplementedError("invalid method: "+method)
+    coords.sample_mode = method
+
+    return coords
 
 
 def gen_LD_seq_bbox(n:int, bbox:tuple[tuple[float]],
@@ -94,6 +100,61 @@ def gen_LD_seq_bbox(n:int, bbox:tuple[tuple[float]],
     out[:,0] = out[:,0] * (bbox[0][1]-bbox[0][0]) + bbox[0][0]
     out[:,1] = out[:,1] * (bbox[1][1]-bbox[1][0]) + bbox[1][0]
     return out.as_subclass(PointSet)
+
+
+def meshgrid_coords(*dims, domain=(-1,1), c2f=True,
+        dtype=torch.float, device="cuda") -> PointSet:
+    # c2f: coarse-to-fine ordering, puts points along coarser grid-points first
+    tensors = [torch.linspace(*domain, steps=d, dtype=dtype, device=device) for d in dims]
+    mgrid = torch.stack(util.meshgrid(*tensors, indexing='ij'), dim=-1)
+        
+    if c2f:
+        x_indices = [0]
+        y_indices = [0]
+        factor = 2
+        x_step = dims[0]//2
+        y_step = dims[1]//2
+        ind_iters = []
+        while x_step > 0 or y_step > 0:
+            if y_step > 0:
+                if y_step > 1 and y_step % 2 == 1:
+                    raise NotImplementedError('meshgrid is only working for powers of 2')
+                    new_y_indices = [y for y in range(1,dims[1]) if y not in y_indices]
+                    ind_iters += list(itertools.product(x_indices, new_y_indices))
+                else:
+                    new_y_indices = list(y_step * np.arange(1,factor,2))
+                    ind_iters += list(itertools.product(x_indices, new_y_indices))
+
+            if x_step > 0:
+                if x_step > 1 and x_step % 2 == 1:
+                    new_x_indices = [x for x in range(1,dims[0]) if x not in x_indices]
+                    ind_iters += list(itertools.product(new_x_indices, y_indices))
+                    x_step = 0
+                else:
+                    new_x_indices = list(x_step * np.arange(1,factor,2))
+                    ind_iters += list(itertools.product(new_x_indices, y_indices))
+
+                if y_step > 0:
+                    ind_iters += list(itertools.product(new_x_indices, new_y_indices))
+                x_indices += new_x_indices
+                x_step = x_step//2
+                
+            if y_step > 0:
+                if y_step > 1 and y_step % 2 == 1:
+                    y_step = 0
+                y_indices += new_y_indices
+                y_step = y_step//2
+
+            factor *= 2
+
+        flat_grid = mgrid.reshape(-1, len(dims))
+        indices = torch.tensor([(0,0),*ind_iters], device=device)
+        indices = indices[:,0]*dims[1] + indices[:,1]
+        coords = flat_grid[indices]
+
+    else:
+        coords = mgrid.reshape(-1, len(dims))
+    return coords.as_subclass(PointSet)
 
 
 def generate_masked_sample_points(mask: torch.Tensor, sample_size: int,
