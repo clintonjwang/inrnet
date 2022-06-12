@@ -34,14 +34,13 @@ class INRNet(nn.Module):
             assert isinstance(layers, tuple) or isinstance(layers, list)
             prev_name = None
             for layer in layers:
-                if name is None:
-                    name = layer.name+".0"
+                name = str(layer)+".0"
                 while name in self.layers:
                     name = util.increment_name(name)
                 self.layers[name] = layer
                 if prev_name is not None:
                     self.parents[name] = [prev_name]
-                self.children = {}
+                    self.children[prev_name] = [name]
             self.output_layer = self.current_layer = layer
 
     @property
@@ -66,7 +65,7 @@ class INRNet(nn.Module):
                 does not affect the existing children of the current layer.
         """
         if name is None:
-            name = layer.name+".0"
+            name = str(layer)+".0"
         while name in self.layers:
             name = util.increment_name(name)
         self.layers[name] = layer
@@ -99,6 +98,16 @@ class INRNet(nn.Module):
     def forward(self, inr: INRBatch) -> INRBatch:
         if self.output_layer is None:
             self.output_layer = self.current_layer
+
+        if self.layer_order is None:
+            ts = TopologicalSorter(self.parents)
+            self.layer_order = ts.static_order()
+
+        out = inr.create_derived_inr()
+        out.inet = self
+        out.layer = self.output_layer
+        return out
+        raise NotImplementedError
         return INRBatch.from_layer(self.output_layer)
 
     def inr_forward(self, coords: PointSet) -> PointValues:

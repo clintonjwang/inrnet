@@ -1,6 +1,7 @@
 """
 Entrypoint for training
 """
+import sys
 import torch, wandb
 import numpy as np
 from functools import partial
@@ -14,7 +15,7 @@ from inrnet.experiments.segment import train_segmenter
 # from inrnet.experiments.warp import train_warp
 
 def main():
-    args = args_module.parse_args()
+    args = args_module.parse_args(sys.argv[1:])
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
     torch.backends.cudnn.benchmark = True

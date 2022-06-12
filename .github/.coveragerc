@@ -6,3 +6,4 @@ omit =
     inrnet/infer.py
     inrnet/pretrain.py
     inrnet/analyze.py
+    inrnet/fit_inr.py

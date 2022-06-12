@@ -27,6 +27,8 @@ class PositionalEncoding(nn.Module):
         self.additive = additive
         self.scale = scale
         
+    def __str__(self):
+        return 'PosEnc'
     def __repr__(self):
         return f"""PositionalEncoding(N={self.N})"""
 

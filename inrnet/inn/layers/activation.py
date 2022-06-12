@@ -37,11 +37,15 @@ def get_activation_layer(type: str | None) -> nn.Module:
         raise NotImplementedError
         
 class ReLU(nn.Module):
+    def __str__(self):
+        return 'ReLU'
     def forward(self, inr: INRBatch) -> INRBatch:
         inr.add_modification(nn.ReLU(inplace=True))
         return inr
 
 class LeakyReLU(nn.Module):
+    def __str__(self):
+        return 'LeakyReLU'
     def __init__(self, negative_slope: float=.1):
         super().__init__()
         self.negative_slope = negative_slope
@@ -50,21 +54,29 @@ class LeakyReLU(nn.Module):
         return inr
 
 class GELU(nn.Module):
+    def __str__(self):
+        return 'GELU'
     def forward(self, inr: INRBatch) -> INRBatch:
         inr.add_modification(nn.GELU())
         return inr
 
 class SiLU(nn.Module):
+    def __str__(self):
+        return 'Swish'
     def forward(self, inr: INRBatch) -> INRBatch:
         inr.add_modification(nn.SiLU(inplace=True))
         return inr
 
 class Tanh(nn.Module):
+    def __str__(self):
+        return 'Tanh'
     def forward(self, inr: INRBatch) -> INRBatch:
         inr.add_modification(nn.Tanh())
         return inr
 
 class Sigmoid(nn.Module):
+    def __str__(self):
+        return 'Sigmoid'
     def forward(self, inr: INRBatch) -> INRBatch:
         inr.add_modification(nn.Sigmoid())
         return inr

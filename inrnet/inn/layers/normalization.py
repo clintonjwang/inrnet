@@ -51,6 +51,11 @@ class ChannelNorm(nn.Module):
             self.register_buffer('running_mean', torch.zeros(channels, **factory_kwargs))
             self.register_buffer('running_var', torch.ones(channels, **factory_kwargs))
 
+    def __str__(self):
+        if self.batchnorm:
+            return 'BN'
+        else:
+            return 'LN'
     def __repr__(self):
         return f"ChannelNorm(batch={self.batchnorm}, affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
 

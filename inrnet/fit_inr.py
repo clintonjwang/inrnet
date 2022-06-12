@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 osp = os.path
 import numpy as np
@@ -89,7 +90,7 @@ def train_inr(args, **kwargs):
 
 
 def main(args):
-    args = args_module.parse_args_fitting()
+    args = args_module.parse_args_fitting(sys.argv[1:])
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
     torch.backends.cudnn.benchmark = True

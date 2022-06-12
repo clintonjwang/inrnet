@@ -10,7 +10,7 @@ from inrnet import CONFIG_DIR
 
 osp = os.path
 
-def parse_args():
+def parse_args(args):
     """Command-line args for train.sh, infer.sh and sweep.sh"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_name')
@@ -18,7 +18,7 @@ def parse_args():
     parser.add_argument('-t', '--target_job', default=None)
     parser.add_argument('-i', '--sweep_id', default=None)
     parser.add_argument('-w', '--no_wandb', action='store_true')
-    cmd_args = parser.parse_args()
+    cmd_args = parser.parse_args(args)
 
     config_name = cmd_args.job_id if cmd_args.config_name is None else cmd_args.config_name
     main_config_path = osp.join(CONFIG_DIR, config_name+".yaml")
@@ -32,13 +32,13 @@ def parse_args():
     yaml.safe_dump(args, open(osp.join(paths["job output dir"], "config.yaml"), 'w'))
     return args
 
-def parse_args_fitting():
+def parse_args_fitting(args):
     """Command-line args for fit_inr.sh"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dataset')
     parser.add_argument('-j', '--job_id', default="manual")
     parser.add_argument('-s', '--start_ix', default=0, type=int)
-    cmd_args = parser.parse_args()
+    cmd_args = parser.parse_args(args)
 
     args = yaml.load(open(CONFIG_DIR+'/fit_config.yaml', 'r'))[cmd_args.dataset]
     args['data loading']['dataset'] = cmd_args.dataset

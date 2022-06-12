@@ -1,4 +1,5 @@
 """Entrypoint for inference"""
+import sys
 import torch
 import numpy as np
 
@@ -8,7 +9,7 @@ from inrnet.experiments.segment import test_inr_segmenter
 from inrnet.experiments.generate import test_inr_generator
 
 def main():
-    args = args_module.parse_args()
+    args = args_module.parse_args(sys.argv[1:])
     if not torch.cuda.is_available():
         raise ValueError("cuda is not available on this device")
     torch.backends.cudnn.benchmark = True

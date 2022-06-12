@@ -47,14 +47,13 @@ class InrCls(VectorValuedINRNet):
                 nn.init.kaiming_uniform_(l.weight)
                 nn.init.zeros_(l.bias)
                 
-        self.layers = [
+        layers = [
             *l1, *l2, *l3, *l4,
             inn.GlobalAvgPoolSequence(out_layers),
         ]
-        self.layers = nn.Sequential(*self.layers)
+        super().__init__(layers=layers)
+        #self.layers = nn.Sequential(*self.layers)
 
-    def forward(self, inr):
-        return self.layers(inr)
 
 
 class InrCls2(nn.Module):

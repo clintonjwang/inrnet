@@ -14,6 +14,8 @@ from inrnet.experiments import classify
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 
+# def fit_inr():
+
 
 def test_equivalence():
     C = 32

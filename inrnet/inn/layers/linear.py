@@ -31,6 +31,8 @@ class ChannelMixer(nn.Module):
             self.bias = nn.Parameter(torch.zeros(out_channels, dtype=dtype))
         self.normalized = normalized
 
+    def __str__(self):
+        return 'ChannelMixer'
     def __repr__(self):
         return f"""ChannelMixer(in_channels={self.in_channels}, 
             out_channels={self.out_channels}, bias={hasattr(self, 'bias')}, 
@@ -55,6 +57,8 @@ class AdaptiveChannelMixer(nn.Module):
             self.bias = nn.Parameter(torch.zeros(out_channels))
         self.normalized = normalized
 
+    def __str__(self):
+        return 'AdaptiveChannelMixer'
     def forward(self, inr):
         new_inr = inr.create_derived_inr()
         new_inr.integrator = partial(inrF.inner_product, inr=new_inr, layer=self)
