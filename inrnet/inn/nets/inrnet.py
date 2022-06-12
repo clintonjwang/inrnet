@@ -3,67 +3,41 @@ import typing
 import numpy as np
 import torch
 from inrnet.inn.inr import DiscretizedINR
+from inrnet.inn.point_set import generate_sample_points
 from inrnet.inn.support import Support
 
 if typing.TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 nn = torch.nn
 
-from inrnet import inn, util
+from inrnet import inn
 
 class INRNet(nn.Module):
     def __init__(self, domain: Support|None=None,
-        sample_mode='qmc', sample_size=256, layers=None):
+        sampler: dict|None=None, layers=None):
         """
         Args:
-            domain (Support, optional): domain of valid INRs.
-            device (str, optional): Defaults to 'cuda'.
+            domain (Support, optional): valid INR domain
         """
         super().__init__()
         self.domain = domain
-        self.sample_mode = sample_mode
-        self.sample_size = sample_size
-        self.layers = {}
-        self.parents = {}
-        self.children = {}
-        if layers is None:
-            self.output_layer = self.current_layer = None
-        else:
-            assert isinstance(layers, tuple) or isinstance(layers, list)
-            prev_name = None
-            for layer in layers:
-                name = str(layer)+".0"
-                while name in self.layers:
-                    name = util.increment_name(name)
-                self.layers[name] = layer
-                if prev_name is not None:
-                    self.parents[name] = [prev_name]
-                    self.children[prev_name] = [name]
-            self.output_layer = self.current_layer = layer
+        self.sampler = sampler
+        self.layers = layers
 
-    @property
-    def volume(self):
-        if isinstance(self.domain, tuple):
-            return (self.domain[1] - self.domain[0])**self.input_dims
-        else:
-            return np.prod([d[1]-d[0] for d in self.domain])
-        
+    def __len__(self):
+        return len(self.layers)
+    def __iter__(self):
+        return iter(self.layers)
+    def __getitem__(self, ix):
+        return self.layers[ix]
+
     def sample_inr(self, inr: INRBatch) -> DiscretizedINR:
-        return inr
+        coords = generate_sample_points(self.sampler)
+        return DiscretizedINR(coords, values=inr(coords), domain=inr.domain)
         
     def forward(self, inr: INRBatch) -> DiscretizedINR|torch.Tensor:
         d_inr = self.sample_inr(inr)
-        
-        if self.detached:
-            if hasattr(self, "cached_outputs"):
-                return self.cached_outputs.detach()
-            with torch.no_grad():
-                return self.layers(d_inr)
-        else:
-            if hasattr(self, "cached_outputs"):
-                return self.cached_outputs
-            return self.layers(d_inr)
-
+        return self.layers(d_inr)
 
 def freeze_layer_types(inrnet, classes=(inn.ChannelMixer, inn.ChannelNorm)):
     for m in inrnet:
