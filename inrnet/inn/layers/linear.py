@@ -1,6 +1,8 @@
 """1x1 Conv Layer"""
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
+from inrnet.inn.inr import DiscretizedINR
 if TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 import torch
@@ -38,14 +40,13 @@ class ChannelMixer(nn.Module):
             out_channels={self.out_channels}, bias={hasattr(self, 'bias')}, 
             normalized={self.normalized})"""
 
-    def forward(self, inr: INRBatch) -> INRBatch:
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
         if self.normalized:
             out = inr.matmul(torch.softmax(self.weight.T, dim=-1))
         else:
             out = inr.matmul(self.weight.T)
         if hasattr(self, "bias"):
             out += self.bias
-        out.channels = self.out_channels
         return out
 
 

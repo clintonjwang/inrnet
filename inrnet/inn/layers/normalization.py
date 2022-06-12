@@ -2,7 +2,7 @@
 from typing import Optional
 import torch
 
-from inrnet.inn.inr import INRBatch
+from inrnet.inn.inr import DiscretizedINR, INRBatch
 from inrnet.inn.point_set import PointValues
 nn = torch.nn
 F = nn.functional
@@ -59,7 +59,7 @@ class ChannelNorm(nn.Module):
     def __repr__(self):
         return f"ChannelNorm(batch={self.batchnorm}, affine={hasattr(self, 'weight')}, track_running_stats={hasattr(self,'running_mean')})"
 
-    def inst_normalize(self, values, inr: INRBatch):
+    def inst_normalize(self, values, inr: DiscretizedINR) -> DiscretizedINR:
         if hasattr(self, "running_mean") and not (inr.training and self.training):
             mean = self.running_mean
             var = self.running_var
@@ -75,7 +75,7 @@ class ChannelNorm(nn.Module):
 
         return self.normalize(values, mean, var)
 
-    def batch_normalize(self, values, inr: INRBatch):
+    def batch_normalize(self, values, inr: DiscretizedINR) -> DiscretizedINR:
         if hasattr(self, "running_mean") and not (inr.training and self.training):
             mean = self.running_mean
             var = self.running_var
@@ -97,10 +97,10 @@ class ChannelNorm(nn.Module):
         else:
             return (values - mean)/(var.sqrt() + self.eps)
 
-    def forward(self, inr):
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
         new_inr = inr.create_derived_inr()
         if self.batchnorm:
-            new_inr.set_integrator(self.batch_normalize, 'BatchNorm')
+            self.batch_normalize(new_inr)
         else:
-            new_inr.set_integrator(self.inst_normalize, 'InstanceNorm')
+            self.inst_normalize(new_inr)
         return new_inr

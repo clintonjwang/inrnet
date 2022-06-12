@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 import torch, pdb, math
 import numpy as np
 from functools import partial
+from inrnet.inn.inr import DiscretizedINR
 if TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 
@@ -289,15 +290,13 @@ class MLPConv(Conv):
         return f"""MLPConv(in_channels={self.in_channels}, out_channels={
         self.out_channels}, kernel_size={np.round(self.kernel_size, decimals=3)}, bias={self.bias is not None})"""
 
-    def forward(self, inr: INRBatch) -> INRBatch:
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
         new_inr = inr.create_derived_inr()
         kwargs = dict(out_channels=self.out_channels, N_bins=self.N_bins,
                     groups=self.groups, bias=self.bias)
         if hasattr(self, 'sample_points'):
             kwargs['sample_points'] = self.sample_points
-        new_inr.add_integrator(inrF.conv, 'MLPConv',
-            coord_to_weights=self.interpolate_weights, **kwargs)
-        new_inr.channels = self.out_channels
+        inrF.conv('MLPConv', coord_to_weights=self.interpolate_weights, **kwargs)
         return new_inr
 
     def interpolate_weights(self, coord_diffs: PointSet) -> torch.Tensor:

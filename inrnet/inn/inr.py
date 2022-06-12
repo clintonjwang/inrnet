@@ -39,7 +39,7 @@ class INRBatch(nn.Module):
     #         input_dims=inr.input_dims,
     #         domain=inr.domain,
     #         device=inr.device)
-        
+    
     def forward(self, coords: PointSet) -> PointValues:
         return self.inet.evaluate(self.input_inr, coords)
 
@@ -135,6 +135,63 @@ class INRBatch(nn.Module):
             return output.squeeze(-1).cpu().float().numpy()
         else:
             return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
+
+
+class DiscretizedINR(INRBatch):
+    """INR represented as its points and point values"""
+    def __init__(self, points: PointSet, values: PointValues,
+        domain: Support|None=None):
+        """
+        Args:
+            channels (int): output size
+            domain (Support, optional): INR domain.
+        """
+        super().__init__()
+        self.points = points
+        self.values = values
+        self.domain = domain
+
+    def copy_with_transform(self, modification: Callable, name: str) -> DiscretizedINR:
+        return DiscretizedINR(self.points, modification(self.values), domain=self.domain)
+
+    def __neg__(self):
+        self.values = -self.values
+        return self
+
+    def __add__(self, other):
+        if isinstance(other, DiscretizedINR):
+            return self.copy_with_transform(lambda x: x + other.values)
+        return self.copy_with_transform(lambda x: x + other)
+    def __iadd__(self, other):
+        self.values += other
+        return self
+
+    def __sub__(self, other):
+        if isinstance(other, DiscretizedINR):
+            return self.copy_with_transform(lambda x: x - other.values)
+        return self.copy_with_transform(lambda x: x - other)
+    def __isub__(self, other):
+        self.values -= other
+        return self
+
+    def __mul__(self, other):
+        if isinstance(other, DiscretizedINR):
+            return self.copy_with_transform(lambda x: x * other.values)
+        return self.copy_with_transform(lambda x: x * other)
+    def __imul__(self, other):
+        self.values *= other
+        return self
+
+    def __truediv__(self, other):
+        if isinstance(other, INRBatch):
+            return self.copy_with_transform(lambda x: x / other.values)
+        return self.copy_with_transform(lambda x: x / other)
+    def __itruediv__(self, other):
+        self.values /= other
+        return self
+    def __rtruediv__(self, other):
+        return self.copy_with_transform(lambda x: other/x)
+    
 
 
 
