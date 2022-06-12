@@ -138,22 +138,22 @@ class INRBatch(nn.Module):
 
 
 class DiscretizedINR(INRBatch):
-    def __init__(self, points: PointSet, values: PointValues,
+    def __init__(self, coords: PointSet, values: PointValues,
         domain: Support|None=None):
         """INR represented as its points and values at those points
 
         Args:
-            points (PointSet): _description_
+            coords (PointSet): _description_
             values (PointValues): _description_
             domain (Support, optional): INR domain.
         """
         super().__init__()
-        self.register_buffer('points', points)
+        self.register_buffer('coords', coords)
         self.register_buffer('values', values)
         self.domain = domain
 
     def copy_with_transform(self, modification: Callable, name: str) -> DiscretizedINR:
-        return DiscretizedINR(self.points, modification(self.values), domain=self.domain)
+        return DiscretizedINR(self.coords, modification(self.values), domain=self.domain)
 
     def __neg__(self):
         self.values = -self.values

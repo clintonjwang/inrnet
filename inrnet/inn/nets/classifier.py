@@ -2,11 +2,11 @@ from inrnet import inn
 
 import torch
 
-from inrnet.inn.nets.inrnet import INRNet, VectorValuedINRNet
+from inrnet.inn.nets.inrnet import INRNet
 nn = torch.nn
 F = nn.functional
 
-class InrCls(VectorValuedINRNet):
+class InrCls(INRNet):
     def __init__(self, in_channels, out_dims, C=64, **kwargs):
         super().__init__()
         k0 = kwargs.pop('k0', .04)
@@ -51,8 +51,7 @@ class InrCls(VectorValuedINRNet):
             *l1, *l2, *l3, *l4,
             inn.GlobalAvgPoolSequence(out_layers),
         ]
-        super().__init__(layers=layers)
-        #self.layers = nn.Sequential(*self.layers)
+        super().__init__(layers=nn.Sequential(*layers))
 
 
 

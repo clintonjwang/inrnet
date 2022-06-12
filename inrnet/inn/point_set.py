@@ -3,7 +3,6 @@ from inrnet.inn.support import Support
 from scipy.stats import qmc
 import math
 import torch
-
 nn=torch.nn
 from inrnet import util
 

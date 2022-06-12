@@ -16,7 +16,7 @@ from inrnet.inn import point_set, functional as inrF
 from scipy.interpolate import RectBivariateSpline as Spline2D
 
 def get_kernel_size(input_shape:tuple, extrema:tuple=((-1,1),(-1,1)),
-    k: tuple | int = 3):
+        k: tuple|int=3):
     h,w = input_shape
     if isinstance(k, int):
         k = (k,k)
@@ -118,8 +118,8 @@ def fit_spline(values, K, order=3, smoothing=0, center=(0,0), dtype=torch.float)
     # K = dims of the entire B spline surface
     h,w = values.shape
     bbox = (-K[0]/2+center[0], K[0]/2+center[0], -K[1]/2+center[1], K[1]/2+center[1])
-    x,y = (np.linspace(bbox[0]/h*(h-1), bbox[1]/h*(h-1), h),
-           np.linspace(bbox[2]/w*(w-1), bbox[3]/w*(w-1), w))
+    x,y = (np.linspace(bbox[0][0]/h*(h-1), bbox[0][1]/h*(h-1), h),
+           np.linspace(bbox[1][0]/w*(w-1), bbox[1][1]/w*(w-1), w))
 
     bs = Spline2D(x,y, values, bbox=bbox, kx=order,ky=order, s=smoothing)
     tx,ty,c = [torch.tensor(z).to(dtype=dtype) for z in bs.tck]
@@ -149,11 +149,11 @@ class SplineConv(Conv):
         # fit pretrained kernel with b-spline
         h,w = init_weights.shape[2:]
         bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
-        x,y = (np.linspace(bbox[0]/h*(h-1), bbox[1]/h*(h-1), h),
-               np.linspace(bbox[2]/w*(w-1), bbox[3]/w*(w-1), w))
+        x,y = (np.linspace(bbox[0][0]/h*(h-1), bbox[0][1]/h*(h-1), h),
+               np.linspace(bbox[1][0]/w*(w-1), bbox[1][1]/w*(w-1), w))
         # if zero_at_bounds:
-        #     x = (bbox[0], *x, bbox[1])
-        #     y = (bbox[2], *y, bbox[3])
+        #     x = (bbox[0][0], *x, bbox[0][1])
+        #     y = (bbox[1][0], *y, bbox[1][1])
         #     init_weights = np.pad(init_weights,((0,0),(0,0),(1,1),(1,1)))
         #     init_weights = F.pad(init_weights,(1,1,1,1))
 
@@ -173,7 +173,7 @@ class SplineConv(Conv):
         self.register_buffer("grid_points", torch.as_tensor(
             np.dstack(np.meshgrid(x,y)).reshape(-1,2), dtype=dtype))
         if N_bins > 0:
-            self.register_buffer("sample_points", point_set.generate_quasirandom_sequence(n=N_bins,
+            self.register_buffer("sample_points", point_set.gen_LD_seq_bbox(n=N_bins,
                 d=input_dims, bbox=bbox, dtype=dtype, device=device))
         self.register_buffer("Tx", tx)
         self.register_buffer("Ty", ty)
@@ -253,10 +253,10 @@ class MLPConv(Conv):
                 diffs[...,0].abs() < self.kernel_size[0]/2) * (
                 diffs[...,1].abs() < self.kernel_size[1]/2)
 
-        bbox = (-K[0]/2, K[0]/2, -K[1]/2, K[1]/2)
+        bbox = ((-K[0]/2, K[0]/2), (-K[1]/2, K[1]/2))
         if self.N_bins > 0:
-            self.register_buffer("sample_points", point_set.generate_quasirandom_sequence(n=self.N_bins,
-                d=input_dims, bbox=bbox, dtype=dtype, device=device))
+            self.register_buffer("sample_points", point_set.gen_LD_seq_bbox(n=self.N_bins,
+                bbox=bbox, dtype=dtype, device=device))
             
         if scale1 is None:
             scale1 = (.5/K[0], .5/K[1])

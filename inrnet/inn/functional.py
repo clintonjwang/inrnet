@@ -1,8 +1,9 @@
 """Functions"""
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
-    from inrnet.inn.inr import INRBatch
+    from inrnet.inn.inr import DiscretizedINR
     from inrnet.inn.point_set import PointSet, PointValues
     from inrnet.inn.support import Support
 from typing import Callable
@@ -10,27 +11,28 @@ import torch
 Tensor = torch.Tensor
 nn=torch.nn
 
-def change_sample_density(values: PointValues, inr: INRBatch):
-    coords = inr.sampled_coords
-    return coords
+# def change_sample_density(inr: DiscretizedINR):
+#     coords = inr.coords
+#     return coords
 
-def tokenization(values: PointValues, inr: INRBatch):
+def tokenization(inr: DiscretizedINR):
     """tokenization"""
-    return values
+    return inr
     
-def pos_enc(values: PointValues, inr: INRBatch, N: int,
+def pos_enc(inr: DiscretizedINR, N: int,
     scale: float=1., additive: bool=True):
     """positional encoding"""
-    coords = inr.sampled_coords.unsqueeze(-1)
+    coords = inr.coords.unsqueeze(-1)
     n = 2**torch.arange(N, device=coords.device) * 2*torch.pi * scale
     embeddings = torch.cat((torch.sin(coords*n), torch.cos(coords*n)), dim=1).flatten(1)
     if additive is True:
-        return values + embeddings
+        inr.values = inr.values + embeddings
     else:
-        return torch.cat((values, embeddings), dim=-1)
+        inr.values = torch.cat((inr.values, embeddings), dim=-1)
+    return inr
 
-def conv(values: PointValues, # [B,N,c_in]
-    inr: INRBatch, out_channels: int,
+def conv(# [B,N,c_in]
+    inr: DiscretizedINR, out_channels: int,
     coord_to_weights: Callable[[PointSet], Tensor],
     support: Support, down_ratio: float,
     N_bins: int=0, groups: int=1,
@@ -40,7 +42,7 @@ def conv(values: PointValues, # [B,N,c_in]
 
     Args:
         values (PointValues): _description_
-        inr (INRBatch): input INR
+        inr (DiscretizedINR): input INR
         out_channels (int): _description_
         coord_to_weights (Callable[[PointSet], Tensor]): _description_
         support (Support): _description_
@@ -55,7 +57,7 @@ def conv(values: PointValues, # [B,N,c_in]
         PointValues: _description_
     """
     
-    coords = inr.sampled_coords #[N,d]
+    coords = inr.coords #[N,d]
     query_coords = _get_query_coords(inr, down_ratio)
     in_channels = inr.channels
 
@@ -69,7 +71,7 @@ def conv(values: PointValues, # [B,N,c_in]
 
     # if layer.dropout > 0 and (inr.training and layer.training):
     #     mask *= torch.rand_like(mask, dtype=torch.half) > layer.dropout
-    Y = values[:,torch.where(mask)[1]] # flattened list of values of neighborhood points
+    Y = inr.values[:,torch.where(mask)[1]] # flattened list of values of neighborhood points
     Diffs = Diffs[mask] # flattened tensor of diffs between center coords and neighboring points
     lens = tuple(mask.sum(1)) # number of kernel points assigned to each point
     Ysplit = Y.split(lens, dim=1) # list of values at neighborhood points
@@ -133,14 +135,16 @@ def conv(values: PointValues, # [B,N,c_in]
 
     if bias is not None:
         newVals = newVals + bias
-    return newVals.as_subclass(PointValues)
+    inr.values = newVals.as_subclass(PointValues)
+    return inr
 
 
 def _cluster_points(points: PointSet,
     grid_points:PointSet|None=None,
     qmc_points:PointSet|None=None, sample_mode=None, tol=.005):
     """Cluster a point set
-
+    Based on kmeans in https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html
+    
     Args:
         points (PointSet): points to cluster
         grid_points (PointSet | None, optional): cluster centers on the grid. Defaults to None.
@@ -150,8 +154,7 @@ def _cluster_points(points: PointSet,
 
     Returns:
         _type_: _description_
-    """    
-    """Based on kmeans in https://www.kernel-operations.io/keops/_auto_tutorials/kmeans/plot_kmeans_torch.html"""
+    """
     if sample_mode == 'grid' and grid_points is not None:
         c = grid_points  # Initialize centroids to grid
     else:
@@ -167,101 +170,41 @@ def _cluster_points(points: PointSet,
 
     return cl, c
 
-def avg_pool(values: PointValues, inr: INRBatch, support: Support, down_ratio: float) -> PointValues:
-    """Average Pooling
-
-    Args:
-        values (Tensor): _description_
-        inr (INRBatch): _description_
-        layer (AvgPool): _description_
-        query_coords (Optional[PointSet], optional): _description_. Defaults to None.
-
-    Returns:
-        Tensor: _description_
-    """
+def avg_pool(inr: DiscretizedINR, kernel_support: Support, down_ratio: float) -> PointValues:
     pool_fxn = lambda x: x.mean(dim=2)
-    return pool_kernel(pool_fxn, values, inr, support, down_ratio)
+    return pool_kernel(pool_fxn, inr, kernel_support, down_ratio)
 
-def max_pool(values: PointValues, inr: INRBatch, support: Support, down_ratio: float) -> PointValues:
-    """Max Pooling
-
-    Returns:
-        PointValues: pooled values
-    """    
+def max_pool(inr: DiscretizedINR, kernel_support: Support, down_ratio: float) -> PointValues:
     def pool_fxn(x):
         n = x.size(1)
         m = x.amax(1)
         if n == 1:
             return m
         return torch.where(m<0, m, m * (n+1)/(n-1) * 3/5)
-    return pool_kernel(pool_fxn, values, inr, support, down_ratio)
+    return pool_kernel(pool_fxn, inr, kernel_support, down_ratio)
 
-def pool_kernel(pool_fxn: Callable, values: Tensor, inr: INRBatch,
-        support: Support, down_ratio: float):
-    coords = inr.sampled_coords
+def pool_kernel(pool_fxn: Callable, inr: DiscretizedINR,
+        kernel_support: Support, down_ratio: float):
     query_coords = _get_query_coords(inr, down_ratio)
-
-    if inr.sample_mode == 'grid' and hasattr(support, 'center'):
-        query_coords = query_coords + support.center.to(device=query_coords.device)
-    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    mask = support.in_support(Diffs)
-    Y = values[:,torch.where(mask)[1]]
+    Diffs = query_coords.unsqueeze(1) - inr.coords.unsqueeze(0)
+    mask = kernel_support.in_support(Diffs)
+    Y = inr.values[:,torch.where(mask)[1]]
     return torch.stack([pool_fxn(y) for y in Y.split(tuple(mask.sum(1)), dim=1)], dim=1)
-
-
-def pool_neighbors(pool_fxn: Callable, values: Tensor, inr: INRBatch,
-        num_neighbors: int, down_ratio: float, shift: Tensor):
-    coords = inr.sampled_coords
-    query_coords = _get_query_coords(inr, down_ratio)
-
-    if inr.sample_mode == 'grid' and shift:
-        query_coords = query_coords + shift.to(device=query_coords.device)
-    Diffs = query_coords.unsqueeze(1) - coords.unsqueeze(0)
-    mask = Diffs.norm(dim=-1).topk(k=num_neighbors, dim=1, largest=False).indices
-    return pool_fxn(values[:,mask])
 
 
 ### Integrations over I
 
-def inner_product(values: PointValues, inr: INRBatch, layer) -> Tensor:
-    W_ij = layer.m_ij(inr.sampled_coords) #(B,d) -> (B,cin,cout)
-    if layer.normalized:
-        out = values.unsqueeze(1).matmul(torch.softmax(W_ij, dim=-1)).squeeze(1)
-    else:
-        out = values.unsqueeze(1).matmul(W_ij).squeeze(1)
-    if hasattr(layer, "b_j"):
-        out = out + layer.b_j
-    return out
-
-# def global_avg_pool(values: PointValues) -> Tensor:
-#     """Collapses spatial coordinate (not in use)
-
-#     Args:
-#         values (PointValues): has shape (N,d) or (B,N,d)
-
-#     Returns:
-#         Tensor: has shape (B,1,d)
-#     """
-#     return values.mean(-2, keepdim=True)
-
-# def adaptive_avg_pool(values: PointValues, inr: INRBatch, layer) -> Tensor:
-#     coords = inr.sampled_coords
-#     Diffs = coords.unsqueeze(0) - coords.unsqueeze(1)
-#     mask = layer.norm(Diffs) < layer.radius 
-#     Y = values[torch.where(mask)[1]]
-#     return torch.stack([y.mean(0) for y in Y.split(tuple(mask.sum(0)))])
-
-def _get_query_coords(inr: INRBatch, down_ratio: float) -> PointSet:
+def _get_query_coords(inr: DiscretizedINR, down_ratio: float) -> PointSet:
     """Get coordinates for the output INR
 
     Args:
-        inr (INRBatch): input INR
+        inr (DiscretizedINR): input INR
         down_ratio (float): ratio between number of output and input points
 
     Returns:
         PointSet: coordinates of output INR
     """    
-    coords = inr.sampled_coords
+    coords = inr.coords
     if down_ratio != 1 and down_ratio != 0:
         if down_ratio > 1: 
             down_ratio = 1/down_ratio
@@ -271,11 +214,12 @@ def _get_query_coords(inr: INRBatch, down_ratio: float) -> PointSet:
                 inr.dropped_coords = coords[N:]
             else:
                 inr.dropped_coords = torch.cat((coords[N:], inr.dropped_coords), dim=0)
-        inr.sampled_coords = query_coords = coords[:N]
+        inr.coords = query_coords = coords[:N]
     else:
         query_coords = coords
     return query_coords
 
 
-def normalize(values: PointValues, mean, var, eps=1e-5):
-    return (values - mean)/(var.sqrt() + eps)
+def normalize(inr: DiscretizedINR, mean, var, eps=1e-5):
+    inr.values = (inr.values - mean)/(var.sqrt() + eps)
+    return inr

@@ -1,8 +1,6 @@
 """Pooling Layer"""
-from functools import partial
 import torch
-
-from inrnet.inn.inr import INRBatch
+from inrnet.inn.inr import DiscretizedINR
 from inrnet.inn.support import BoundingBox, Support
 nn = torch.nn
 F = nn.functional
@@ -49,13 +47,13 @@ class KernelPool(nn.Module):
         self.down_ratio = down_ratio
 
 class AvgPool(KernelPool):
-    def forward(self, inr: INRBatch) -> INRBatch:
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
         new_inr = inr.create_derived_inr()
-        new_inr.add_integrator(inrF.avg_pool, 'AvgPool', support=self.support, down_ratio=self.down_ratio)
+        inrF.avg_pool('AvgPool', support=self.support, down_ratio=self.down_ratio)
         return new_inr
 
 class MaxPool(KernelPool):
-    def forward(self, inr: INRBatch) -> INRBatch:
+    def forward(self, inr: DiscretizedINR) -> DiscretizedINR:
         new_inr = inr.create_derived_inr()
-        new_inr.add_integrator(inrF.max_pool, 'MaxPool', support=self.support, down_ratio=self.down_ratio)
+        inrF.max_pool('MaxPool', support=self.support, down_ratio=self.down_ratio)
         return new_inr
