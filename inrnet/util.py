@@ -1,7 +1,13 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from inrnet.inn.inr import DiscretizedINR
+    
 import os, itertools
 from typing import Any
 import torch
 import numpy as np
+
 osp = os.path
 from glob import glob
 import matplotlib.pyplot as plt
@@ -100,6 +106,12 @@ def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, spl
     indices = torch.sort((coords[:,0]+2)*coords.size(0)/2 + coords[:,1]).indices
     return out[:,indices]
     #coords[indices]
+
+def sort_inr(inr: DiscretizedINR):
+    indices = torch.sort((inr.coords[:,0]+2)*inr.coords.size(0)/2 + inr.coords[:,1]).indices
+    inr.values = inr.values[:,indices]
+    inr.coords = inr.coords[:,indices]
+    return inr
 
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:

@@ -19,12 +19,14 @@ class Support:
         return NotImplemented
 
 class BoundingBox(Support):
-    def __init__(self, bounds: tuple[tuple[float]]):
+    def __init__(self, *bounds):
         """Constructor from bounds.
 
         Args:
-            bounds (tuple[tuple[float]]): must be in format ((0,1),(0,1))
-        """        
+            bounds (tuple[tuple[float]]): must be in format (0,1),(0,1)
+        """
+        if len(bounds) == 1 and hasattr(bounds[0][0], '__iter__'):
+            bounds = bounds[0]
         self.bounds = bounds
         self.dimensionality = len(bounds)
         assert len(bounds) == 2 and len(bounds[0]) == 2

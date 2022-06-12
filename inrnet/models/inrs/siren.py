@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+
+from inrnet.inn.support import BoundingBox
 nn = torch.nn
 F = nn.functional
 
@@ -12,7 +14,7 @@ def get_siren_keys():
 
 def to_black_box(siren_list, **kwargs):
     return inn.BlackBoxINR(siren_list, channels=siren_list[0].out_channels,
-        input_dims=2, domain=(-1,1), **kwargs)
+        domain=BoundingBox((-1,1),(-1,1)), **kwargs)
 
 class Siren(nn.Module):
     def __init__(self, C=256, in_dims=2, out_channels=3, layers=3, outermost_linear=True, 

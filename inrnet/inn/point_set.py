@@ -1,5 +1,5 @@
 """Point set"""
-from inrnet.inn.support import Support
+from inrnet.inn.support import BoundingBox, Support
 from scipy.stats import qmc
 import math
 import torch
@@ -28,10 +28,10 @@ def get_sampler_from_args(dl_args, c2f:bool=True):
         sampler = {'sample type': 'grid', 'dims': dl_args['image shape'], 'c2f': c2f}
     else:
         sampler = {'sample type': dl_args['sample type'],
-            'sample size': dl_args['sample size']}
+            'sample points': dl_args['sample points']}
     return sampler
 
-def generate_sample_points(domain: Support, sampler: dict|None=None) -> PointSet:
+def generate_sample_points(domain: Support, sampler: dict) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -49,14 +49,14 @@ def generate_sample_points(domain: Support, sampler: dict|None=None) -> PointSet
 
     elif method == "shrunk":
         assert 'dims' in sampler
-        coords = gen_LD_seq_bbox(d=domain.dimensionality,
-            n=sampler['sample size'],
+        coords = gen_LD_seq_bbox(
+            n=sampler['sample points'],
             bbox=domain.bounds, scramble=True)
         return coords * coords.abs()
 
     elif method in ("qmc", 'rqmc'):
-        return gen_LD_seq_bbox(d=domain.dimensionality,
-            n=sampler['sample size'],
+        return gen_LD_seq_bbox(
+            n=sampler['sample points'],
             bbox=domain.bounds, scramble=(method=='rqmc'))
 
     else:
@@ -114,8 +114,8 @@ def generate_masked_sample_points(mask: torch.Tensor, sample_size: int,
 
     H,W = mask.shape
     fraction = (mask.sum()/torch.numel(mask)).item()
-    coords = gen_LD_seq_bbox(d=2, n=int(sample_size/fraction * 1.2),
-                bbox=(eps,H-eps,eps,W-eps), scramble=True)
+    coords = gen_LD_seq_bbox(n=int(sample_size/fraction * 1.2),
+                bbox=BoundingBox((eps,H-eps),(eps,W-eps)), scramble=True)
     coo = torch.floor(coords).long()
     bools = mask[coo[:,0], coo[:,1]]
     coord_subset = coords[bools]

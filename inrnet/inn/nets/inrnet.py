@@ -3,24 +3,22 @@ import typing
 import numpy as np
 import torch
 from inrnet.inn.inr import DiscretizedINR
-from inrnet.inn.point_set import generate_sample_points
+from inrnet.inn.point_set import PointValues, generate_sample_points
 from inrnet.inn.support import Support
 
 if typing.TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 nn = torch.nn
 
-from inrnet import inn
+from inrnet import inn, util
 
 class INRNet(nn.Module):
-    def __init__(self, domain: Support|None=None,
-        sampler: dict|None=None, layers=None):
+    def __init__(self, sampler: dict, layers=None):
         """
         Args:
             domain (Support, optional): valid INR domain
         """
         super().__init__()
-        self.domain = domain
         self.sampler = sampler
         self.layers = layers
 
@@ -32,12 +30,27 @@ class INRNet(nn.Module):
         return self.layers[ix]
 
     def sample_inr(self, inr: INRBatch) -> DiscretizedINR:
-        coords = generate_sample_points(self.sampler)
+        coords = generate_sample_points(domain=inr.domain, sampler=self.sampler)
         return DiscretizedINR(coords, values=inr(coords), domain=inr.domain)
         
     def forward(self, inr: INRBatch) -> DiscretizedINR|torch.Tensor:
         d_inr = self.sample_inr(inr)
         return self.layers(d_inr)
+
+    def produce_images(self, inr: INRBatch, H,W, dtype=torch.float):
+        with torch.no_grad():
+            xy_grid = util.meshgrid_coords(H,W, device=self.device)
+            coords = generate_sample_points(domain=inr.domain, sampler={
+                'sample type': 'grid', 'dims': (H,W),
+            })
+            d_inr = DiscretizedINR(coords, values=inr(coords), domain=inr.domain)
+            out_inr = self.layers(d_inr)
+            output = util.sort_inr(out_inr).values
+            output = output.reshape(output.size(0),H,W,-1)
+        if dtype == 'numpy':
+            return output.squeeze(-1).cpu().float().numpy()
+        else:
+            return output.permute(0,3,1,2).to(dtype=dtype).as_subclass(PointValues)
 
 def freeze_layer_types(inrnet, classes=(inn.ChannelMixer, inn.ChannelNorm)):
     for m in inrnet:

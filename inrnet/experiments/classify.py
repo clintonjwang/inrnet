@@ -1,5 +1,6 @@
 """INR classification"""
 import os
+import pdb
 import torch
 import wandb
 osp = os.path
@@ -37,16 +38,13 @@ def train_classifier(args: dict) -> None:
         else:
             wandb.watch(model[0][0], log_freq=300)
         
-    if args["network"]['type'].startswith('inr'):
-        model.set_sample_mode(dl_args['sample type'])
 
     for img_inr, labels in data_loader:
         model.train()
         global_step += 1
 
         if args["network"]['type'].startswith('inr'):
-            coords = model.generate_sample_points(dl_args)
-            logits = model(img_inr, coords)
+            logits = model(img_inr)
         else:
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img)
@@ -70,8 +68,7 @@ def train_classifier(args: dict) -> None:
                 img_inr, labels = next(val_data_loader)
                 if args["network"]['type'].startswith('inr'):
                     model.eval()
-                    coords = model.generate_sample_points(dl_args)
-                    logits = model(img_inr, coords)
+                    logits = model(img_inr)
 
                 else:
                     img = img_inr.produce_images(*dl_args['image shape'])
@@ -99,12 +96,10 @@ def test_inr_classifier(args):
     orig_args = job_mgmt.get_job_args(origin)
 
     with torch.no_grad():
+        model.eval()
         for img_inr, labels in data_loader:
             if orig_args["network"]['type'].startswith('inr'):
-                logit_fxn = model(img_inr).cuda().eval()
-                logit_fxn.change_sample_mode(dl_args['sample type'])
-                coords = point_set.generate_sample_points(logit_fxn, dl_args)
-                logits = logit_fxn(coords)
+                logits = model(img_inr)
             else:
                 img = img_inr.produce_images(*dl_args['image shape'])
                 logits = model(img)
@@ -141,7 +136,6 @@ def log(variable, *args, use_wandb=True, **kwargs) -> None:
 #             N = dl_args["sample points"]
 #             global_step += 1
 #             logit_fxn = model(img_inr)
-#             coords = logit_fxn.generate_sample_points(sample_size=N, method='rqmc')
 #             logits = logit_fxn(coords)
 
 #             loss = loss_tracker(logits, labels)
@@ -180,7 +174,8 @@ def load_pretrained_model(args):
     elif net_args["type"] == "cnn-5":
         return Conv5(**kwargs)
     elif net_args["type"] == "inrnet":
-        return InrCls(**kwargs, **net_args['conv'])
+        sampler = point_set.get_sampler_from_args(args['data loading'])
+        return InrCls(sampler=sampler, **kwargs, **net_args['conv'])
     else:
         raise NotImplementedError
 

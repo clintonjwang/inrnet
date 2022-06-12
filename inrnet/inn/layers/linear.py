@@ -1,10 +1,10 @@
 """1x1 Conv Layer"""
 from __future__ import annotations
 from typing import TYPE_CHECKING
-
-from inrnet.inn.inr import DiscretizedINR
 if TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
+
+from inrnet.inn.inr import DiscretizedINR
 import torch
 nn = torch.nn
 F = nn.functional

@@ -1,4 +1,6 @@
 import torch
+
+from inrnet.inn.support import BoundingBox
 nn=torch.nn
 
 from inrnet import inn
@@ -6,7 +8,7 @@ from inrnet.inn import point_set
 
 def to_black_box(rff_list, **kwargs):
     evaluator = nn.ModuleList(rff_list).eval()
-    return inn.BlackBoxINR(evaluator, channels=3, input_dims=2, domain=(-1,1), **kwargs)
+    return inn.BlackBoxINR(evaluator, channels=3, domain=BoundingBox((-1,1),(-1,1)), **kwargs)
 
 """
 An implementation of Gaussian Fourier feature mapping.

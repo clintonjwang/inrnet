@@ -7,8 +7,7 @@ nn = torch.nn
 F = nn.functional
 
 class InrCls(INRNet):
-    def __init__(self, in_channels, out_dims, C=64, **kwargs):
-        super().__init__()
+    def __init__(self, in_channels, out_dims, sampler, C=64, **kwargs):
         k0 = kwargs.pop('k0', .04)
         k1 = kwargs.pop('k1', .07)
         k2 = kwargs.pop('k2', .14)
@@ -51,7 +50,7 @@ class InrCls(INRNet):
             *l1, *l2, *l3, *l4,
             inn.GlobalAvgPoolSequence(out_layers),
         ]
-        super().__init__(layers=nn.Sequential(*layers))
+        super().__init__(sampler=sampler, layers=nn.Sequential(*layers))
 
 
 
