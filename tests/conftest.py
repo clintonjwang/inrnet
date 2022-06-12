@@ -13,7 +13,8 @@ requirescuda = pytest.mark.skipif(
 
 @pytest.fixture
 def qmc_2d_sequence256():
-    return point_set.generate_quasirandom_sequence(d=2, n=256, bbox=(-1,1,-1,1), dtype=torch.float, device="cpu")
+    return point_set.gen_LD_seq_bbox(n=256, bbox=((-1,1),(-1,1)),
+        dtype=torch.float, device="cpu")
 
 @pytest.fixture
 def args():

@@ -1,6 +1,5 @@
 from conftest import requirescuda
 from inrnet.inn import point_set
-# requirescuda
 
 import pytest, torch, pdb, torchvision
 nn=torch.nn

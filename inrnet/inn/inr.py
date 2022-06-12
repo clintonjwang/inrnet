@@ -7,13 +7,10 @@ from typing import Callable
 import torch
 from inrnet.inn import point_set
 from inrnet.inn.layers.merge import MergeLayer
-from inrnet.inn.layers.other import PointWiseFunction
 from inrnet.inn.point_set import PointSet, PointValues
 from inrnet.inn.support import Support
 nn=torch.nn
 F=nn.functional
-
-from inrnet import util
 
 class INRBatch(nn.Module):
     """Standard INR minibatch"""

@@ -10,9 +10,9 @@ def test_get_job_args():
     assert 'data loading' in args
     ds = jobs.get_dataset_for_job('manual')
     assert ds == args["data loading"]["dataset"]
-    # jobs.rename_job('manual', 'testmanual')
-    # assert jobs.get_job_args('testmanual') == args
-    # jobs.rename_job('testmanual', 'manual')
+    jobs.rename_job('manual', 'testmanual')
+    assert jobs.get_job_args('testmanual') == args
+    jobs.rename_job('testmanual', 'manual')
 
 # def test_meshgrid():
 #     assert util.meshgrid(torch.arange(2), torch.arange(2))
