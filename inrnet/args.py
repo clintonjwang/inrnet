@@ -25,9 +25,9 @@ def parse_args(args):
 
     args = args_from_file(main_config_path, cmd_args)
     paths = args["paths"]
-    for subdir in ("weights", "imgs", "plots"):
+    for subdir in ("weights", "imgs"):
         shutil.rmtree(osp.join(paths["job output dir"], subdir), ignore_errors=True)
-    for subdir in ("weights", "imgs", "plots"):
+    for subdir in ("weights", "imgs"):
         os.makedirs(osp.join(paths["job output dir"], subdir))
     yaml.safe_dump(args, open(osp.join(paths["job output dir"], "config.yaml"), 'w'))
     return args
@@ -51,6 +51,7 @@ def get_wandb_config():
     wandb_sweep_dict = {
         'learning_rate': ['optimizer', 'learning rate'],
         'batch_size': ['data loading', 'batch size'],
+        'sample_points': ['data loading', 'sample points'],
         'sample_type': ['data loading', 'sample type'],
         'augment': ['data loading', 'augment'],
         'weight_decay': ['optimizer', 'weight decay'],

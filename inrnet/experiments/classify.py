@@ -3,6 +3,8 @@ import os
 import pdb
 import torch
 import wandb
+
+from inrnet.inn.nets.consistent import LearnedSampler
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -31,6 +33,11 @@ def train_classifier(args: dict) -> None:
 
     model = load_pretrained_model(args).cuda()
     optimizer = util.get_optimizer(model, args)
+    # dense_sampler = model.sampler.copy()
+    # dense_sampler['sample points'] *= 16
+    # query_layers = nn.Sequential()
+    # flow_layers = nn.Sequential()
+    # LearnedSampler(dense_sampler, query_layers, flow_layers, ratio=16)
     
     if not args['no_wandb']:
         if hasattr(model, 'layers'):

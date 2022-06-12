@@ -3,7 +3,10 @@ from __future__ import annotations
 import pdb
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from inrnet.inn.point_set import PointSet, PointValues
+from inrnet.inn.support import BoundingBox
 if TYPE_CHECKING:
     from inrnet.inn.inr import DiscretizedINR
     from inrnet.inn.support import Support
@@ -16,15 +19,31 @@ nn=torch.nn
 #     coords = inr.coords
 #     return coords
 
-def tokenization(inr: DiscretizedINR):
+def tokenization(inr: DiscretizedINR, partitions: tuple[int]):
     """tokenization"""
-    return inr
+    bounds = inr.domain.bounds
+    new_domains = []
+    assert len(partitions) == 2
+    x0,x1 = bounds[0]
+    y0,y1 = bounds[1]
+    nx,ny = partitions
+    x_bounds = np.linspace(x0,x1,nx+1)
+    y_bounds = np.linspace(y0,y1,ny+1)
+    inrs = []
+    for ix in range(nx):
+        for iy in range(ny):
+            bbox = BoundingBox((x_bounds[ix], x_bounds[ix+1]),
+                (y_bounds[iy], y_bounds[iy+1]))
+            indices = torch.where(bbox.in_support(inr.coords))[1]
+            inrs.append(DiscretizedINR(
+                inr.coords[indices], inr.values[indices], domain=bbox))
+    return inrs
     
 def pos_enc(inr: DiscretizedINR, N: int,
     scale: float=1., additive: bool=True):
     """positional encoding"""
     coords = inr.coords.unsqueeze(-1)
-    n = 2**torch.arange(N, device=coords.device) * 2*torch.pi * scale
+    n = 2**torch.arange(N, device=coords.device) * torch.pi * scale
     embeddings = torch.cat((torch.sin(coords*n), torch.cos(coords*n)), dim=1).flatten(1)
     if additive is True:
         inr.values = inr.values + embeddings

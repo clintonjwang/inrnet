@@ -7,13 +7,12 @@ F = nn.functional
 from inrnet import inn
 
 def conv_norm_act(in_, out_, kernel_size=(.1,.1), **kwargs):
-    act_layer = inn.get_activation_layer(kwargs.pop("activation", "swish"))
     kernel_support = BoundingBox.from_orthotope(dims=kernel_size)
     cv = inn.MLPConv(in_, out_, kernel_support=kernel_support, **kwargs)
     # cv.mask_tracker = True
     return nn.Sequential(cv,
         inn.ChannelNorm(out_),
-        act_layer,
+        inn.Activation(kwargs.pop("activation", "relu")),
     )
 
 class ResBlock(nn.Module):
@@ -29,16 +28,20 @@ class ResBlock(nn.Module):
     def __iter__(self):
         return self.sequential.__iter__()
 
-# class ResTest(nn.Module):
-#     def __init__(self, C):
-#         super().__init__()
-#         self.block = nn.Sequential(nn.Conv2d(C,C,3,1,1,bias=False))
-#     def forward(self, x):
-#         return x + self.block(x)
-
 class ResConv(ResBlock):
     def __init__(self, C, **kwargs):
         super().__init__(conv_norm_act(C, C, **kwargs))
+
+class ResConvCM(ResBlock):
+    def __init__(self, C, kernel_size=(.3,.3), **kwargs):
+        kernel_support = BoundingBox.from_orthotope(dims=kernel_size)
+        cv = inn.MLPConv(C, C, kernel_support=kernel_support, **kwargs)
+        super().__init__(nn.Sequential(cv,
+            inn.ChannelNorm(C, batchnorm=False),
+            inn.ChannelMixer(C, C*4),
+            inn.Activation(kwargs.pop("activation", "relu")),
+            inn.ChannelMixer(C*4, C),
+        ))
 
 class ResConv2(ResBlock):
     def __init__(self, C, **kwargs):

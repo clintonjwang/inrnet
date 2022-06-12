@@ -8,14 +8,13 @@ F = nn.functional
 
 class InrCls(INRNet):
     def __init__(self, in_channels, out_dims, sampler, C=64, **kwargs):
-        k0 = kwargs.pop('k0', .04)
-        k1 = kwargs.pop('k1', .07)
-        k2 = kwargs.pop('k2', .14)
-        k3 = kwargs.pop('k3', .3)
-        posenc = kwargs.pop('posenc_order', 1)
-        pe_scale = kwargs.pop('pe_scale', 1.)
+        k0 = kwargs.pop('k0', .03)
+        k1 = kwargs.pop('k1', .06)
+        k2 = kwargs.pop('k2', .12)
+        k3 = kwargs.pop('k3', .24)
         l1 = [
             inn.blocks.conv_norm_act(in_channels, C, kernel_size=(k0,k0), down_ratio=.25, **kwargs),
+            inn.PositionalEncoding(N=C//4),
         ]
         l2 = [
             inn.blocks.ResConv(C, kernel_size=(k1,k1), **kwargs),
@@ -24,20 +23,11 @@ class InrCls(INRNet):
         l3 = [
             inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k2*.7,k2*.7), down_ratio=.5, **kwargs),
             inn.blocks.ResConv(C*2, kernel_size=(k2,k2), **kwargs),
-            inn.ChannelMixer(C*2, C*2),
         ]
         l4 = [
             inn.blocks.conv_norm_act(C*2, C*2, kernel_size=(k3*.7,k3*.7), down_ratio=.5, **kwargs),
             inn.blocks.ResConv(C*2, kernel_size=(k3,k3), **kwargs),
         ]
-        if posenc == 1:
-            l1.append(inn.PositionalEncoding(N=C//4, scale=pe_scale))
-        elif posenc == 2:
-            l2.append(inn.PositionalEncoding(N=C//2, scale=pe_scale))
-        elif posenc == 3:
-            l3.append(inn.PositionalEncoding(N=C//2, scale=pe_scale))
-        elif posenc == 4:
-            l4.append(inn.PositionalEncoding(N=C//2, scale=pe_scale))
             
         out_layers = nn.Sequential(nn.Linear(C*2, 128),
             nn.ReLU(inplace=True), nn.Linear(128, out_dims))
