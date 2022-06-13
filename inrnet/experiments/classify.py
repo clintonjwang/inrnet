@@ -33,11 +33,13 @@ def train_classifier(args: dict) -> None:
 
     model = load_pretrained_model(args).cuda()
     optimizer = util.get_optimizer(model, args)
+
+    # ratio = 16
     # dense_sampler = model.sampler.copy()
-    # dense_sampler['sample points'] *= 16
+    # dense_sampler['sample points'] *= ratio/4
     # query_layers = nn.Sequential()
     # flow_layers = nn.Sequential()
-    # LearnedSampler(dense_sampler, query_layers, flow_layers, ratio=16)
+    # LearnedSampler(dense_sampler, query_layers, flow_layers, ratio=ratio)
     
     if not args['no_wandb']:
         if hasattr(model, 'layers'):

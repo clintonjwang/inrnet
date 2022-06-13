@@ -1,4 +1,5 @@
 import os, pdb, torch
+import wandb
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -6,6 +7,7 @@ import monai.transforms as mtr
 import numpy as np
 import matplotlib.pyplot as plt
 
+from inrnet import args as args_module
 from inrnet.data import dataloader
 from inrnet import inn, jobs as job_mgmt, util
 from inrnet.inn import point_set
@@ -44,8 +46,6 @@ def load_pretrained_model(args):
         else:
             raise NotImplementedError
             
-    if net_args['frozen'] is True:
-        inn.inrnet.freeze_layer_types(InrNet)
     return InrNet
 
 def load_model_from_job(origin):
@@ -67,15 +67,17 @@ def get_seg_at_coords(seg, coords):
     coo = torch.floor(coords).long()
     return seg[...,coo[:,0], coo[:,1]].transpose(1,2)
 
-def train_segmenter(args):
+def train_segmenter(args: dict) -> None:
+    if not args['no_wandb']:
+        wandb.init(project="inrnet", job_type="train", name=args["job_id"],
+            config=wandb.helper.parse_config(args, exclude=['job_id']))
+        args = args_module.get_wandb_config()
     paths = args["paths"]
     dl_args = args["data loading"]
     global_step = 0
     trainsegdist = torch.load(DS_DIR+'/inrnet/cityscapes/trainsegdist.pt')
     weight = trainsegdist.sum() / trainsegdist
-    loss_tracker = util.MetricTracker("loss", function=nn.CrossEntropyLoss(weight=weight.cuda()))#nn.BCEWithLogitsLoss())
-    iou_tracker = util.MetricTracker("mean IoU", function=mean_iou)
-    acc_tracker = util.MetricTracker("pixel accuracy", function=pixel_acc)
+    loss_fxn = nn.CrossEntropyLoss(weight=weight.cuda())
     if dl_args['sample type'] == 'masked':
         dl_args['batch size'] = 1 #cannot handle different masks per datapoint
     data_loader = dataloader.get_inr_dataloader(dl_args)
@@ -91,7 +93,8 @@ def train_segmenter(args):
             seg_inr = model(img_inr)
             if dl_args['sample type'] == 'masked':
                 seg_inr.change_sample_mode('masked')
-                coords = point_set.generate_masked_sample_points(mask=(segs.amax(1) == True),
+                coords = point_set.generate_masked_sample_points(
+                    mask=(segs.amax(1) == True),
                     sample_size=dl_args["sample points"])
                 seg_gt = get_seg_at_coords(segs, coords)
 
@@ -116,7 +119,7 @@ def train_segmenter(args):
 
         # loss = loss_tracker(logits, seg_gt.float()) #BCE
         maxes, gt_labels = seg_gt.max(-1)
-        loss = loss_tracker(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
+        loss = loss_fxn(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         if torch.isnan(loss):
             pdb.set_trace()
             print('nan loss')
@@ -124,9 +127,9 @@ def train_segmenter(args):
             # raise ValueError('nan loss')
         pred_seg = logits.max(-1).indices
         pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
-        iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-        acc = acc_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-
+        iou = mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+        acc = pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+        wandb.log({"train_mIoU": iou, "train_PixAcc": acc})
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -138,9 +141,6 @@ def train_segmenter(args):
 
         if global_step % 100 == 0:
             torch.save(model.state_dict(), osp.join(paths["weights dir"], "model.pth"))
-            loss_tracker.plot_running_average(path=paths["job output dir"]+"/plots/loss.png")
-            iou_tracker.plot_running_average(path=paths["job output dir"]+"/plots/iou.png")
-            acc_tracker.plot_running_average(path=paths["job output dir"]+"/plots/acc.png")
 
             path = paths["job output dir"]+f"/imgs/{global_step}.png"
             with torch.no_grad():
@@ -185,10 +185,6 @@ def train_segmenter(args):
 def test_inr_segmenter(args):
     paths = args["paths"]
     dl_args = args["data loading"]
-    iou_tracker = util.MetricTracker("coarse IoU", function=mean_iou)
-    acc_tracker = util.MetricTracker("coarse pixel accuracy", function=pixel_acc)
-    # fiou_tracker = util.MetricTracker("fine IoU", function=mean_iou)
-    # facc_tracker = util.MetricTracker("fine pixel accuracy", function=pixel_acc)
     if dl_args['sample type'] == 'masked':
         dl_args['batch size'] = 1 #cannot handle different masks per datapoint
     data_loader = dataloader.get_inr_dataloader(dl_args)
@@ -229,8 +225,9 @@ def test_inr_segmenter(args):
             maxes, gt_labels = seg_gt.max(-1)
             pred_seg = logits.max(-1).indices
             pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
-            iou = iou_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-            acc = acc_tracker(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            iou = mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            acc = pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            wandb.log({"test_mIoU": iou, "test_PixAcc": acc})
 
         if dl_args['sample type'] == 'grid':
             rgb = img_inr.produce_images(*dl_args['image shape'])
@@ -241,9 +238,6 @@ def test_inr_segmenter(args):
             for i in range(3):
                 path = paths["job output dir"]+f"/imgs/{ix}_{i}.png"
                 save_example_segs(path, rgb[i], pred_seg[i].reshape(*rgb.shape[-2:]), gt_labels[i].reshape(*rgb.shape[-2:]))
-
-    torch.save((iou_tracker.minibatch_values['val'], acc_tracker.minibatch_values['val']),
-        osp.join(paths["job output dir"], "stats.pt"))
 
 import imgviz
 def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'building', 'traffic', 'nature', 'sky', 'human', 'vehicle')):

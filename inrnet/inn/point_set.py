@@ -34,7 +34,7 @@ def get_sampler_from_args(dl_args, c2f:bool=True):
             'sample points': dl_args['sample points']}
     return sampler
 
-def generate_sample_points(domain: Support, sampler: dict) -> PointSet:
+def generate_sample_points(domain: Support, sampler: dict, **kwargs) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
@@ -58,6 +58,12 @@ def generate_sample_points(domain: Support, sampler: dict) -> PointSet:
         coords = coords * coords.abs()
 
     elif method in ("qmc", 'rqmc'):
+        coords = gen_LD_seq_bbox(
+            n=sampler['sample points'],
+            bbox=domain.bounds, scramble=(method=='rqmc'))
+
+    elif method == 'masked':
+        assert 'mask' in kwargs
         coords = gen_LD_seq_bbox(
             n=sampler['sample points'],
             bbox=domain.bounds, scramble=(method=='rqmc'))
