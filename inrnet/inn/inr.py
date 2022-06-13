@@ -54,6 +54,11 @@ class DiscretizedINR(INRBatch):
         inr.values = modification(self.values)
         return inr
 
+    def sort(self):
+        indices = torch.sort((self.coords[:,0]+2)*self.coords.size(0)/2 + self.coords[:,1]).indices
+        self.values = self.values[:,indices]
+        self.coords = self.coords[:,indices]
+
     def __neg__(self):
         self.values = -self.values
         return self

@@ -56,12 +56,6 @@ def realign_values(out, inr=None, coords=None):#, inr=None, coords_out=None, spl
     return out[:,indices]
     #coords[indices]
 
-def sort_inr(inr: DiscretizedINR):
-    indices = torch.sort((inr.coords[:,0]+2)*inr.coords.size(0)/2 + inr.coords[:,1]).indices
-    inr.values = inr.values[:,indices]
-    inr.coords = inr.coords[:,indices]
-    return inr
-
 def load_checkpoint(model, paths):
     if paths["pretrained model name"] is not None:
         init_weight_path = osp.join('~/code/inrnet/temp', paths["pretrained model name"])

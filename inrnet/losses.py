@@ -86,3 +86,11 @@ def gradient_penalty_inr(coords: PointSet, real_inr: INRBatch,
                create_graph=True, retain_graph=True)[0].view(B, -1)
     grads_norm = torch.sqrt(torch.sum(grads ** 2, dim=1) + 1e-12)
     return (grads_norm - 1) ** 2
+
+def mean_iou(pred_seg, gt_seg):
+    # pred_seg [B*N], gt_seg [B*N,C]
+    iou_per_channel = (pred_seg & gt_seg).sum(0) / (pred_seg | gt_seg).sum(0)
+    return iou_per_channel.mean()
+
+def pixel_acc(pred_seg, gt_seg):
+    return (pred_seg & gt_seg).sum() / pred_seg.size(0)

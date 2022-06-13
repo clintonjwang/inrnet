@@ -1,3 +1,4 @@
+import os
 import torch
 nn = torch.nn
 F = nn.functional
@@ -29,7 +30,7 @@ def get_convnext_block(state_dict):
 
 
 def mini_convnext(n_stages=2):
-    sd = torch.load('/data/vision/polina/users/clintonw/code/diffcoord/temp/upernet_convnext.pth')['state_dict']
+    sd = torch.load(os.path.expanduser('~/code/inrnet/temp/upernet_convnext.pth'))['state_dict']
 
     # all the top level layers need to be built before we can change shape/extrema
     root = 'decode_head.lateral_convs.'

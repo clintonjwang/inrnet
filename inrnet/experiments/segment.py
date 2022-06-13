@@ -7,7 +7,7 @@ import monai.transforms as mtr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from inrnet import args as args_module
+from inrnet import args as args_module, losses
 from inrnet.data import dataloader
 from inrnet import inn, jobs as job_mgmt, util
 from inrnet.inn import point_set
@@ -21,11 +21,13 @@ DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
 def load_pretrained_model(args):
     net_args = args["network"]
+    if net_args["type"].startswith("inr"):
+        sampler = point_set.get_sampler_from_args(args['data loading'])
     kwargs = dict(in_channels=3, out_channels=7)
     if net_args["type"] == "inr-3":
-        return inn.nets.inr2inr.ISeg3(**kwargs)
+        return inn.nets.inr2inr.ISeg3(sampler=sampler, **kwargs)
     elif net_args["type"] == "inr-5":
-        return inn.nets.inr2inr.ISeg5(**kwargs)
+        return inn.nets.inr2inr.ISeg5(sampler=sampler, **kwargs)
     elif net_args["type"] == "cnn-3":
         return inrnet.models.common.Seg3(**kwargs)
     elif net_args["type"] == "cnn-5":
@@ -39,9 +41,9 @@ def load_pretrained_model(args):
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
         elif net_args["type"] == "inr-convnext":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"], sampler=sampler, )
         elif net_args["type"] == "inr-mlpconv":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"])
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"], sampler=sampler, )
             inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
         else:
             raise NotImplementedError
@@ -50,18 +52,10 @@ def load_pretrained_model(args):
 
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
-    path = osp.expanduser(f"~/code/diffcoord/results/{origin}/weights/model.pth")
+    path = osp.expanduser(f"~/code/inrnet/results/{origin}/weights/model.pth")
     model = load_pretrained_model(orig_args)
     model.load_state_dict(torch.load(path))
     return model
-
-def mean_iou(pred_seg, gt_seg):
-    # pred_seg [B*N], gt_seg [B*N,C]
-    iou_per_channel = (pred_seg & gt_seg).sum(0) / (pred_seg | gt_seg).sum(0)
-    return iou_per_channel.mean()
-
-def pixel_acc(pred_seg, gt_seg):
-    return (pred_seg & gt_seg).sum() / pred_seg.size(0)
 
 def get_seg_at_coords(seg, coords):
     coo = torch.floor(coords).long()
@@ -88,30 +82,15 @@ def train_segmenter(args: dict) -> None:
         global_step += 1
         
         if args["network"]['type'].startswith('inr'):
-            # if global_step == args["optimizer"]["max steps"]//2:
-            #     inrnet.inn.nets.convnext.enable_cn_blocks(model)
-            seg_inr = model(img_inr)
-            if dl_args['sample type'] == 'masked':
-                seg_inr.change_sample_mode('masked')
-                coords = point_set.generate_masked_sample_points(
-                    mask=(segs.amax(1) == True),
-                    sample_size=dl_args["sample points"])
-                seg_gt = get_seg_at_coords(segs, coords)
+            logit_inr = model(img_inr)
 
-            elif dl_args['sample type'] == 'grid':
-                seg_gt = segs.flatten(start_dim=2).transpose(2,1)
-                seg_inr.change_sample_mode('grid')
-                coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
-            
-            else:
-                coords = seg_inr.generate_sample_points(sample_size=dl_args["sample points"],
-                    method=dl_args['sample type'])
-                seg_gt = get_seg_at_coords(segs, coords)
-                
-            logits = seg_inr.cuda()(coords)
             if dl_args['sample type'] == 'grid':
-                logits = util.realign_values(logits, coords=coords)
-
+                seg_gt = segs.flatten(start_dim=2).transpose(2,1)
+                logit_inr.sort()
+            else:
+                seg_gt = get_seg_at_coords(segs, logit_inr.coords)
+            logits = logit_inr.values
+                
         else:
             img = img_inr.produce_images(*dl_args['image shape'])
             logits = model(img).flatten(start_dim=2).transpose(2,1)
@@ -121,15 +100,12 @@ def train_segmenter(args: dict) -> None:
         maxes, gt_labels = seg_gt.max(-1)
         loss = loss_fxn(logits[maxes != 0], gt_labels[maxes != 0]) #cross entropy
         if torch.isnan(loss):
-            pdb.set_trace()
-            print('nan loss')
-            continue
-            # raise ValueError('nan loss')
+            raise ValueError('nan loss')
         pred_seg = logits.max(-1).indices
         pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
-        iou = mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-        acc = pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-        wandb.log({"train_mIoU": iou, "train_PixAcc": acc})
+        iou = losses.mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+        acc = losses.pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+        wandb.log({"train_loss": loss.item(), "train_mIoU": iou, "train_PixAcc": acc})
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -145,36 +121,11 @@ def train_segmenter(args: dict) -> None:
             path = paths["job output dir"]+f"/imgs/{global_step}.png"
             with torch.no_grad():
                 rgb = img_inr.produce_images(*dl_args['image shape'])[0]
-                if args["network"]['type'].startswith('inr') and dl_args['sample type'] == 'masked':
-                    grid_seg = torch.zeros(*dl_args['image shape'], device=coords.device, dtype=torch.long)
-                    pred_seg = util.realign_values(pred_seg, coords=coords)
-                    # inrF.nn_interpolate(grid_seg, pred_seg)
-                    coo = torch.floor(coords).long()
-                    grid_seg[coo[:,0], coo[:,1]] = pred_seg[0] + 1
-
-                    gt_label = segs[0].max(0).indices + 1
-                    save_example_segs(path, rgb, grid_seg, gt_label)
-                    
-                    # seg_gt = segs.flatten(start_dim=2).transpose(2,1)
-                    # maxes, gt_labels = seg_gt.max(-1)
-                    # seg_inr = model(img_inr)
-                    # seg_inr.change_sample_mode('grid')
-                    # coords = seg_inr.generate_sample_points(dims=dl_args['image shape'])
-                    # logits = seg_inr.cuda()(coords)
-                    # logits = util.realign_values(logits, coords=coords)
-                    # pred_seg = logits.max(-1).indices
-                    # gt_labels += 1
-                    # gt_labels[maxes == 0] = 0
-                    # pred_seg += 1
-                    # pred_seg[maxes == 0] = 0
-                    # save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
-
-                else:
-                    gt_labels += 1
-                    gt_labels[maxes == 0] = 0
-                    pred_seg += 1
-                    pred_seg[maxes == 0] = 0
-                    save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
+                gt_labels += 1
+                gt_labels[maxes == 0] = 0
+                pred_seg += 1
+                pred_seg[maxes == 0] = 0
+                save_example_segs(path, rgb, pred_seg[0].reshape(*rgb.shape[-2:]), gt_labels[0].reshape(*rgb.shape[-2:]))
 
         if global_step >= args["optimizer"]["max steps"]:
             break
@@ -225,8 +176,8 @@ def test_inr_segmenter(args):
             maxes, gt_labels = seg_gt.max(-1)
             pred_seg = logits.max(-1).indices
             pred_1hot = F.one_hot(pred_seg, num_classes=seg_gt.size(-1)).bool()
-            iou = mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
-            acc = pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            iou = losses.mean_iou(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
+            acc = losses.pixel_acc(pred_1hot[maxes != 0], seg_gt[maxes != 0]).item()
             wandb.log({"test_mIoU": iou, "test_PixAcc": acc})
 
         if dl_args['sample type'] == 'grid':
