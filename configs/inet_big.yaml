@@ -1,0 +1,7 @@
+parent: inet_i2
+data loading:
+  batch size: 72
+  sample points: 16384
+  image shape:
+  - 128
+  - 128

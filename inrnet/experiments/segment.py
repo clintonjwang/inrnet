@@ -41,9 +41,11 @@ def load_pretrained_model(args):
         if net_args["type"] == "convnext":
             return inrnet.models.convnext.mini_convnext()
         elif net_args["type"] == "inr-convnext":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"], sampler=sampler, )
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(
+                    args["data loading"]["image shape"], sampler=sampler)
         elif net_args["type"] == "inr-mlpconv":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(args["data loading"]["image shape"], sampler=sampler, )
+            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(
+                    args["data loading"]["image shape"], sampler=sampler)
             inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
         else:
             raise NotImplementedError

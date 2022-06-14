@@ -1,23 +1,17 @@
 from __future__ import annotations
 import typing
-import numpy as np
-import torch
-from inrnet.inn.inr import DiscretizedINR
-from inrnet.inn.point_set import PointValues, generate_sample_points
-from inrnet.inn.support import Support
-
 if typing.TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
+from inrnet.inn.inr import DiscretizedINR
+from inrnet.inn.point_set import generate_sample_points
+
+import torch
 nn = torch.nn
 
 from inrnet import inn, util
 
 class INRNet(nn.Module):
     def __init__(self, sampler: dict, layers=None):
-        """
-        Args:
-            domain (Support, optional): valid INR domain
-        """
         super().__init__()
         self.sampler = sampler
         self.layers = layers
@@ -37,7 +31,9 @@ class INRNet(nn.Module):
         
     def forward(self, inr: INRBatch) -> DiscretizedINR|torch.Tensor:
         d_inr = self.sample_inr(inr)
-        return self.layers(d_inr)
+        return self._forward(d_inr)
+    def _forward(self, inr: DiscretizedINR) -> DiscretizedINR|torch.Tensor:
+        return self.layers(inr)
 
     def produce_images(self, inr: INRBatch, H,W, dtype=torch.float):
         with torch.no_grad():

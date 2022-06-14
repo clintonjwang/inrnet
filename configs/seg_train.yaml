@@ -10,12 +10,12 @@ data loading:
   dataset: cityscapes
   classes: 7
   sample type: grid
-  sample points: 4608
+  sample points: 8192
   image shape:
-  - 48
-  - 96
+  - 64
+  - 128
 optimizer:
   type: AdamW
-  learning rate: 1e-2
+  learning rate: 1e-3
   max steps: 10000
 #N=2975 / bsz * 10 epochs

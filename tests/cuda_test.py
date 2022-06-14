@@ -2,6 +2,8 @@ from conftest import requirescuda
 from inrnet.inn import point_set
 
 import pytest, torch, pdb, torchvision
+
+from inrnet.inn.support import BoundingBox
 nn=torch.nn
 F=nn.functional
 from time import time
@@ -22,7 +24,7 @@ def test_equivalence():
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
-    inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
+    inr = inn.BlackBoxINR([dummy_inr()], channels=C, domain=BoundingBox((-1,1),(-1,1))).cuda()
     # loader = get_inr_loader_for_cityscapes(1, 'train', img_shape)
     # for inr,_ in loader:
     #     break
@@ -31,7 +33,7 @@ def test_equivalence():
 
     with torch.no_grad():
         # model = torchvision.models.efficientnet_b0(pretrained=True)
-        model = classify.load_model_from_job('inet_nn_train')
+        model = classify.load_model_from_job('inet_i2')
         discrete_model = model[0][1][0].block[1:2].eval().cuda()
         InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
 
@@ -71,7 +73,7 @@ def test_equivalence_dummy():
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
-    inr = inn.BlackBoxINR([dummy_inr()], channels=C, input_dims=2, domain=(-1,1)).cuda()
+    inr = inn.BlackBoxINR([dummy_inr()], channels=C, domain=BoundingBox((-1,1),(-1,1))).cuda()
     with torch.no_grad():
         x = inr.produce_images(h,w)
         conv = nn.Conv2d(1,2,3,1,padding=1,bias=False)
@@ -116,7 +118,7 @@ def test_backprop():
     class dummy_inr(nn.Module):
         def forward(self, coords):
             return zz.to(dtype=coords.dtype, device=coords.device)
-    inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=C, input_dims=2, domain=(-1,1)).cuda()
+    inr = inn.BlackBoxINR(evaluator=dummy_inr(), channels=C, domain=BoundingBox((-1,1),(-1,1))).cuda()
 
     # discrete_model = model.train().cuda()
     # InrNet, output_shape = inn.conversion.translate_discrete_model(discrete_model, (h,w))
