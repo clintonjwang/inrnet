@@ -1,7 +1,10 @@
 parent: inet_i2
 data loading:
-  batch size: 72
+  batch size: 24
   sample points: 16384
   image shape:
   - 128
   - 128
+optimizer:
+  learning rate: 5e-4
+  max steps: 8000
