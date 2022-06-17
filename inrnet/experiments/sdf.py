@@ -19,51 +19,7 @@ import inn.nets.inr2inr
 rescale_float = mtr.ScaleIntensity()
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"
 
-def load_model(args):
-    net_args = args["network"]
-    if net_args["type"].startswith("inr"):
-        sampler = point_set.get_sampler_from_args(args['data loading'])
-    kwargs = dict(in_channels=3, out_channels=7)
-    if net_args["type"] == "inr-3":
-        return inn.nets.inr2inr.ISeg3(sampler=sampler, **kwargs)
-    elif net_args["type"] == "inr-5":
-        return inn.nets.inr2inr.ISeg5(sampler=sampler, **kwargs)
-    elif net_args["type"] == "cnn-3":
-        return inrnet.models.common.Seg3(**kwargs)
-    elif net_args["type"] == "cnn-5":
-        return inrnet.models.common.Seg5(**kwargs)
-
-    pretrained = net_args['pretrained']
-    if isinstance(pretrained, str):
-        raise NotImplementedError
-        load_model_from_job(pretrained)
-    else:
-        if net_args["type"] == "convnext":
-            return inrnet.models.convnext.mini_convnext()
-        elif net_args["type"] == "inr-convnext":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(
-                    args["data loading"]["image shape"], sampler=sampler)
-        elif net_args["type"] == "inr-mlpconv":
-            InrNet = inrnet.inn.nets.convnext.translate_convnext_model(
-                    args["data loading"]["image shape"], sampler=sampler)
-            inn.inrnet.replace_conv_kernels(InrNet, k_type='mlp')
-        else:
-            raise NotImplementedError
-            
-    return InrNet
-
-def load_model_from_job(origin):
-    orig_args = job_mgmt.get_job_args(origin)
-    path = osp.expanduser(f"~/code/inrnet/results/{origin}/weights/model.pth")
-    model = load_model(orig_args)
-    model.load_state_dict(torch.load(path))
-    return model
-
-def get_seg_at_coords(seg, coords):
-    coo = torch.floor(coords).long()
-    return seg[...,coo[:,0], coo[:,1]].transpose(1,2)
-
-def train_segmenter(args: dict) -> None:
+def train_nerf_to_sdf(args: dict) -> None:
     if not args['no_wandb']:
         wandb.init(project="inrnet", job_type="train", name=args["job_id"],
             config=wandb.helper.parse_config(args, exclude=['job_id']))
@@ -71,20 +27,14 @@ def train_segmenter(args: dict) -> None:
     paths = args["paths"]
     dl_args = args["data loading"]
     global_step = 0
-    trainsegdist = torch.load(DS_DIR+'/inrnet/cityscapes/trainsegdist.pt')
-    weight = trainsegdist.sum() / trainsegdist
     loss_fxn = nn.CrossEntropyLoss(weight=weight.cuda())
-    if dl_args['sample type'] == 'masked':
-        dl_args['batch size'] = 1 #cannot handle different masks per datapoint
     data_loader = dataloader.get_inr_dataloader(dl_args)
 
-    model = load_model(args).cuda()
+    inrnet = load_model(args).cuda()
     optimizer = util.get_optimizer(model, args)
-    for img_inr, segs in data_loader:
+    for nerf, sdf_gt in data_loader:
         global_step += 1
-        
-        if args["network"]['type'].startswith('inr'):
-            logit_inr = model(img_inr)
+        logit_inr = model(nerf)
 
             if dl_args['sample type'] == 'grid':
                 seg_gt = segs.flatten(start_dim=2).transpose(2,1)
@@ -192,32 +142,17 @@ def test_inr_segmenter(args):
                 path = paths["job output dir"]+f"/imgs/{ix}_{i}.png"
                 save_example_segs(path, rgb[i], pred_seg[i].reshape(*rgb.shape[-2:]), gt_labels[i].reshape(*rgb.shape[-2:]))
 
-import imgviz
-def save_example_segs(path, rgb, pred_seg, gt_seg, class_names=('ground', 'building', 'traffic', 'nature', 'sky', 'human', 'vehicle')):
-    label_names = [
-        "{}:{}".format(i, n) for i, n in enumerate(class_names)
-    ]
-    labelviz_pred = imgviz.label2rgb(pred_seg.cpu())#, label_names=label_names, font_size=6, loc="rb")
-    labelviz_gt = imgviz.label2rgb(gt_seg.cpu())#, label_names=label_names, font_size=6, loc="rb")
-    rgb = rescale_float(rgb.cpu().permute(1,2,0))
 
-    # kwargs = dict(bbox_inches='tight', transparent="True", pad_inches=0)
-    plt.figure(dpi=400)
-    plt.tight_layout()
-    plt.subplot(131)
-    # plt.title("rgb")
-    plt.imshow(rgb)
-    plt.axis("off")
-    plt.subplot(132)
-    # plt.title("pred")
-    plt.imshow(labelviz_pred)
-    plt.axis("off")
-    plt.subplot(133)
-    # plt.title("gt")
-    plt.imshow(labelviz_gt)
-    plt.axis("off")
-    plt.subplots_adjust(wspace=0, hspace=0)
-
-    img = imgviz.io.pyplot_to_numpy()
-    plt.imsave(path, img)
-    plt.close('all')
+def load_model(args):
+    net_args = args["network"]
+    if net_args["type"].startswith("inr"):
+        sampler = point_set.get_sampler_from_args(args['data loading'])
+    kwargs = dict(in_channels=3, out_channels=7)
+    if net_args["type"] == "inr-3":
+        return inn.nets.inr2inr.ISeg3(sampler=sampler, **kwargs)
+    elif net_args["type"] == "inr-5":
+        return inn.nets.inr2inr.ISeg5(sampler=sampler, **kwargs)
+    elif net_args["type"] == "cnn-3":
+        return inrnet.models.common.Seg3(**kwargs)
+    elif net_args["type"] == "cnn-5":
+        return inrnet.models.common.Seg5(**kwargs)

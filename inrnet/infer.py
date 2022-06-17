@@ -7,6 +7,7 @@ from inrnet import args as args_module
 from inrnet.experiments.classify import test_inr_classifier
 from inrnet.experiments.segment import test_inr_segmenter
 from inrnet.experiments.generate import test_inr_generator
+from inrnet.experiments.sdf import test_nerf_to_sdf
 
 def main():
     args = args_module.parse_args(sys.argv[1:])
@@ -17,12 +18,13 @@ def main():
         np.random.seed(args["random seed"])
         torch.manual_seed(args["random seed"])
 
-    if args["network"]["task"] == "segment":
-        test_inr_segmenter(args)
-    elif args["network"]["task"] == "classify":
-        test_inr_classifier(args)
-    elif args["network"]["task"] == "generate":
-        test_inr_generator(args)
+    method_dict = {
+        'classify': test_inr_classifier,
+        'sdf': train_nerf_to_sdf,
+        'segment': test_inr_segmenter,
+        'generate': test_inr_generator,
+    }
+    test_inr_segmenter(method_dict[args["network"]["task"]])
 
 if __name__ == "__main__":
     main()

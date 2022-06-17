@@ -9,6 +9,7 @@ from functools import partial
 from inrnet import args as args_module
 # from inrnet.experiments.diffusion import train_diffusion_model
 # from inrnet.experiments.depth import train_depth_model
+from inrnet.experiments.sdf import train_nerf_to_sdf
 from inrnet.experiments.classify import train_classifier
 from inrnet.experiments.segment import train_segmenter
 # from inrnet.experiments.generate import train_generator
@@ -25,6 +26,7 @@ def main():
     method_dict = {
         # 'diffusion': train_diffusion_model,
         'classify': train_classifier,
+        'sdf': train_nerf_to_sdf,
         # 'depth': train_depth_model,
         'segment': train_segmenter,
         # 'generate': train_generator,

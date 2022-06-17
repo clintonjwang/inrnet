@@ -31,7 +31,7 @@ def train_classifier(args: dict) -> None:
     top3 = lambda pred_cls, labels: (labels.unsqueeze(1) == pred_cls).amax(1).float().mean()
     top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
 
-    model = load_pretrained_model(args).cuda()
+    model = load_model(args).cuda()
     optimizer = util.get_optimizer(model, args)
 
     # ratio = 16
@@ -137,7 +137,7 @@ def log(variable, *args, use_wandb=True, **kwargs) -> None:
 #     top1 = lambda pred_cls, labels: (labels == pred_cls[:,0]).float().mean()
 #     top1_tracker = util.MetricTracker("top1", function=top1)
 
-#     model = load_pretrained_model(args).cuda()
+#     model = load_model(args).cuda()
 #     optimizer = torch.optim.AdamW(model.parameters(), lr=args["optimizer"]["learning rate"])
 
 #     while True:
@@ -173,7 +173,7 @@ def log(variable, *args, use_wandb=True, **kwargs) -> None:
 
 
 
-def load_pretrained_model(args):
+def load_model(args):
     net_args = args["network"]
     in_ch = args['data loading']['input channels']
     n_classes = args['data loading']['classes']
@@ -237,7 +237,7 @@ def load_pretrained_model(args):
 def load_model_from_job(origin):
     orig_args = job_mgmt.get_job_args(origin)
     path = osp.expanduser(f"~/code/inrnet/results/{origin}/weights/best.pth")
-    model = load_pretrained_model(orig_args)
+    model = load_model(orig_args)
     model.load_state_dict(torch.load(path))
     return model
-
+    
