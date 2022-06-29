@@ -125,11 +125,28 @@ class MLPConv(Conv):
             kernel_support: Support,
             mid_ch: tuple | int = (32,32),
             down_ratio: float=1.,
-            groups: int=1, padded_extrema: tuple|None=None,
+            groups: int=1,
             bias: bool=False,
             mlp_type: str='standard', scale1=None, scale2=1,
             N_bins: int=64,
             dtype=torch.float, device='cuda'):
+        """Convolutional layer with an MLP as the kernel
+
+        Args:
+            in_channels (int): number of input channels
+            out_channels (int): number of output channels
+            kernel_support (Support): support of the kernel
+            mid_ch (tuple, optional): number of channels in the MLP. Defaults to (32,32).
+            down_ratio (float, optional): downsampling ratio. Defaults to 1.
+            groups (int, optional): number of channel groups. Defaults to 1.
+            bias (bool, optional): whether to have additive bias. Defaults to False.
+            mlp_type (str, optional): 'standard' (default) or 'siren' (not implemented).
+            scale1 ([type], optional): scale input.
+            scale2 (int, optional): scale output.
+            N_bins (int, optional): quantization of kernel values.
+            dtype ([type], optional): torch.float
+            device (str, optional): 'cuda'
+        """        
         super().__init__(in_channels, out_channels, kernel_support=kernel_support,
             down_ratio=down_ratio, bias=bias, groups=groups, dtype=dtype)
         self.N_bins = N_bins
@@ -147,8 +164,6 @@ class MLPConv(Conv):
         self.scale2 = scale2
         self.mlp_type = mlp_type
         
-        if padded_extrema is not None:
-            self.register_buffer("padded_extrema", torch.as_tensor(padded_extrema, dtype=dtype))
         if isinstance(mid_ch, int):
             mid_ch = [mid_ch]
 

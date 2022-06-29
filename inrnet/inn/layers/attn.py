@@ -6,7 +6,6 @@ F = nn.functional
 from inrnet.inn import functional as inrF
 
 class TokenAttn(nn.Module):
-    # 
     def __init__(self, in_channels, out_channels, d_k=64, num_heads=1, spacing=.2):
         # in_ch is the output dimensions of the input INR (3 for RGB, 1 for occupancy net)
         # out_ch is the output dimensions of the output INR
