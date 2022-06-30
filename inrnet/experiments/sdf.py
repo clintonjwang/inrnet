@@ -1,5 +1,8 @@
-import os, pdb, torch
+"""import os, pdb, torch
 import wandb
+
+from inrnet.utils import util
+from inrnet.utils import jobs as job_mgmt
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -9,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from inrnet import args as args_module, losses
 from inrnet.data import dataloader
-from inrnet import inn, jobs as job_mgmt, util
+from inrnet import inn
 from inrnet.inn import point_set
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
@@ -150,9 +153,4 @@ def load_model(args):
     kwargs = dict(in_channels=3, out_channels=7)
     if net_args["type"] == "inr-3":
         return inn.nets.inr2inr.ISeg3(sampler=sampler, **kwargs)
-    elif net_args["type"] == "inr-5":
-        return inn.nets.inr2inr.ISeg5(sampler=sampler, **kwargs)
-    elif net_args["type"] == "cnn-3":
-        return inrnet.models.common.Seg3(**kwargs)
-    elif net_args["type"] == "cnn-5":
-        return inrnet.models.common.Seg5(**kwargs)
+"""

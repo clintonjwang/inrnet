@@ -1,6 +1,6 @@
 import pytest
 from torch import nn
-from inrnet import losses
+from inrnet.utils import losses
 
 @pytest.fixture
 def loss_settings():

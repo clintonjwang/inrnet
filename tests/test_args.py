@@ -1,8 +1,8 @@
 import pytest
 
 from torch import nn
-from inrnet import args as args_module
-from inrnet import util
+from inrnet.utils import args as args_module
+from inrnet.utils import util
 
 @pytest.fixture
 def nn_model():

@@ -1,5 +1,7 @@
 import os
 import torch
+
+from inrnet.utils import losses, util
 osp = os.path
 import torch
 nn = torch.nn
@@ -9,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import inn, util, losses
+from inrnet import inn
 from inrnet.models.inrs.siren import to_black_box
 
 rescale_clip = mtr.ScaleIntensityRangePercentiles(lower=5, upper=95, b_min=0, b_max=255, clip=True, dtype=np.uint8)

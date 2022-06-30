@@ -4,8 +4,8 @@ import torch
 osp = os.path
 import numpy as np
 
-import inrnet.args as args_module
-from inrnet import losses
+from inrnet.utils import args as args_module
+from inrnet.utils import losses
 from inrnet.data import dataloader
 from inrnet.models.inrs import siren, rff
 from inrnet.data import inet

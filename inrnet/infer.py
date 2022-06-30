@@ -3,7 +3,7 @@ import sys
 import torch
 import numpy as np
 
-from inrnet import args as args_module
+from inrnet.utils import args as args_module
 from inrnet.experiments.classify import test_inr_classifier
 from inrnet.experiments.segment import test_inr_segmenter
 from inrnet.experiments.generate import test_inr_generator

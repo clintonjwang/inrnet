@@ -6,7 +6,7 @@ import torch, wandb
 import numpy as np
 from functools import partial
 
-from inrnet import args as args_module
+from inrnet.utils import args as args_module
 from inrnet.experiments.autoencode import pretrain_inrnet
 
 def main():

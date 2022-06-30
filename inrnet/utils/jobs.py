@@ -1,9 +1,11 @@
 import os
 import shutil
 import yaml
+
+from inrnet.utils import util
 osp = os.path
 
-from inrnet import ANALYSIS_DIR, RESULTS_DIR, util
+from inrnet import ANALYSIS_DIR, RESULTS_DIR
 
 def rename_job(job, new_name):
     os.rename(osp.join(RESULTS_DIR, job), osp.join(RESULTS_DIR, new_name))

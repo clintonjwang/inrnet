@@ -3,8 +3,9 @@ import torch
 
 from inrnet.inn import point_set
 from inrnet.inn.support import BoundingBox
+from inrnet.utils import args as args_module
 nn=torch.nn
-from inrnet import inn, args as args_module
+from inrnet import inn
 from inrnet.inn.nets.classifier import InrCls
 
 requirescuda = pytest.mark.skipif(

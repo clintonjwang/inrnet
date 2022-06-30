@@ -1,5 +1,8 @@
 import os
 import torch
+
+from inrnet.utils import util
+from inrnet.utils import jobs as job_mgmt
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -8,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import inn, jobs as job_mgmt, util
+from inrnet import inn
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext
 import inrnet.models.common

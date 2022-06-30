@@ -7,7 +7,7 @@ F=nn.functional
 from monai.networks.blocks import Warp, DVF2DDF
 from monai.data import NibabelReader
 
-from inrnet.util import glob2
+from inrnet.utils.util import glob2
 from inrnet.fit_inr import fit_siren_to_img
 
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"

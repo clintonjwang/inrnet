@@ -7,7 +7,7 @@ from PIL import Image
 import numpy as np
 nn=torch.nn
 from inrnet.models.inrs import siren
-from inrnet.util import glob2
+from inrnet.utils.util import glob2
 from inrnet.data import kitti, inet, cityscapes
 nearest = transforms.InterpolationMode('nearest')
 

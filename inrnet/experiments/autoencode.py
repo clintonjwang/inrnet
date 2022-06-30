@@ -1,7 +1,8 @@
 
 import wandb
-from inrnet import args as args_module, inn, util, jobs as job_mgmt
+from inrnet import inn
 from inrnet.data import dataloader
+from inrnet.utils import args as args_module, jobs as job_mgmt, util
 
 
 def pretrain_inrnet(args: dict) -> None:

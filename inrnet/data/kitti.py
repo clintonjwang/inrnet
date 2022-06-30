@@ -7,7 +7,7 @@ from PIL import Image
 from torchvision import transforms
 
 from inrnet.models.inrs import siren
-from inrnet import util
+from inrnet.utils import util
 
 kitti_root = "/data/vision/torralba/datasets/kitti_raw"
 DS_DIR = "/data/vision/polina/scratch/clintonw/datasets"

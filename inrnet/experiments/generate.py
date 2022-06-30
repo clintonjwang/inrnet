@@ -1,4 +1,6 @@
 import os, pdb, torch
+
+from inrnet.utils import jobs as job_mgmt, util
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -7,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from inrnet.data import dataloader
-from inrnet import jobs as job_mgmt, losses, util
+from inrnet.utils import losses
 import inrnet.inn.nets.wgan
 import inrnet.models.wgan
 

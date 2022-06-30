@@ -4,13 +4,14 @@ from inrnet.inn import point_set
 import pytest, torch, pdb, torchvision
 
 from inrnet.inn.support import BoundingBox
+from inrnet.utils import util
 nn=torch.nn
 F=nn.functional
 from time import time
 import numpy as np
 
-from inrnet import jobs as job_mgmt
-from inrnet import inn, util
+from inrnet.utils import jobs as job_mgmt
+from inrnet import inn
 from inrnet.experiments import classify
 
 import inrnet.inn.nets.convnext

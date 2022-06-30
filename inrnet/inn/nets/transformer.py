@@ -1,9 +1,62 @@
 import torch
+
+from inrnet.inn.inr import INRBatch
 nn = torch.nn
 F = nn.functional
 
+import torch
+import math
+Tensor = torch.Tensor
+nn = torch.nn
 
+from collections import namedtuple
+Bbox = namedtuple('Bbox', 'x1 x2 y1 y2 z1 z2')
 
+class BoundingBoxToken:
+    def __init__(self, coords: Bbox):
+        super().__init__()
+        self.coords = coords
+        self.dims = (coords.x2-coords.x1, coords.y2-coords.y1, coords.z2-coords.z1)
+
+    def add_positional_encoding(self):
+        freq_scales = [math.log2(d) for d in self.dims]
+        return NotImplementedError
+
+class Sampler(nn.Module):
+    def __init__(self):
+        """Cross-attention layer between previous tokens (produces K) and new tokens (produces Q and V) to produce new points to sample and 
+        """
+        super().__init__()
+
+    def refine_tokens(token_bboxes: BBox, token_informativeness, token_points_to_sample):
+        token_bboxes = sample(inr)
+        return
+
+class NerfTransformer(nn.Module):
+    def __init__(self):
+        """
+        1. Initializes tokens to a coarse 4*4*4 grid, and samples 64 points from each.
+        2. Create a sequence of 64 tokens: an embedding of the 64 points + positional encoding
+        3. Each token passes through self-attention layer to produce a new set of bboxes, importance weights, and coordinates to sample, as well as K
+        4. Distribute a budget of 64*64 points to sample across all new tokens, proportional to the importance weights (and must be a multiple of 4).
+        5. Process the bboxes to produce a new token sequence of size T (the number of bboxes allocated at least 4 sampling points), sampling the coordinates specified up to the budget.
+        6. Create an embedding of the new tokens with positional encoding. Create Q and V from these tokens.
+        7. Compute cross-attention with QKV to produce a new set of bboxes, importance weights, and coordinates to sample, as well as Q and V
+        8. Repeat 4-6, but the new tokens must be of size T (select most important bboxes), and produce K.
+        9. Cross-attention layer, and repeat 7-8.
+        """
+        super().__init__
+        
+    def forward(self, inr: INRBatch):
+        """_summary_
+
+        Args:
+            inr (INRBatch): _description_
+        """        
+        bboxes = inr.initialize_token_bboxes()
+        bboxes.add_positional_encoding()
+        return
+        
 # class AttnNet(nn.Module):
 #     def __init__(self, out_ch, in_ch=3, spatial_dim=2, C=512):
 #         super().__init__()

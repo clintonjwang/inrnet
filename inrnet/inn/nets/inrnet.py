@@ -1,5 +1,7 @@
 from __future__ import annotations
 import typing
+
+from inrnet.utils import util
 if typing.TYPE_CHECKING:
     from inrnet.inn.inr import INRBatch
 from inrnet.inn.inr import DiscretizedINR
@@ -8,7 +10,7 @@ from inrnet.inn.point_set import generate_sample_points
 import torch
 nn = torch.nn
 
-from inrnet import inn, util
+from inrnet import inn
 
 class INRNet(nn.Module):
     def __init__(self, sampler: dict, layers=None):

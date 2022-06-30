@@ -1,5 +1,8 @@
 import os, pdb, torch
 import wandb
+
+from inrnet.utils import losses, util
+from inrnet.utils import jobs as job_mgmt
 osp = os.path
 nn = torch.nn
 F = nn.functional
@@ -7,9 +10,9 @@ import monai.transforms as mtr
 import numpy as np
 import matplotlib.pyplot as plt
 
-from inrnet import args as args_module, losses
+from inrnet.utils import args as args_module
 from inrnet.data import dataloader
-from inrnet import inn, jobs as job_mgmt, util
+from inrnet import inn
 from inrnet.inn import point_set
 import inrnet.inn.nets.convnext
 import inrnet.models.convnext

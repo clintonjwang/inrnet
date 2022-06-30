@@ -6,7 +6,7 @@ import torch, wandb
 import numpy as np
 from functools import partial
 
-from inrnet import args as args_module
+from inrnet.utils import args as args_module
 # from inrnet.experiments.diffusion import train_diffusion_model
 # from inrnet.experiments.depth import train_depth_model
 from inrnet.experiments.sdf import train_nerf_to_sdf

@@ -1,11 +1,14 @@
 import os, pytest
 import torch
+
+from inrnet.utils import util
+from inrnet.utils import jobs as job_mgmt
 osp = os.path
 nn = torch.nn
 F = nn.functional
 import torchvision.models
 
-from inrnet import inn, util, jobs as job_mgmt
+from inrnet import inn
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 

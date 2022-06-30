@@ -97,3 +97,25 @@ class Ball(Support):
             else:
                 n = self.dimensionality
                 return np.pi**(n/2) / gamma(n/2 + 1) * self.radius**n
+
+class Sphere(Support):
+    def __init__(self, radius: float, p_norm: str="inf",
+        dimensionality: int=2):
+        """
+        Args:
+            radius (float)
+            p_norm (str, optional): Defaults to "inf".
+            dimensionality (int): Defaults to 2.
+        """
+        self.radius = radius
+        self.p_norm = p_norm
+        self.dimensionality = dimensionality
+
+    def __str__(self):
+        return 'Sphere'
+    def __repr__(self):
+        return f'Sphere({self.radius})'
+
+    def in_support(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.isclose(torch.linalg.norm(x, ord=self.p_norm, dim=-1) - self.radius, torch.tensor(0))
+    

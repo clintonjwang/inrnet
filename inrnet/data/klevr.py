@@ -1,7 +1,7 @@
 import json
 import os
 osp=os.path
-from inrnet.util import glob2
+from inrnet.utils.util import glob2
 
 def get_klevr_paths():
     data_dir = '/data/vision/polina/scratch/clintonw/datasets/kubric-public/data'

@@ -2,14 +2,15 @@
 import itertools
 
 import numpy as np
-from inrnet.inn.support import BoundingBox, Support
+from inrnet.inn.support import BoundingBox, Sphere, Support
 from scipy.stats import qmc
 import math
 import torch
 nn=torch.nn
-from inrnet import util
+from inrnet.utils import util
 
 PointValues = torch.Tensor
+Sampler = dict
 # class PointValues(torch.Tensor):
 #     def batch_size(self):
 #         return self.size(0)
@@ -17,7 +18,6 @@ PointValues = torch.Tensor
 #         return self.size(-2)
 #     def channels(self):
 #         return self.size(-1)
-    
 class PointSet(torch.Tensor):
     def N(self):
         return self.size(-2)
@@ -34,15 +34,15 @@ def get_sampler_from_args(dl_args, c2f:bool=True):
             'sample points': dl_args['sample points']}
     return sampler
 
-def generate_sample_points(domain: Support, sampler: dict, **kwargs) -> PointSet:
+def generate_sample_points(domain: Support, sampler: Sampler, **kwargs) -> PointSet:
     """Generates sample points for integrating along the INR
 
     Args:
         domain (INRBatch): domain of INR to sample
-        sampler (Optional[str], optional): _description_. Defaults to None.
+        sampler (Sampler): specifies how to sample points
 
     Returns:
-        torch.Tensor: coordinates to sample
+        PointSet: coordinates to sample
     """
     method = sampler['sample type']
 
@@ -58,9 +58,17 @@ def generate_sample_points(domain: Support, sampler: dict, **kwargs) -> PointSet
         coords = coords * coords.abs()
 
     elif method in ("qmc", 'rqmc'):
-        coords = gen_LD_seq_bbox(
-            n=sampler['sample points'],
-            bbox=domain.bounds, scramble=(method=='rqmc'))
+        if isinstance(domain, Sphere):
+            # Lambert equal area projection
+            coords = gen_LD_seq_bbox(n=sampler['sample points'],
+                bbox=((0,1),(0,1)), scramble=(method=='rqmc'))
+            theta = torch.arccos(2*coords[...,0]-1) #[0,pi]
+            phi = 2*torch.pi*coords[...,1] #[0,2pi]
+            coords = torch.stack((theta, phi), dim=-1)
+        else:
+            coords = gen_LD_seq_bbox(
+                n=sampler['sample points'],
+                bbox=domain.bounds, scramble=(method=='rqmc'))
 
     elif method == 'masked':
         assert 'mask' in kwargs
@@ -70,6 +78,7 @@ def generate_sample_points(domain: Support, sampler: dict, **kwargs) -> PointSet
 
     else:
         raise NotImplementedError("invalid method: "+method)
+        
     coords.sample_mode = method
 
     return coords
@@ -84,9 +93,9 @@ def gen_LD_seq_bbox(n:int, bbox:tuple[tuple[float]],
         n (int): number of points to generate.
         bbox (tuple, optional): bounds of domain
         scramble (bool, optional): randomized QMC. Defaults to False.
-        like (_type_, optional): _description_. Defaults to None.
-        dtype (_type_, optional): _description_. Defaults to torch.float.
-        device (str, optional): _description_. Defaults to "cuda".
+        like (_type_, optional): Defaults to None.
+        dtype (_type_, optional): Defaults to torch.float.
+        device (str, optional): Defaults to "cuda".
 
     Returns:
         PointSet (n,d): coordinates

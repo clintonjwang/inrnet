@@ -5,13 +5,14 @@ import torch
 import wandb
 
 from inrnet.inn.nets.consistent import LearnedSampler
+from inrnet.utils import args as args_module, jobs as job_mgmt, util
 osp = os.path
 nn = torch.nn
 F = nn.functional
 import torchvision.models
 
 # from inrnet import RESULTS_DIR
-from inrnet import args as args_module, inn, util, jobs as job_mgmt
+from inrnet import inn
 from inrnet.data import dataloader
 from inrnet.inn import point_set
 from inrnet.models.common import Conv2, Conv5
