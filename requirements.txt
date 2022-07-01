@@ -3,7 +3,7 @@ keras==2.9.0
 kornia==0.6.4
 matplotlib==3.5.1
 monai==0.8.1
-numpy==1.21.2
+numpy>=1.22
 pandas==1.4.1
 pathos==0.2.9
 Pillow==9.1.1

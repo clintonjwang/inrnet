@@ -1,13 +1,10 @@
-import torch
-
+import numpy as np
 from inrnet.inn.inr import INRBatch
-nn = torch.nn
-F = nn.functional
-
 import torch
 import math
 Tensor = torch.Tensor
 nn = torch.nn
+F = nn.functional
 
 from collections import namedtuple
 Bbox = namedtuple('Bbox', 'x1 x2 y1 y2 z1 z2')
@@ -20,7 +17,7 @@ class BoundingBoxToken:
 
     def add_positional_encoding(self):
         freq_scales = [math.log2(d) for d in self.dims]
-        return NotImplementedError
+        raise NotImplementedError
 
 class Sampler(nn.Module):
     def __init__(self):
@@ -28,12 +25,31 @@ class Sampler(nn.Module):
         """
         super().__init__()
 
-    def refine_tokens(token_bboxes: BBox, token_informativeness, token_points_to_sample):
+    def refine_tokens(token_bboxes: BoundingBoxToken, token_informativeness, token_points_to_sample):
         token_bboxes = sample(inr)
         return
 
 class NerfTransformer(nn.Module):
     def __init__(self):
+        """
+        Transforms a NeRF into a 3D INR (NeRF, SDF, 3D seg, MDL, etc.)
+        """
+        super().__init__()
+
+    def initialize_tokens(self):
+        tokens = []
+        dx = dy = dz = 1/4
+        for x1 in np.arange(0,1,dx):
+            for y1 in np.arange(0,1,dy):
+                for z1 in np.arange(0,1,dz):
+                    coords = Bbox(x1, x1+dx, y1, y1+dy, z1, z1+dz)
+                    tokens.append(BoundingBoxToken(coords))
+        return tokens
+
+    def initialize_sampling_coords(self):
+        raise NotImplementedError
+
+    def forward(self, nerf: INRBatch):
         """
         1. Initializes tokens to a coarse 4*4*4 grid, and samples 64 points from each.
         2. Create a sequence of 64 tokens: an embedding of the 64 points + positional encoding
@@ -44,16 +60,12 @@ class NerfTransformer(nn.Module):
         7. Compute cross-attention with QKV to produce a new set of bboxes, importance weights, and coordinates to sample, as well as Q and V
         8. Repeat 4-6, but the new tokens must be of size T (select most important bboxes), and produce K.
         9. Cross-attention layer, and repeat 7-8.
-        """
-        super().__init__
-        
-    def forward(self, inr: INRBatch):
-        """_summary_
 
         Args:
-            inr (INRBatch): _description_
-        """        
-        bboxes = inr.initialize_token_bboxes()
+            nerf (INRBatch): NeRFs to process
+        """
+        tokens = self.initialize_tokens()
+        bboxes = nerf.initialize_token_bboxes()
         bboxes.add_positional_encoding()
         return
         

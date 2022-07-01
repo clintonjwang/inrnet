@@ -7,7 +7,7 @@ from inrnet.utils import args as args_module
 from inrnet.experiments.classify import test_inr_classifier
 from inrnet.experiments.segment import test_inr_segmenter
 from inrnet.experiments.generate import test_inr_generator
-from inrnet.experiments.sdf import test_nerf_to_sdf
+# from inrnet.experiments.sdf import test_nerf_to_sdf
 
 def main():
     args = args_module.parse_args(sys.argv[1:])
@@ -20,7 +20,7 @@ def main():
 
     method_dict = {
         'classify': test_inr_classifier,
-        'sdf': train_nerf_to_sdf,
+        # 'sdf': train_nerf_to_sdf,
         'segment': test_inr_segmenter,
         'generate': test_inr_generator,
     }
