@@ -2,21 +2,41 @@ import numpy as np
 from inrnet.inn.inr import INRBatch
 import torch
 import math
+
+from inrnet.inn.support import BoundingBox, Mask
 Tensor = torch.Tensor
 nn = torch.nn
 F = nn.functional
 
 from collections import namedtuple
-Bbox = namedtuple('Bbox', 'x1 x2 y1 y2 z1 z2')
 
 class BoundingBoxToken:
-    def __init__(self, coords: Bbox):
+    def __init__(self, bbox: BoundingBox):
+        """
+        Token represented as a bounding box
+        """
         super().__init__()
-        self.coords = coords
-        self.dims = (coords.x2-coords.x1, coords.y2-coords.y1, coords.z2-coords.z1)
+        self.bbox = bbox
 
     def add_positional_encoding(self):
-        freq_scales = [math.log2(d) for d in self.dims]
+        """
+        Integrated positional encoding.
+        """
+        freq_scales = [math.log2(d) for d in self.bbox.shape]
+        raise NotImplementedError
+
+class MaskToken:
+    def __init__(self, mask: Mask):
+        """
+        Token represented as a bounding box
+        """
+        super().__init__()
+        self.mask = mask
+
+    def add_positional_encoding(self):
+        """
+        Integrated positional encoding.
+        """
         raise NotImplementedError
 
 class Sampler(nn.Module):
@@ -29,21 +49,23 @@ class Sampler(nn.Module):
         token_bboxes = sample(inr)
         return
 
-class NerfTransformer(nn.Module):
-    def __init__(self):
+class NerfTokenizer(nn.Module):
+    def __init__(self, coarse_levels: int=4):
         """
-        Transforms a NeRF into a 3D INR (NeRF, SDF, 3D seg, MDL, etc.)
+        Tokenizes a NeRF by partitioning the volume into regions corresponding to tokens.
+        The partition is learned by a few cross-attention layers.
         """
         super().__init__()
+        self.coarse_levels = coarse_levels
 
     def initialize_tokens(self):
         tokens = []
-        dx = dy = dz = 1/4
-        for x1 in np.arange(0,1,dx):
-            for y1 in np.arange(0,1,dy):
-                for z1 in np.arange(0,1,dz):
-                    coords = Bbox(x1, x1+dx, y1, y1+dy, z1, z1+dz)
-                    tokens.append(BoundingBoxToken(coords))
+        dx = dy = dz = 1/self.coarse_levels
+        for x1 in np.arange(0,.999,dx):
+            for y1 in np.arange(0,.999,dy):
+                for z1 in np.arange(0,.999,dz):
+                    bbox = BoundingBox((x1, x1+dx), (y1, y1+dy), (z1, z1+dz))
+                    tokens.append(BoundingBoxToken(bbox))
         return tokens
 
     def initialize_sampling_coords(self):
@@ -53,13 +75,10 @@ class NerfTransformer(nn.Module):
         """
         1. Initializes tokens to a coarse 4*4*4 grid, and samples 64 points from each.
         2. Create a sequence of 64 tokens: an embedding of the 64 points + positional encoding
-        3. Each token passes through self-attention layer to produce a new set of bboxes, importance weights, and coordinates to sample, as well as K
-        4. Distribute a budget of 64*64 points to sample across all new tokens, proportional to the importance weights (and must be a multiple of 4).
-        5. Process the bboxes to produce a new token sequence of size T (the number of bboxes allocated at least 4 sampling points), sampling the coordinates specified up to the budget.
-        6. Create an embedding of the new tokens with positional encoding. Create Q and V from these tokens.
-        7. Compute cross-attention with QKV to produce a new set of bboxes, importance weights, and coordinates to sample, as well as Q and V
-        8. Repeat 4-6, but the new tokens must be of size T (select most important bboxes), and produce K.
-        9. Cross-attention layer, and repeat 7-8.
+        3. Each token passes through self-attention layer to produce a set of non-overlapping masks, importance weights.
+            Conditioned on the masks, regress 128 coordinates to sample, and extract a linear embedding K from the sampled RGBA values.
+        4. Each token is formed from the 128 coordinates in its mask.
+        5. Process the masks to produce a new token sequence of size T (the number of masks allocated at least 4 sampling points), sampling the coordinates specified up to the budget.
 
         Args:
             nerf (INRBatch): NeRFs to process
@@ -67,8 +86,46 @@ class NerfTransformer(nn.Module):
         tokens = self.initialize_tokens()
         bboxes = nerf.initialize_token_bboxes()
         bboxes.add_positional_encoding()
-        return
-        
+        return tokens
+
+class NerfTransformer(nn.Module):
+    def __init__(self, core_layers: nn.Module, prefix_layers: nn.Module|None=None, suffix_layers: nn.Module|None=None,
+            head_only: bool=False):
+        """Transforms a NeRF into a 3D INR (NeRF, SDF, 3D seg, MDL, etc.)
+
+        Args:
+            core_layers (Module): task-independent layers
+            prefix_layers (Module): input-dependent layers
+            suffix_layers (Module): output-dependent layers
+            head_only (bool): whether to only use the CLS token
+        """
+        super().__init__()
+        self.core_layers = core_layers
+        self.prefix_layers = prefix_layers
+        self.suffix_layers = suffix_layers
+
+
+    def forward(self, in_tokens: Tensor):
+        """
+        6. Embed the given tokens with positional encoding. Create Q and V from these tokens.
+        7. Compute cross-attention with QKV to produce a new set of masks, importance weights, and coordinates to sample, as well as Q and V
+        8. Repeat 4-6, but the new tokens must be of size T (select most important masks), and produce K.
+        9. Cross-attention layer, and repeat 7-8.
+
+        Args:
+            in_tokens (Tensor): _description_
+
+        Returns:
+            _type_: _description_
+        """        
+        in_token_embeddings = self.prefix_layers(in_tokens)
+        out_token_embeddings = self.core_layers(in_token_embeddings)
+        if self.head_only:
+            return self.suffix_layers(out_token_embeddings[0])
+        else:
+            return self.suffix_layers(out_token_embeddings)
+
+
 # class AttnNet(nn.Module):
 #     def __init__(self, out_ch, in_ch=3, spatial_dim=2, C=512):
 #         super().__init__()

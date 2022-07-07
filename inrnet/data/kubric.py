@@ -16,9 +16,11 @@ def clean_kubric():
 def tmp():
     subdirs = glob.glob(osp.expanduser("~/code/kubric/output/*"))
     for subdir in subdirs:
-        path = subdir+"/transforms_test.json"
-        if osp.exists(path):
-            os.remove(path)
+        if osp.isdir(subdir):
+            path = subdir+"/transforms.json"
+            if osp.exists(path):
+                os.rename(path, path.replace("transforms.json",
+                    "transforms_train.json"))
     # src = osp.expanduser(f"~/code/kubric/output/39/transforms_test.json")
     # for ix in range(39):
     #     target = osp.expanduser(f"~/code/kubric/output/{ix}/transforms_test.json")

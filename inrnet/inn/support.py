@@ -6,9 +6,13 @@ if TYPE_CHECKING:
 from math import gamma
 import numpy as np
 import torch
+Tensor = torch.Tensor
 
 class Support:
-    def in_support(self, x: torch.Tensor) -> torch.Tensor:
+    def in_support(self, x: Tensor) -> Tensor:
+        """
+        Returns a boolean tensor of shape (N,) indicating whether each point is in the support.
+        """
         return NotImplemented
         
     @property
@@ -57,7 +61,7 @@ class BoundingBox(Support):
     def volume(self):
         return np.prod(self.shape)
 
-    def in_support(self, x: torch.Tensor) -> torch.Tensor:
+    def in_support(self, x: Tensor) -> Tensor:
         return (
             x[...,0] > self.bounds[0][0]) * (x[...,0] < self.bounds[0][1]) * (
             x[...,1] > self.bounds[1][0]) * (x[...,1] < self.bounds[1][1]
@@ -82,7 +86,7 @@ class Ball(Support):
     def __repr__(self):
         return f'Ball({self.radius})'
 
-    def in_support(self, x: torch.Tensor) -> torch.Tensor:
+    def in_support(self, x: Tensor) -> Tensor:
         return torch.linalg.norm(x, ord=self.p_norm, dim=-1) < self.radius
     
     @property
@@ -116,6 +120,36 @@ class Sphere(Support):
     def __repr__(self):
         return f'Sphere({self.radius})'
 
-    def in_support(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.isclose(torch.linalg.norm(x, ord=self.p_norm, dim=-1) - self.radius, torch.tensor(0))
+    def in_support(self, x: Tensor) -> Tensor:
+        return torch.allclose(torch.linalg.norm(x, ord=self.p_norm, dim=-1) - self.radius,
+                torch.zeros_like(x[...,0]))
     
+class Mask(Support):
+    def __init__(self, segmentation: Tensor):
+        """
+        Args:
+            segmentation (Tensor)
+        """
+        self.segmentation = segmentation.squeeze()
+        if self.segmentation.dtype != torch.bool:
+            self.segmentation = self.segmentation > 0
+        self.dimensionality = len(self.segmentation.shape)
+
+    def __str__(self):
+        return 'Mask'
+    def __repr__(self):
+        return f'Mask({self.volume})'
+
+    def in_support(self, x: Tensor) -> Tensor:
+        if self.dimensionality != len(x.shape):
+            raise ValueError(f'Dimensionality of x ({len(x.shape)}) does not match dimensionality of mask ({self.dimensionality})')
+        coords = torch.floor(x).long()
+        assert coords.min() >= 0, f'Coordinates must be positive, but found {coords.min()}'
+        seg = self.segmentation
+        for axis in range(self.dimensionality):
+            seg = torch.index_select(seg, dim=axis, index=coords[...,axis])
+        return seg
+    
+    @property
+    def volume(self):
+        return self.segmentation.long().sum().item()
